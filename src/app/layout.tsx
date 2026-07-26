@@ -27,9 +27,10 @@ export const viewport: Viewport = {
   // Zoom er bevidst IKKE slaet fra — felterne er 16px, sa iOS zoomer ikke af
   // sig selv, og screeneren kan stadig forstorre et billede.
   viewportFit: "cover",
+  // Samme vaerdier som nemscreening.dk, sa browserlinjen matcher pa tvaers.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d1117" },
+    { media: "(prefers-color-scheme: light)", color: "#f5f7fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1f3a" },
   ],
 };
 

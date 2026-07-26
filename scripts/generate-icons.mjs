@@ -104,8 +104,9 @@ function drawIcon(size, { rounded, inset }) {
   ]);
   const stroke = size * 0.085 * m;
 
-  const bg = [21, 128, 61];
-  const fg = [255, 255, 255];
+  // Maerkets navy med mint-flueben — samme par som nemscreening.dk.
+  const bg = [11, 31, 58]; // navy-900 #0b1f3a
+  const fg = [46, 229, 122]; // mint-400 #2ee57a
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {

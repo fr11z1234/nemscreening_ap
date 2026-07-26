@@ -6,25 +6,33 @@
  * bruges kun hvor de baerer betydning; ellers adskilles flader med tone og en
  * meget svag skygge.
  */
+/*
+ * Paletten er nemscreening.dk's egen: navy som maerkefarve, mint som
+ * handlingsfarve og bone som neutraler. Kun skrifttypen er en anden.
+ *
+ * Nuancerne er valgt sa tekst holder WCAG AA — maerkets #e54848 giver fx kun
+ * 3,9:1 pa lys baggrund, sa den er morknet til #c93636 (5,2:1) hvor den
+ * baerer ord.
+ */
 :root {
-  --bg: #f7f8fa;
+  --bg: #f5f7fa; /* bone-100 — samme som sitets theme-color */
   --surface: #ffffff;
-  --surface-2: #eff1f5;
-  --border: #e7eaee;
-  --border-strong: #ccd3dc;
+  --surface-2: #e8edf3; /* bone-200 */
+  --border: #e8edf3; /* bone-200 */
+  --border-strong: #d4dde7; /* bone-300 */
 
-  --fg: #0f1317;
-  --fg-2: #3c4652;
-  --muted: #6b7684;
+  --fg: #0b1f3a; /* navy-900 — brodteksten baerer maerket */
+  --fg-2: #15315f; /* navy-700 */
+  --muted: #5c7091; /* navy-tonet gra, 4,7:1 pa bone-100 */
 
-  --primary: #16a34a;
-  --primary-hover: #15803d;
+  --primary: #138345; /* mint-700 — 4,9:1 med hvid tekst */
+  --primary-hover: #0f6b38;
   --primary-fg: #ffffff;
-  --primary-soft: rgb(22 163 74 / 0.1);
-  --primary-line: rgb(22 163 74 / 0.28);
+  --primary-soft: rgb(19 131 69 / 0.1);
+  --primary-line: rgb(19 131 69 / 0.26);
 
-  --danger: #dc2626;
-  --danger-soft: rgb(220 38 38 / 0.09);
+  --danger: #c93636;
+  --danger-soft: rgb(229 72 72 / 0.1);
   --warning: #b45309;
   --warning-soft: rgb(180 83 9 / 0.1);
 
@@ -35,24 +43,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0e12;
-    --surface: #14181e;
-    --surface-2: #1c222a;
-    --border: #242b34;
-    --border-strong: #3a434f;
+    --bg: #0b1f3a; /* navy-900 — sitets morke theme-color */
+    --surface: #0e2244; /* navy-800 */
+    --surface-2: #15315f; /* navy-700 */
+    --border: #15315f; /* navy-700 */
+    --border-strong: #2e599f; /* navy-500 */
 
-    --fg: #e9edf2;
-    --fg-2: #b4bec9;
-    --muted: #8290a0;
+    --fg: #f5f7fa; /* bone-100 */
+    --fg-2: #d4dde7; /* bone-300 */
+    --muted: #b8c4d3; /* bone-400 — 9,5:1 pa navy-900 */
 
-    --primary: #22c55e;
-    --primary-hover: #16a34a;
-    --primary-fg: #06140b;
-    --primary-soft: rgb(34 197 94 / 0.14);
-    --primary-line: rgb(34 197 94 / 0.34);
+    --primary: #2ee57a; /* mint-400 */
+    --primary-hover: #5fe69d; /* mint-300 */
+    --primary-fg: #0b1f3a;
+    --primary-soft: rgb(46 229 122 / 0.14);
+    --primary-line: rgb(46 229 122 / 0.32);
 
-    --danger: #f87171;
-    --danger-soft: rgb(248 113 113 / 0.13);
+    --danger: #ff6b6b;
+    --danger-soft: rgb(229 72 72 / 0.18);
     --warning: #fbbf24;
     --warning-soft: rgb(251 191 36 / 0.13);
 

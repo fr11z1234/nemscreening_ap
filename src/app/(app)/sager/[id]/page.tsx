@@ -102,10 +102,11 @@ export default async function CasePage({
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {samples.map((s) => (
-              <li
-                key={s.id}
-                className="rounded-xl border border-border bg-surface p-3"
-              >
+              <li key={s.id}>
+                <Link
+                  href={`/sager/${id}/proever?seq=${s.seq}`}
+                  className="block rounded-xl border border-border bg-surface p-3 active:bg-surface-2"
+                >
                 <div className="flex items-center gap-2">
                   <span
                     className={`tabular rounded-md px-2 py-0.5 text-sm font-semibold ${
@@ -151,6 +152,7 @@ export default async function CasePage({
                     ))}
                   </div>
                 )}
+                </Link>
               </li>
             ))}
           </ul>

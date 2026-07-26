@@ -88,6 +88,7 @@ export function SamplingView({
   sampleTypes,
   initialSamples,
   initialPhotos,
+  initialSeq,
 }: {
   caseId: string;
   userId: string;
@@ -96,6 +97,8 @@ export function SamplingView({
   sampleTypes: string[];
   initialSamples: Sample[];
   initialPhotos: InitialPhoto[];
+  /** Aabner direkte pa en bestemt prove, nar man kommer fra sagsoverblikket. */
+  initialSeq?: number;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -107,7 +110,16 @@ export function SamplingView({
     const seq = Math.max(0, ...existing.map((d) => d.seq)) + 1;
     return [...existing, nextDraft(caseId, seq, userId, last)];
   });
-  const [index, setIndex] = useState(() => initialSamples.length);
+
+  const startIndex =
+    initialSeq != null
+      ? Math.max(
+          0,
+          initialSamples.findIndex((s) => s.seq === initialSeq),
+        )
+      : initialSamples.length;
+
+  const [index, setIndex] = useState(startIndex);
 
   const [photos, setPhotos] = useState<Record<string, Thumb[]>>(() => {
     const map: Record<string, Thumb[]> = {};
@@ -119,7 +131,7 @@ export function SamplingView({
 
   const draft = rows[index];
   const [tonsText, setTonsText] = useState(() =>
-    formatDecimal(rows[initialSamples.length]?.estimated_tons),
+    formatDecimal(initialSamples[startIndex]?.estimated_tons ?? null),
   );
   const [pending, setPending] = useState({ samples: 0, photos: 0 });
   const [busy, setBusy] = useState(false);
@@ -616,7 +628,9 @@ export function SamplingView({
         )}
       </div>
 
-      <div className="safe-b fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface px-4 pt-3">
+      {/* max-w matcher app-layoutets kolonne, sa linjen ikke spaender hele
+          skaermen pa en pc. */}
+      <div className="safe-b fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-xl border-t border-border bg-surface px-4 pt-3">
         {notice && <p className="pb-2 text-xs text-warning">{notice}</p>}
         <div className="grid grid-cols-2 gap-3">
           <button

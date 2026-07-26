@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getMember } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
-import type { AppUser } from "@/lib/types";
 
 /**
  * Adgangskontrol for hele appen.
@@ -11,34 +10,24 @@ import type { AppUser } from "@/lib/types";
  * samme i databasen — tjekket her findes for at give en forstaelig besked
  * i stedet for sider der bare er tomme.
  *
- * Sidehovedet ligger ikke her, men i <AppHeader />, sa provetagningsviewet
- * kan bruge hele skaermen.
+ * Indholdet holdes i en centreret kolonne: appen er bygget til en telefon, og
+ * fuldbredde-tekstlinjer pa en skaerm er ubehagelige at lase.
  */
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const member = await getMember();
+  if (!member) redirect("/login");
 
-  if (!user) redirect("/login");
-
-  const { data: member } = await supabase
-    .from("app_users")
-    .select("id, full_name, email, role, active")
-    .eq("id", user.id)
-    .maybeSingle<AppUser>();
-
-  if (!member || !member.active) {
+  if (!member.profile || !member.profile.active) {
     return (
       <main className="flex flex-1 flex-col justify-center px-6 py-12">
         <div className="mx-auto w-full max-w-sm text-center">
           <h1 className="text-xl font-semibold">Ingen adgang</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Kontoen <span className="font-medium">{user.email}</span> er ikke
+            Kontoen <span className="font-medium">{member.email}</span> er ikke
             oprettet som bruger i screening-appen. Kontakt kontoret, hvis du skal
             have adgang.
           </p>
@@ -52,5 +41,9 @@ export default async function AppLayout({
     );
   }
 
-  return <div className="flex flex-1 flex-col">{children}</div>;
+  return (
+    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col border-border sm:border-x">
+      {children}
+    </div>
+  );
 }

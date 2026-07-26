@@ -11,7 +11,7 @@ const TONE: Record<CaseStatus, string> = {
 export function StatusBadge({ status }: { status: CaseStatus }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium ${TONE[status]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONE[status]}`}
     >
       {CASE_STATUS_LABEL[status]}
     </span>

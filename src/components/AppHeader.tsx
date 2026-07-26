@@ -1,25 +1,17 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getMember } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
-import type { AppUser } from "@/lib/types";
 
 /**
  * Sidehoved til de almindelige sider. Provetagningsviewet bruger den bevidst
  * ikke — der skal hele skaermen ga til kamera og formular.
+ *
+ * getMember() er cachet pr. request, sa opslaget her deles med layoutets
+ * adgangstjek i stedet for at koste et ekstra kald til Supabase Auth.
  */
 export async function AppHeader() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: member } = await supabase
-    .from("app_users")
-    .select("full_name, email")
-    .eq("id", user?.id ?? "")
-    .maybeSingle<Pick<AppUser, "full_name" | "email">>();
-
-  const name = member?.full_name?.trim() || member?.email || "";
+  const member = await getMember();
+  const name = member?.profile?.full_name?.trim() || member?.email || "";
 
   return (
     <header className="safe-t sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
@@ -27,7 +19,7 @@ export async function AppHeader() {
         <Link href="/sager" className="font-semibold tracking-tight">
           Nemscreening
         </Link>
-        <span className="ml-auto max-w-[9rem] truncate text-sm text-muted">
+        <span className="ml-auto max-w-36 truncate text-sm text-muted">
           {name}
         </span>
         <form action={logout}>

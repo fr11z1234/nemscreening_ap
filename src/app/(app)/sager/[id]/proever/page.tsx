@@ -8,10 +8,13 @@ export const metadata = { title: "Prøvetagning · Nemscreening" };
 
 export default async function SamplingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ seq?: string }>;
 }) {
   const { id } = await params;
+  const { seq } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -105,6 +108,7 @@ export default async function SamplingPage({
       sampleTypes={(typesRes.data ?? []).map((t) => t.name)}
       initialSamples={samples}
       initialPhotos={initialPhotos}
+      initialSeq={seq ? Number(seq) : undefined}
     />
   );
 }

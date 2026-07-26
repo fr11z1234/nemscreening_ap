@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/*
+ * Farverne er valgt til at kunne laeses bade i skarpt sollys pa en byggeplads
+ * og i en mork kaelder. Hoj kontrast, ingen sarte gratoner.
+ */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --border: #d8dde3;
+  --fg: #12161a;
+  --muted: #5b6672;
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-fg: #ffffff;
+  --danger: #b91c1c;
+  --warning: #a16207;
+  --ring: #15803d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1f242c;
+    --border: #2d343d;
+    --fg: #e8edf2;
+    --muted: #94a2b0;
+    --primary: #22c55e;
+    --primary-hover: #16a34a;
+    --primary-fg: #05140a;
+    --danger: #f87171;
+    --warning: #fbbf24;
+    --ring: #22c55e;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--bg);
+  /* Ingen gummibands-scroll pa iOS nar viewet er sticky top og bund. */
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * 16px er ikke kosmetik: under 16px zoomer iOS Safari automatisk ind nar et
+ * felt far fokus, og sa er hele layoutet forskubbet resten af proven.
+ */
+input,
+select,
+textarea,
+button {
+  font-size: 16px;
+}
+
+/* Tal skal vaere lette at sammenligne i provetabellen. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility safe-b {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+@utility safe-t {
+  padding-top: max(env(safe-area-inset-top), 0rem);
+}
+
+/* Alt der kan trykkes pa skal kunne rammes med en tommelfinger i arbejdshandske. */
+@utility tap {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

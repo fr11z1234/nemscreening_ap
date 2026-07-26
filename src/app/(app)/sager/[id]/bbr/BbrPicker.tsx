@@ -9,7 +9,8 @@ import { saveBuildings } from "./actions";
 /** `key` er kun til Reacts liste — den folger ikke med i databasen. */
 type Row = BbrBuilding & { key: string; selected: boolean; isManual?: boolean };
 
-const field = "tap w-full rounded-lg border border-border bg-surface px-3 py-2.5";
+const field =
+  "tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted";
 
 const asRows = (buildings: BbrBuilding[]): Row[] =>
   buildings.map((b, i) => ({
@@ -152,14 +153,14 @@ export function BbrPicker({
   return (
     <div className="flex flex-col gap-6 px-4 pb-12">
       {!husnummerId && (
-        <p className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">
           Sagen har ingen adresse fra adressesøgningen, så BBR kan ikke slås op
           automatisk. Opret bygningerne i hånden nedenfor.
         </p>
       )}
 
       {error && (
-        <p className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">
           {error}
         </p>
       )}
@@ -196,7 +197,7 @@ export function BbrPicker({
         <button
           type="button"
           onClick={addManual}
-          className="tap rounded-lg border border-border px-4"
+          className="tap rounded-xl border border-border-strong px-4"
         >
           Tilføj bygning i hånden
         </button>
@@ -276,7 +277,7 @@ export function BbrPicker({
         </button>
         <Link
           href={`/sager/${caseId}`}
-          className="tap flex items-center justify-center rounded-lg border border-border px-4"
+          className="tap flex items-center justify-center rounded-xl border border-border-strong px-4"
         >
           Tilbage
         </Link>
@@ -347,8 +348,10 @@ function BuildingRow({
 
   return (
     <div
-      className={`rounded-xl border ${
-        row.selected ? "border-primary bg-primary/5" : "border-border bg-surface"
+      className={`rounded-xl transition-colors ${
+        row.selected
+          ? "bg-primary-soft inset-ring inset-ring-primary-line"
+          : "bg-surface shadow-card"
       }`}
     >
       <div className="flex gap-3 p-3">
@@ -381,9 +384,9 @@ function BuildingRow({
       </div>
 
       {open && (
-        <div className="flex flex-col gap-4 border-t border-border p-3">
+        <div className="flex flex-col gap-4 border-t border-border/70 p-3">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Navn</span>
+            <span className="label-xs">Navn</span>
             <input
               type="text"
               value={row.label}

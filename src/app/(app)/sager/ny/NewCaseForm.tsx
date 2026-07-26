@@ -20,7 +20,7 @@ function SubmitButton() {
 }
 
 const field =
-  "tap w-full rounded-lg border border-border bg-surface px-3 py-2.5";
+  "tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted";
 
 export function NewCaseForm() {
   const [state, formAction] = useActionState<CreateCaseState, FormData>(
@@ -44,7 +44,7 @@ export function NewCaseForm() {
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+          className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger"
         >
           {state.error}
         </p>
@@ -140,7 +140,7 @@ export function NewCaseForm() {
         <SubmitButton />
         <Link
           href="/sager"
-          className="tap inline-flex items-center justify-center rounded-lg border border-border px-4"
+          className="tap inline-flex items-center justify-center rounded-xl border border-border-strong px-4"
         >
           Annullér
         </Link>

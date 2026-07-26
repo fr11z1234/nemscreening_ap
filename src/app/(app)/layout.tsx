@@ -32,7 +32,7 @@ export default async function AppLayout({
             have adgang.
           </p>
           <form action={logout} className="mt-6">
-            <button className="tap rounded-lg border border-border px-4 py-2.5">
+            <button className="tap rounded-xl border border-border-strong px-4 py-2.5">
               Log ud
             </button>
           </form>

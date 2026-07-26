@@ -29,14 +29,16 @@ export function PickerField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="label-xs">{label}</span>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="tap flex w-full items-center rounded-lg border border-border bg-surface px-3 py-2.5 text-left"
+        className="tap flex w-full items-center gap-2 rounded-xl bg-surface px-3.5 py-2.5 text-left shadow-card"
       >
-        <span className={value ? "" : "text-muted"}>{value ?? placeholder}</span>
-        <span className="ml-auto text-muted" aria-hidden>
+        <span className={`truncate ${value ? "font-medium" : "text-muted"}`}>
+          {value ?? placeholder}
+        </span>
+        <span className="ml-auto shrink-0 text-xs text-muted" aria-hidden>
           ▾
         </span>
       </button>
@@ -116,9 +118,13 @@ function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex max-h-[85dvh] flex-col rounded-t-2xl border-t border-border bg-surface"
+        className="relative mx-auto flex max-h-[85dvh] w-full max-w-xl flex-col rounded-t-2xl bg-surface shadow-sheet"
       >
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        {/* Greb, sa det er tydeligt at panelet kan lukkes ved at trykke ved siden af. */}
+        <div className="flex justify-center pt-2.5">
+          <div className="h-1 w-9 rounded-full bg-border-strong" />
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3">
           <h2 className="font-semibold">{title}</h2>
           <button
             type="button"
@@ -129,14 +135,14 @@ function Sheet({
           </button>
         </div>
 
-        <div className="px-4 py-3">
+        <div className="px-4 pb-3">
           <input
             ref={inputRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Søg"
-            className="tap w-full rounded-lg border border-border bg-bg px-3 py-2.5"
+            className="tap w-full rounded-xl bg-surface-2 px-3.5 py-2.5 outline-none placeholder:text-muted"
           />
         </div>
 
@@ -196,7 +202,7 @@ function Option({
       <button
         type="button"
         onClick={onSelect}
-        className={`tap flex w-full items-center gap-2 border-b border-border px-4 py-3 text-left last:border-0 active:bg-surface-2 ${
+        className={`tap flex w-full items-center gap-2 px-4 py-3 text-left active:bg-surface-2 ${
           muted ? "text-muted" : ""
         } ${selected ? "font-medium text-primary" : ""}`}
       >

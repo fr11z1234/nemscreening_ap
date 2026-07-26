@@ -70,7 +70,7 @@ export function AddressSearch({
         onFocus={() => visible.length > 0 && setOpen(true)}
         placeholder="Søg adresse"
         autoComplete="off"
-        className="tap w-full rounded-lg border border-border bg-surface px-3 py-2.5"
+        className="tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
       />
 
       {loading && (
@@ -80,13 +80,13 @@ export function AddressSearch({
       )}
 
       {open && visible.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <ul className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-xl bg-surface shadow-raised inset-ring inset-ring-border">
           {visible.map((s) => (
             <li key={s.id}>
               <button
                 type="button"
                 onClick={() => choose(s)}
-                className="tap block w-full px-3 py-2.5 text-left active:bg-surface-2 border-b border-border last:border-0"
+                className="tap block w-full px-3.5 py-2.5 text-left active:bg-surface-2"
               >
                 {s.tekst}
               </button>

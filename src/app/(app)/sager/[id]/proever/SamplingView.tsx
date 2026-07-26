@@ -263,6 +263,10 @@ export function SamplingView({
   }
 
   async function removePhoto(id: string) {
+    // Et billede kan ikke tages om, nar screeneren er kort hjem fra adressen.
+    // Derfor en bekraeftelse frem for et tryk der bare sletter.
+    if (!window.confirm("Slet billedet?")) return;
+
     const thumb = thumbs.find((t) => t.id === id);
     if (thumb?.local) {
       URL.revokeObjectURL(thumb.url);
@@ -368,7 +372,7 @@ export function SamplingView({
           <span className="font-semibold">Prøve {draft.seq}</span>
           <span
             className={`tabular rounded-md px-1.5 text-sm font-semibold ${
-              isLabSample ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted"
+              isLabSample ? "bg-primary-soft text-primary" : "bg-surface-2 text-muted"
             }`}
           >
             {label}
@@ -389,7 +393,7 @@ export function SamplingView({
           </span>
         </div>
         {unsynced > 0 && (
-          <p className="bg-warning/10 px-4 py-1 text-xs text-warning">
+          <p className="bg-warning-soft px-4 py-1 text-xs text-warning">
             {unsynced} ting venter på at blive sendt
           </p>
         )}
@@ -466,24 +470,28 @@ export function SamplingView({
 
       <div className="flex items-center gap-2 overflow-x-auto px-4 py-3">
         {thumbs.length === 0 ? (
-          <p className="text-sm text-muted">
-            Tryk på billedet for at fotografere prøven
+          <p className="text-[13px] text-muted">
+            Tryk på billedet ovenfor for at fotografere prøven
           </p>
         ) : (
           thumbs.map((t) => (
-            <button
+            // Selve billedet er ikke en knap. Sletning ligger pa det lille
+            // kryds, sa et tilfaeldigt tryk ikke koster et foto.
+            <div
               key={t.id}
-              type="button"
-              onClick={() => removePhoto(t.id)}
-              className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border"
-              aria-label="Fjern billede"
+              className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={t.url} alt="" className="h-full w-full object-cover" />
-              <span className="absolute right-0 top-0 bg-black/60 px-1 text-xs text-white">
+              <button
+                type="button"
+                onClick={() => removePhoto(t.id)}
+                aria-label="Slet billedet"
+                className="absolute right-0.5 top-0.5 flex size-6 items-center justify-center rounded-full bg-black/65 text-sm leading-none text-white"
+              >
                 ×
-              </span>
-            </button>
+              </button>
+            </div>
           ))
         )}
       </div>
@@ -519,7 +527,7 @@ export function SamplingView({
         )}
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Periode</span>
+          <span className="label-xs">Periode</span>
           <div className="grid grid-cols-2 gap-2">
             {(Object.keys(PERIOD_LABEL) as BuildingPeriod[]).map((p) => (
               <button
@@ -527,10 +535,10 @@ export function SamplingView({
                 type="button"
                 onClick={() => update({ period: draft.period === p ? null : p })}
                 aria-pressed={draft.period === p}
-                className={`tap rounded-lg border px-3 ${
+                className={`tap rounded-xl px-3 transition-colors ${
                   draft.period === p
-                    ? "border-primary bg-primary/10 font-medium text-primary"
-                    : "border-border bg-surface"
+                    ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                    : "bg-surface shadow-card"
                 }`}
               >
                 {PERIOD_LABEL[p]}
@@ -540,7 +548,7 @@ export function SamplingView({
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Estimeret mængde (ton)</span>
+          <span className="label-xs">Estimeret mængde (ton)</span>
           <input
             type="text"
             inputMode="decimal"
@@ -552,12 +560,12 @@ export function SamplingView({
               update({ estimated_tons: n });
             }}
             placeholder="0,2"
-            className="tap w-full rounded-lg border border-border bg-surface px-3 py-2.5"
+            className="tap tabular w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
           />
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Analyser</span>
+          <span className="label-xs">Analyser</span>
           <div className="grid grid-cols-2 gap-2">
             {ANALYSIS_FIELDS.map((a) => (
               <button
@@ -565,17 +573,17 @@ export function SamplingView({
                 type="button"
                 onClick={() => update({ [a.key]: !draft[a.key] })}
                 aria-pressed={draft[a.key]}
-                className={`tap rounded-lg border px-3 text-sm ${
+                className={`tap rounded-xl px-3 text-sm transition-colors ${
                   draft[a.key]
-                    ? "border-primary bg-primary/10 font-medium text-primary"
-                    : "border-border bg-surface"
+                    ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                    : "bg-surface shadow-card"
                 }`}
               >
                 {a.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted">
+          <p className="text-xs leading-relaxed text-muted">
             {isLabSample
               ? `Sendes til laboratoriet som ${label}.`
               : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet."}
@@ -583,18 +591,20 @@ export function SamplingView({
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Kommentar</span>
+          <span className="label-xs">Kommentar</span>
           <textarea
             rows={2}
             value={draft.comment ?? ""}
             onChange={(e) => update({ comment: e.target.value || null })}
-            className="tap w-full rounded-lg border border-border bg-surface px-3 py-2.5"
+            className="w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none"
           />
         </label>
 
         {filled > 0 && (
           <section>
-            <h2 className="text-sm font-medium">Registreret på sagen</h2>
+            <h2 className="label-xs uppercase tracking-wide">
+              Registreret på sagen
+            </h2>
             <ul className="mt-2 flex flex-col gap-1">
               {rows.map((r, i) =>
                 r.material ? (
@@ -606,13 +616,13 @@ export function SamplingView({
                         await commit(false);
                         goTo(i);
                       }}
-                      className={`tap flex w-full items-center gap-2 rounded-lg border px-3 text-left text-sm ${
+                      className={`tap flex w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm transition-colors ${
                         i === index
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-surface"
+                          ? "bg-primary-soft inset-ring inset-ring-primary-line"
+                          : "bg-surface shadow-card"
                       }`}
                     >
-                      <span className="tabular w-9 shrink-0 font-semibold">
+                      <span className="tabular w-8 shrink-0 font-semibold">
                         {labelFor(r)}
                       </span>
                       <span className="truncate">{r.material}</span>
@@ -632,12 +642,14 @@ export function SamplingView({
           skaermen pa en pc. */}
       <div className="safe-b fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-xl border-t border-border bg-surface px-4 pt-3">
         {notice && <p className="pb-2 text-xs text-warning">{notice}</p>}
-        <div className="grid grid-cols-2 gap-3">
+        {/* "Naeste" er den handling der gentages hundredvis af gange, sa den
+            far bade mest plads og den staerkeste vaegt. */}
+        <div className="flex gap-2.5">
           <button
             type="button"
             onClick={onNext}
             disabled={busy}
-            className="tap rounded-lg bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-60"
+            className="tap flex-1 rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-60"
           >
             {isLastRow ? "Næste prøve" : "Næste"}
           </button>
@@ -645,7 +657,7 @@ export function SamplingView({
             type="button"
             onClick={onFinish}
             disabled={busy}
-            className="tap rounded-lg border border-border px-4 font-medium disabled:opacity-60"
+            className="tap rounded-xl border border-border-strong px-5 font-medium disabled:opacity-60"
           >
             Afslut
           </button>

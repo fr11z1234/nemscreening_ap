@@ -24,7 +24,7 @@ export default async function LoginPage({
         {error && (
           <p
             role="alert"
-            className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm"
+            className="mb-4 rounded-xl bg-danger-soft px-4 py-3 text-danger text-sm"
           >
             {error}
           </p>
@@ -41,7 +41,7 @@ export default async function LoginPage({
               autoComplete="username"
               inputMode="email"
               required
-              className="tap rounded-lg border border-border bg-surface px-3 py-2.5"
+              className="tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
             />
           </label>
 
@@ -52,7 +52,7 @@ export default async function LoginPage({
               type="password"
               autoComplete="current-password"
               required
-              className="tap rounded-lg border border-border bg-surface px-3 py-2.5"
+              className="tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
             />
           </label>
 

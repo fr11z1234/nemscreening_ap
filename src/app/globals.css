@@ -1,38 +1,64 @@
 @import "tailwindcss";
 
 /*
- * Farverne er valgt til at kunne laeses bade i skarpt sollys pa en byggeplads
- * og i en mork kaelder. Hoj kontrast, ingen sarte gratoner.
+ * Farverne skal kunne laeses bade i skarpt sollys pa en byggeplads og i en
+ * mork kaelder — men uden at hver eneste flade far en synlig ramme. Kanter
+ * bruges kun hvor de baerer betydning; ellers adskilles flader med tone og en
+ * meget svag skygge.
  */
 :root {
-  --bg: #f5f6f8;
+  --bg: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #eef0f3;
-  --border: #d8dde3;
-  --fg: #12161a;
-  --muted: #5b6672;
-  --primary: #15803d;
-  --primary-hover: #166534;
+  --surface-2: #eff1f5;
+  --border: #e7eaee;
+  --border-strong: #ccd3dc;
+
+  --fg: #0f1317;
+  --fg-2: #3c4652;
+  --muted: #6b7684;
+
+  --primary: #16a34a;
+  --primary-hover: #15803d;
   --primary-fg: #ffffff;
-  --danger: #b91c1c;
-  --warning: #a16207;
-  --ring: #15803d;
+  --primary-soft: rgb(22 163 74 / 0.1);
+  --primary-line: rgb(22 163 74 / 0.28);
+
+  --danger: #dc2626;
+  --danger-soft: rgb(220 38 38 / 0.09);
+  --warning: #b45309;
+  --warning-soft: rgb(180 83 9 / 0.1);
+
+  --shadow-sm: 0 1px 2px rgb(15 19 23 / 0.05);
+  --shadow: 0 1px 3px rgb(15 19 23 / 0.07), 0 1px 2px rgb(15 19 23 / 0.04);
+  --shadow-lg: 0 -8px 32px rgb(15 19 23 / 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface-2: #1f242c;
-    --border: #2d343d;
-    --fg: #e8edf2;
-    --muted: #94a2b0;
+    --bg: #0b0e12;
+    --surface: #14181e;
+    --surface-2: #1c222a;
+    --border: #242b34;
+    --border-strong: #3a434f;
+
+    --fg: #e9edf2;
+    --fg-2: #b4bec9;
+    --muted: #8290a0;
+
     --primary: #22c55e;
     --primary-hover: #16a34a;
-    --primary-fg: #05140a;
+    --primary-fg: #06140b;
+    --primary-soft: rgb(34 197 94 / 0.14);
+    --primary-line: rgb(34 197 94 / 0.34);
+
     --danger: #f87171;
+    --danger-soft: rgb(248 113 113 / 0.13);
     --warning: #fbbf24;
-    --ring: #22c55e;
+    --warning-soft: rgb(251 191 36 / 0.13);
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 -8px 32px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -41,13 +67,24 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
   --color-muted: var(--muted);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-line: var(--primary-line);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow);
+  --shadow-sheet: var(--shadow-lg);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
@@ -75,9 +112,30 @@ button {
   font-size: 16px;
 }
 
-/* Tal skal vaere lette at sammenligne i provetabellen. */
+/* Store overskrifter samler sig med lidt strammere spatiering. */
+h1,
+h2 {
+  letter-spacing: -0.015em;
+}
+
+/* Tal skal kunne sammenlignes lodret i provetabellen. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/** Kort: tone og skygge frem for en ramme rundt om alt. */
+@utility card {
+  background: var(--surface);
+  border-radius: 0.875rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/** Lille daempet etiket over en vaerdi. */
+@utility label-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 @utility safe-b {
@@ -95,6 +153,6 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }

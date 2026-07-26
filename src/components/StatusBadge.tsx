@@ -1,17 +1,21 @@
 import { CASE_STATUS_LABEL, type CaseStatus } from "@/lib/types";
 
+/**
+ * Kun de statusser der kraever handling far farve. Havde alle fem en kulør,
+ * ville ingen af dem betyde noget.
+ */
 const TONE: Record<CaseStatus, string> = {
-  oprettet: "bg-surface-2 text-muted border-border",
-  under_screening: "bg-primary/10 text-primary border-primary/30",
-  proever_taget: "bg-primary/10 text-primary border-primary/30",
-  sendt_til_lab: "bg-warning/10 text-warning border-warning/30",
-  afsluttet: "bg-surface-2 text-muted border-border",
+  oprettet: "bg-surface-2 text-muted",
+  under_screening: "bg-primary-soft text-primary",
+  proever_taget: "bg-primary-soft text-primary",
+  sendt_til_lab: "bg-warning-soft text-warning",
+  afsluttet: "bg-surface-2 text-muted",
 };
 
 export function StatusBadge({ status }: { status: CaseStatus }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${TONE[status]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium ${TONE[status]}`}
     >
       {CASE_STATUS_LABEL[status]}
     </span>

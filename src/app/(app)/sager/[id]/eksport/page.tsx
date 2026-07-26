@@ -78,7 +78,7 @@ export default async function ExportPage({
         </div>
 
         {errors.length > 0 && (
-          <div className="rounded-xl border border-danger/40 bg-danger/10 p-4">
+          <div className="rounded-xl bg-danger-soft p-4">
             <p className="text-sm font-medium text-danger">
               Filen kan ikke laves endnu
             </p>
@@ -91,7 +91,7 @@ export default async function ExportPage({
         )}
 
         {warnings.length > 0 && (
-          <div className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+          <div className="mt-3 rounded-xl bg-warning-soft p-4">
             <p className="text-sm font-medium text-warning">
               Filen kan laves, men tjek lige dette
             </p>
@@ -119,10 +119,10 @@ export default async function ExportPage({
               {labSamples.map((s) => (
                 <li
                   key={s.id}
-                  className="rounded-xl border border-border bg-surface p-3"
+                  className="card p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="tabular rounded-md bg-primary/15 px-2 py-0.5 text-sm font-semibold text-primary">
+                    <span className="tabular rounded-md bg-primary-soft px-2 py-0.5 text-sm font-semibold text-primary">
                       {s.label}
                     </span>
                     <span className="truncate font-medium">
@@ -141,7 +141,7 @@ export default async function ExportPage({
                         <span
                           key={a.key}
                           title={col?.name}
-                          className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                          className="rounded bg-primary-soft px-2 py-0.5 text-xs text-primary"
                         >
                           {a.label}
                         </span>
@@ -172,7 +172,7 @@ export default async function ExportPage({
                 await setCaseStatus(id, "sendt_til_lab");
               }}
             >
-              <button className="tap w-full rounded-lg border border-border px-4">
+              <button className="tap w-full rounded-xl border border-border-strong px-4">
                 Markér som sendt til lab
               </button>
             </form>

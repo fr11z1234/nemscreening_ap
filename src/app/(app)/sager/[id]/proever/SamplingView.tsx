@@ -18,6 +18,8 @@ import { formatDecimal, parseDecimal } from "@/lib/format";
 import {
   ANALYSIS_FIELDS,
   PERIOD_LABEL,
+  analysesForPeriod,
+  analysisApplies,
   type BuildingPeriod,
   type CaseBuilding,
   type Sample,
@@ -31,6 +33,16 @@ const uuid = () => crypto.randomUUID();
 
 const labelFor = (d: Draft) =>
   ANALYSIS_FIELDS.some((a) => d[a.key]) ? `P${d.seq}` : String(d.seq);
+
+/** Navnene pa de analyser perioden slar fra, som "A og B". */
+const EXCLUDED_LABELS = (() => {
+  const names = ANALYSIS_FIELDS.filter(
+    (a) => !analysisApplies(a.key, "efter_1990"),
+  ).map((a) => a.label);
+  return names.length > 1
+    ? `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`
+    : names.join("");
+})();
 
 /**
  * En ny raekke starter blank. Kun bygningen folger med.
@@ -77,6 +89,10 @@ function toDraft(s: Sample, userId: string): Draft {
     analysis_pah: s.analysis_pah,
     comment: s.comment,
     created_by: s.created_by ?? userId,
+    // Raekker gemt for perioden begraensede analyserne kan baere et valg der
+    // ikke laengere kan traeffes. Draften viser det perioden tillader, sa
+    // knappen og det gemte ikke siger hver sit.
+    ...analysesForPeriod(s.period),
   };
 }
 
@@ -533,7 +549,10 @@ export function SamplingView({
               <button
                 key={p}
                 type="button"
-                onClick={() => update({ period: draft.period === p ? null : p })}
+                onClick={() => {
+                  const period = draft.period === p ? null : p;
+                  update({ period, ...analysesForPeriod(period) });
+                }}
                 aria-pressed={draft.period === p}
                 className={`tap rounded-xl px-3 transition-colors ${
                   draft.period === p
@@ -567,26 +586,32 @@ export function SamplingView({
         <div className="flex flex-col gap-1.5">
           <span className="label-xs">Analyser</span>
           <div className="grid grid-cols-2 gap-2">
-            {ANALYSIS_FIELDS.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                onClick={() => update({ [a.key]: !draft[a.key] })}
-                aria-pressed={draft[a.key]}
-                className={`tap rounded-xl px-3 text-sm transition-colors ${
-                  draft[a.key]
-                    ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
-                    : "bg-surface shadow-card"
-                }`}
-              >
-                {a.label}
-              </button>
-            ))}
+            {ANALYSIS_FIELDS.map((a) => {
+              const applies = analysisApplies(a.key, draft.period);
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  disabled={!applies}
+                  onClick={() => update({ [a.key]: !draft[a.key] })}
+                  aria-pressed={draft[a.key]}
+                  className={`tap rounded-xl px-3 text-sm transition-colors ${
+                    draft[a.key]
+                      ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                      : "bg-surface shadow-card"
+                  } ${applies ? "" : "opacity-40"}`}
+                >
+                  {a.label}
+                </button>
+              );
+            })}
           </div>
           <p className="text-xs leading-relaxed text-muted">
             {isLabSample
               ? `Sendes til laboratoriet som ${label}.`
               : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet."}
+            {draft.period === "efter_1990" &&
+              ` ${EXCLUDED_LABELS} bestilles ikke på en bygning fra efter 1990.`}
           </p>
         </div>
 

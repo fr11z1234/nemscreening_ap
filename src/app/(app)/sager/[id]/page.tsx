@@ -47,6 +47,8 @@ export default async function CasePage({
   const samples = samplesRes.data ?? [];
   const labCount = samples.filter((s) => s.is_lab_sample).length;
   const buildingLabel = new Map(buildings.map((b) => [b.id, b.label]));
+  const photosOf = (s: SampleRow) => s.sample_photos?.[0]?.count ?? 0;
+  const withoutPhotos = samples.filter((s) => photosOf(s) === 0).length;
 
   return (
     <>
@@ -115,7 +117,7 @@ export default async function CasePage({
           ) : (
             <ul className="mt-2.5 flex flex-col gap-1.5">
               {samples.map((s) => {
-                const photos = s.sample_photos?.[0]?.count ?? 0;
+                const photos = photosOf(s);
                 return (
                   <li key={s.id}>
                     <Link
@@ -172,6 +174,26 @@ export default async function CasePage({
                 );
               })}
             </ul>
+          )}
+
+          {/* Den sidste kontrol for screeneren korer: er der billeder pa alle
+              prover? Knappen sidder under listen, hvor spørgsmalet opstar. */}
+          {samples.length > 0 && (
+            <Link
+              href={`/sager/${id}/billeder`}
+              className={`tap mt-3 flex items-center justify-center gap-2 rounded-xl px-4 font-medium ${
+                withoutPhotos > 0
+                  ? "bg-warning-soft text-warning"
+                  : "border border-border-strong"
+              }`}
+            >
+              Gennemgå billeder
+              {withoutPhotos > 0 && (
+                <span className="tabular text-sm font-normal">
+                  · {withoutPhotos} uden
+                </span>
+              )}
+            </Link>
           )}
         </section>
       </main>

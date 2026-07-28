@@ -33,6 +33,7 @@ const sample = (
   type: string,
   a: Partial<ExportSample>,
 ): ExportSample => {
+  const period = a.period ?? "foer_1990";
   const flags = {
     analysis_pcb: false,
     analysis_asbestos: false,
@@ -49,6 +50,7 @@ const sample = (
     label: isLab ? `P${seq}` : String(seq),
     material,
     sample_type: type,
+    period,
     is_lab_sample: isLab,
     ...flags,
   };
@@ -247,6 +249,25 @@ check(
     ),
   ).some((i) => i.message.includes("plads til")),
   `valideringen fangede ikke mere end ${MAX_SAMPLES} proever`,
+);
+
+// 12. Perioden: PCB og asbest hoerer ikke til pa en bygning efter 1990.
+check(
+  validateForExport("Testvej 1", [
+    sample(1, "Træ", "Maling", {
+      analysis_pcb: true,
+      analysis_asbestos: true,
+      period: "efter_1990",
+    }),
+  ]).filter((i) => i.level === "warning" && i.message.includes("efter 1990"))
+    .length === 2,
+  "valideringen advarede ikke om bade PCB og asbest pa en bygning efter 1990",
+);
+check(
+  validateForExport("Testvej 1", [
+    sample(1, "Træ", "Maling", { analysis_metals: true, period: "efter_1990" }),
+  ]).every((i) => !i.message.includes("efter 1990")),
+  "valideringen advarede om metaller, som perioden ikke slar fra",
 );
 
 const out = new URL("../.eurofins-test.xlsx", import.meta.url);

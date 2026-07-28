@@ -52,6 +52,7 @@ export async function GET(
     label: s.label,
     material: s.material,
     sample_type: s.sample_type,
+    period: s.period,
     is_lab_sample: s.is_lab_sample,
     analysis_pcb: s.analysis_pcb,
     analysis_asbestos: s.analysis_asbestos,

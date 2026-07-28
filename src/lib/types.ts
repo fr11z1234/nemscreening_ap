@@ -121,3 +121,33 @@ export const ANALYSIS_FIELDS = [
 ] as const;
 
 export type AnalysisKey = (typeof ANALYSIS_FIELDS)[number]["key"];
+
+/**
+ * Analyser der ikke bestilles pa en bygning fra efter 1990.
+ *
+ * PCB og asbest var udfaset i byggematerialer for den periode, sa proven
+ * ville koste kunden penge uden at kunne finde andet end nul.
+ */
+const EXCLUDED_AFTER_1990: readonly AnalysisKey[] = [
+  "analysis_pcb",
+  "analysis_asbestos",
+];
+
+/** Om analysen overhovedet kan vaelges for en bygning fra den periode. */
+export function analysisApplies(
+  key: AnalysisKey,
+  period: BuildingPeriod | null,
+): boolean {
+  return period !== "efter_1990" || !EXCLUDED_AFTER_1990.includes(key);
+}
+
+/** De analyser perioden slar fra, som en aendring der kan gemmes. */
+export function analysesForPeriod(
+  period: BuildingPeriod | null,
+): Partial<Record<AnalysisKey, false>> {
+  const off: Partial<Record<AnalysisKey, false>> = {};
+  for (const a of ANALYSIS_FIELDS) {
+    if (!analysisApplies(a.key, period)) off[a.key] = false;
+  }
+  return off;
+}

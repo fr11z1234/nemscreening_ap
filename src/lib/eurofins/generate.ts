@@ -1,5 +1,10 @@
 import { EUROFINS_ANALYSES } from "./template";
 import {
+  ANALYSIS_FIELDS,
+  analysisApplies,
+  type BuildingPeriod,
+} from "@/lib/types";
+import {
   MAX_SAMPLES,
   fillOrderTemplate,
   readAnalysisCodes,
@@ -10,6 +15,7 @@ export type ExportSample = {
   label: string;
   material: string | null;
   sample_type: string | null;
+  period: BuildingPeriod | null;
   is_lab_sample: boolean;
   analysis_pcb: boolean;
   analysis_asbestos: boolean;
@@ -72,6 +78,19 @@ export function validateForExport(
       issues.push({
         level: "warning",
         message: `${s.label} mangler prøveart.`,
+      });
+    }
+
+    // Perioden slar analyserne fra i prøvetagningen, men en raekke gemt for
+    // reglen kom til kan stadig baere dem. Sa hellere sige det her end
+    // bestille en analyse kunden betaler for uden at kunne finde noget.
+    const wrongPeriod = ANALYSIS_FIELDS.filter(
+      (a) => s[a.key] && !analysisApplies(a.key, s.period),
+    );
+    for (const a of wrongPeriod) {
+      issues.push({
+        level: "warning",
+        message: `${s.label} har ${a.label} valgt, men bygningen er fra efter 1990. Åbn prøven og gem den igen for at fjerne analysen.`,
       });
     }
   }

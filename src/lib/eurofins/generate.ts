@@ -2,9 +2,7 @@ import { EUROFINS_ANALYSES } from "./template";
 import {
   MAX_SAMPLES,
   fillOrderTemplate,
-  orderTemplateFilename,
   readAnalysisCodes,
-  readOrderMetadata,
   type SampleRow,
 } from "./xlsx";
 
@@ -95,7 +93,6 @@ export function generateEurofinsXlsx(opts: {
   template: Buffer;
   caseName: string;
   samples: ExportSample[];
-  now?: Date;
 }): { file: Buffer; filename: string; rowCount: number } {
   const { template, caseName, samples } = opts;
 
@@ -119,10 +116,25 @@ export function generateEurofinsXlsx(opts: {
     }));
 
   const file = fillOrderTemplate(template, rows, EUROFINS_ANALYSES.length);
-  const filename = orderTemplateFilename(
-    readOrderMetadata(template),
-    opts.now ?? new Date(),
-  );
 
-  return { file, filename, rowCount: rows.length };
+  return { file, filename: eurofinsFilename(caseName), rowCount: rows.length };
+}
+
+/**
+ * Filnavn der kan overleve en Windows-download.
+ *
+ * Eurofins doeber selv skabelonen efter kunde, ordreskabelon, kontrakt og
+ * dato — men de noegler star ogsa i det skjulte Order_Metadata, og det er
+ * dem importen bruger. Navnet er testet: filen gar igennem uanset hvad den
+ * hedder. Sa den far sagsnavnet, sa to sager hentet samme dag ikke lander
+ * som "(1)" og "(2)" i screenerens downloadmappe.
+ */
+export function eurofinsFilename(caseName: string): string {
+  const safe =
+    caseName
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, "")
+      .replace(/\s+/g, " ")
+      .slice(0, 80) || "sag";
+  return `${safe} - Eurofins.xlsx`;
 }

@@ -162,21 +162,6 @@ export function readAnalysisCodes(template: Buffer): string[] {
   return codes;
 }
 
-/**
- * Filnavnet Eurofins selv giver skabelonen: kunde, ordreskabelon, kontrakt,
- * dato. Vi genskaber det, sa filen ser ud praecis som en de har udleveret.
- */
-export function orderTemplateFilename(meta: OrderMetadata, date: Date): string {
-  const day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Copenhagen",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-
-  return `${meta.customerId}-${meta.orderTemplateId}-${meta.contractId}-${day}.xlsx`;
-}
-
 function partOf(entries: ZipEntry[], name: string): string {
   const entry = entries.find((e) => e.name === name);
   if (!entry) throw new Error(`Skabelonen mangler ${name}.`);

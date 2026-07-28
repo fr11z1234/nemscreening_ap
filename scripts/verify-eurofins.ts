@@ -8,6 +8,7 @@
  */
 import { writeFileSync } from "node:fs";
 import {
+  eurofinsFilename,
   generateEurofinsXlsx,
   validateForExport,
   type ExportSample,
@@ -71,7 +72,6 @@ const { file, filename, rowCount } = generateEurofinsXlsx({
   template,
   caseName,
   samples,
-  now: new Date("2026-07-28T09:00:00Z"),
 });
 
 const before = new Map(readZip(template).map((e) => [e.name, e]));
@@ -224,10 +224,14 @@ check(
   `forventede 7 nye strenge (6 maerkninger + sagsnavn), fik ${strings.length - stringsBefore.length}`,
 );
 
-// 10. Filnavnet er det Eurofins selv giver skabelonen.
+// 10. Filnavnet er sagens, sa to sager samme dag ikke kolliderer.
 check(
-  filename === "A01466717NKH-YVD5SC230009-VL0001974001-2026-07-28.xlsx",
+  filename === "Nørrebrogade 12, 2200 København N - Eurofins.xlsx",
   `filnavnet blev ${filename}`,
+);
+check(
+  eurofinsFilename('Testvej 1: "A/B"') === "Testvej 1 AB - Eurofins.xlsx",
+  "tegn Windows ikke tillader i filnavne blev ikke fjernet",
 );
 
 // 11. Valideringen fanger de sager der ikke kan eksporteres.

@@ -194,9 +194,9 @@ export default async function ExportPage({
 
         <p className="mt-10 text-xs leading-relaxed text-muted">
           Filen er Eurofins&nbsp;egen Excel-skabelon med prøverne skrevet ind.
-          Upload den som den er — lad være med at åbne og gemme den først, og
-          lad være med at omdøbe den. Navnet og de skjulte ark er det, Eurofins
-          bruger til at genkende kunde, kontrakt og ordreskabelon.
+          Upload den som den er — lad være med at åbne og gemme den først. Den
+          har skjulte ark, og det er dem, Eurofins bruger til at genkende
+          kunde, kontrakt og ordreskabelon. Filnavnet må du gerne ændre.
         </p>
       </main>
     </>

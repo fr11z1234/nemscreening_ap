@@ -30,9 +30,10 @@ Seks ark, hvoraf fem er skjulte:
 | `B5`  | `3U1L4QONS7\|EUAA59` | analysepakken bag ordreskabelonen            |
 | `B6`  | `da`                | sprog                                        |
 
-Filnavnet appen genererer bygges af `B1-B4-B2-dato` — præcis det navn
-Eurofins selv giver skabelonen. De tre id'er læses ud af arket, ikke fra
-konstanter i koden, så et skabelonskift følger automatisk med.
+Eurofins døber selv skabelonen `B1-B4-B2-dato`. Det er testet mod deres
+import: **navnet betyder ingenting** — filen går igennem uanset hvad den
+hedder, fordi nøglerne står i arket. Derfor får downloaden sagsnavnet, så to
+sager hentet samme dag ikke lander som "(1)" og "(2)" hos screeneren.
 
 Ud over arkene indeholder filen fire navngivne områder
 (`SampleDetailsRange`, `ProductList`, `Matrix`, `BooleanList`), SHA-512-

@@ -255,23 +255,23 @@ export default async function RapportPage({
               <Inline label="Bemærkning" value={s.comment} />
             </dl>
 
-            {/* Hojden er sat efter arket, ikke efter billedet: en prove skal
-                kunne vaere pa en side, ogsa forklaringen under skemaet.
+            {/* To lige store felter, ogsa nar der kun er et billede: de
+                staaende billeder er smalle og forskellige i hojden, og uden
+                en fast ramme om hver ville hver prove faa sit eget layout.
+                Den gra flade koster ikke hojde — den er praecis sa hoj som
+                max-h siger, uanset hvad der staar i den.
 
-                Billederne far deres egen bredde frem for en halv side hver —
-                naesten alle er staaende, sa den halve side var gra kant. Og
-                items-center frem for stretch: et billede er et erstattet
-                element, og flexbox ville traekke det i hojden og forvraenge
-                motivet. */}
+                Hojden er sat efter arket og ikke efter billedet: en prove
+                skal kunne vaere pa en side, ogsa forklaringen under skemaet. */}
             {urls.length > 0 && (
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+              <div className="mt-4 grid grid-cols-2 gap-4">
                 {urls.slice(0, 2).map((url, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}
                     src={url}
                     alt={`${s.label}, billede ${i + 1}`}
-                    className="max-h-[7cm] max-w-[48%] rounded-xl"
+                    className="h-[7cm] w-full rounded-xl bg-surface-2 object-contain"
                   />
                 ))}
               </div>

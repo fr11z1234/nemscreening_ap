@@ -31,6 +31,15 @@ export type InitialPhoto = { id: string; sample_id: string; url: string };
 
 const uuid = () => crypto.randomUUID();
 
+/**
+ * Billeder pr. prove.
+ *
+ * To raekker: et oversigtsbillede af hvor proven er taget, og et naerbillede
+ * af materialet. Flere goer hverken dokumentationen staerkere eller
+ * gennemgangen inden afgang hurtigere — den bliver bare laengere at scrolle.
+ */
+const MAX_PHOTOS = 2;
+
 const labelFor = (d: Draft) =>
   ANALYSIS_FIELDS.some((a) => d[a.key]) ? `P${d.seq}` : String(d.seq);
 
@@ -165,6 +174,8 @@ export function SamplingView({
   const fileInput = useRef<HTMLInputElement>(null);
 
   const thumbs = photos[draft.id] ?? [];
+  const atPhotoLimit = thumbs.length >= MAX_PHOTOS;
+  const photoLimitNotice = `Der er plads til ${MAX_PHOTOS} billeder pr. prøve. Slet et for at tage et nyt.`;
   const isLabSample = ANALYSIS_FIELDS.some((a) => draft[a.key]);
   const label = labelFor(draft);
   const isLastRow = index === rows.length - 1;
@@ -244,6 +255,10 @@ export function SamplingView({
   }, []);
 
   async function addPhoto(shot: { blob: Blob; width: number; height: number }) {
+    // Sidste laas. De tre veje ind stopper hver for sig med en besked, men
+    // graensen skal ogsa holde hvis en af dem far en vej udenom.
+    if (atPhotoLimit) return;
+
     const id = uuid();
     await enqueuePhoto({
       id,
@@ -266,16 +281,34 @@ export function SamplingView({
     void sync();
   }
 
+  /** Systemets kamera, nar det indbyggede ikke kan bruges. */
+  function openFilePicker() {
+    if (atPhotoLimit) {
+      setNotice(photoLimitNotice);
+      return;
+    }
+    fileInput.current?.click();
+  }
+
   async function onShutter() {
+    if (atPhotoLimit) {
+      setNotice(photoLimitNotice);
+      return;
+    }
     const shot = await capture();
     if (shot) await addPhoto(shot);
-    else fileInput.current?.click();
+    else openFilePicker();
   }
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) await addPhoto(await compressImageFile(file));
+    if (!file) return;
+    if (atPhotoLimit) {
+      setNotice(photoLimitNotice);
+      return;
+    }
+    await addPhoto(await compressImageFile(file));
   }
 
   async function removePhoto(id: string) {
@@ -453,7 +486,7 @@ export function SamplingView({
               {cameraState !== "starting" && (
                 <button
                   type="button"
-                  onClick={() => fileInput.current?.click()}
+                  onClick={openFilePicker}
                   className="tap rounded-lg bg-white px-4 text-black"
                 >
                   Brug systemets kamera
@@ -472,6 +505,14 @@ export function SamplingView({
           >
             {torchOn ? "Lys fra" : "Lys til"}
           </button>
+        )}
+
+        {/* En baelte over billedet frem for et lag der daekker det: screeneren
+            skal stadig kunne se motivet nar hun blader til naeste prove. */}
+        {atPhotoLimit && (
+          <p className="absolute inset-x-0 bottom-0 bg-black/70 px-4 py-2 text-center text-sm text-white">
+            {MAX_PHOTOS} af {MAX_PHOTOS} billeder — slet et for at tage et nyt
+          </p>
         )}
       </div>
 

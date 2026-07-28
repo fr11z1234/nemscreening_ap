@@ -189,51 +189,66 @@ export function ResultatUpload({
                 </tr>
               </thead>
               <tbody>
-                {matched.map(({ row, sample }) => (
-                  <tr key={row.reference} className="border-b border-border">
-                    <td className="tabular px-2 py-1.5">{row.mark}</td>
-                    <td className="px-2 py-1.5">
-                      {sample ? (
-                        <span className="font-semibold text-primary">
-                          {sample.label}
-                        </span>
-                      ) : (
-                        <span className="text-danger">
-                          ingen P{row.mark} på sagen
-                        </span>
-                      )}
-                    </td>
-                    {LAB_PARAMETERS.map((p) => {
-                      const value = row.values[p.key];
-                      const level = classify(p, value);
-                      return (
-                        <td
-                          key={p.key}
-                          className={`tabular whitespace-nowrap px-2 py-1.5 text-right ${
-                            level === "farligt"
-                              ? "font-semibold text-danger"
-                              : level === "forurenet"
-                                ? "font-medium text-warning"
-                                : "text-muted"
-                          }`}
-                        >
-                          {displayValue(value)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {matched.map(({ row, sample }) => {
+                  // En raekke uden prove gemmes ikke. Den skal se ud som om
+                  // den ikke gor — ellers ligner tallene noget der skal et
+                  // sted hen, og det er praecis den tvivl der er farlig her.
+                  const springesOver = !sample;
+                  return (
+                    <tr
+                      key={row.reference}
+                      className={`border-b border-border ${
+                        springesOver ? "opacity-45" : ""
+                      }`}
+                    >
+                      <td className="tabular px-2 py-1.5">{row.mark}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5">
+                        {sample ? (
+                          <span className="font-semibold text-primary">
+                            {sample.label}
+                          </span>
+                        ) : (
+                          <span className="text-danger">
+                            ingen P{row.mark} — springes over
+                          </span>
+                        )}
+                      </td>
+                      {LAB_PARAMETERS.map((p) => {
+                        const value = row.values[p.key];
+                        const level = classify(p, value);
+                        return (
+                          <td
+                            key={p.key}
+                            className={`tabular whitespace-nowrap px-2 py-1.5 text-right ${
+                              springesOver
+                                ? "text-muted line-through"
+                                : level === "farligt"
+                                  ? "font-semibold text-danger"
+                                  : level === "forurenet"
+                                    ? "font-medium text-warning"
+                                    : "text-muted"
+                            }`}
+                          >
+                            {displayValue(value)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {misses.length > 0 && (
             <p className="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">
-              {misses.length} række{misses.length === 1 ? "" : "r"} i filen (
-              {misses.map((m) => m.row.mark).join(", ")}) passer ikke til nogen
-              analyseret prøve på sagen — deres {misses[0].row.mark} skal svare
-              til vores P{misses[0].row.mark}. De gemmes ikke. Er det den
-              rigtige sag?
+              <span className="font-medium">
+                {misses.length} af {matched.length} rækker springes over
+              </span>{" "}
+              — mærke {misses.map((m) => m.row.mark).join(", ")} passer ikke til
+              nogen analyseret prøve på sagen. Deres {misses[0].row.mark} skal
+              svare til vores P{misses[0].row.mark}. Værdierne gemmes ikke og
+              lander ikke på nogen prøve. Er det den rigtige sag?
             </p>
           )}
 
@@ -268,6 +283,11 @@ export function ResultatUpload({
               Fortryd
             </button>
             <p className="text-sm text-muted">
+              {misses.length > 0 && (
+                <>
+                  Kun de {hits.length} rækker med en prøve gemmes.{" "}
+                </>
+              )}
               Et gemt svar erstatter et tidligere svar på samme prøve.
             </p>
           </div>

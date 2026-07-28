@@ -154,6 +154,21 @@ export function SamplingView({
     return map;
   });
 
+  /**
+   * Om nogen har rort raekken.
+   *
+   * Skelner den blanke raekke i enden — som bare ligger klar — fra en prove
+   * der bevidst er efterladt uden materiale. Materiale kan ikke laengere
+   * bruges til det, nu hvor det er frivilligt.
+   */
+  const started = (d: Draft) =>
+    (photos[d.id]?.length ?? 0) > 0 ||
+    !!d.material ||
+    !!d.sample_type ||
+    !!d.comment ||
+    d.estimated_tons != null ||
+    ANALYSIS_FIELDS.some((a) => d[a.key]);
+
   const draft = rows[index];
   const [tonsText, setTonsText] = useState(() =>
     formatDecimal(initialSamples[startIndex]?.estimated_tons ?? null),
@@ -332,15 +347,35 @@ export function SamplingView({
     void refreshPending();
   }
 
-  /** Gemmer den aktuelle raekke. Tomme raekker springes over uden brok. */
+  /**
+   * Gemmer den aktuelle raekke.
+   *
+   * En prove skal have en lokalitet og mindst et billede. Materiale,
+   * proveart, maengde og analyser er frivillige — screeneren skal kunne
+   * registrere at hun har staet et sted og fotograferet det, uden at kunne
+   * sige hvad det er. En sadan raekke far ingen P og sendes ikke til
+   * laboratoriet, praecis som en raekke uden analyser.
+   *
+   * require er "screeneren gar videre til naeste prove"; sa skal raekken vaere
+   * hel. Uden require er det et sideskift eller en afslutning, og sa gemmes
+   * det der star, uden at spaerre vejen tilbage.
+   */
   async function commit(require: boolean): Promise<boolean> {
-    const empty = !draft.material && !draft.sample_type && thumbs.length === 0;
-    if (empty) return !require;
-
-    if (!draft.material) {
-      setNotice("Vælg et materiale, før du går videre.");
-      return false;
+    if (require) {
+      if (buildings.length > 0 && !draft.building_id) {
+        setNotice("Vælg en lokalitet, før du går videre.");
+        return false;
+      }
+      if (thumbs.length === 0) {
+        setNotice("Tag mindst ét billede, før du går videre.");
+        return false;
+      }
+    } else if (!started(draft)) {
+      // Den blanke raekke i enden er ikke en prove endnu. Den ligger bare
+      // klar, og skal ikke gemmes som en tom registrering.
+      return true;
     }
+
     setNotice(null);
     setBusy(true);
     try {
@@ -398,7 +433,7 @@ export function SamplingView({
   }
 
   const unsynced = pending.samples + pending.photos;
-  const filled = rows.filter((r) => r.material).length;
+  const filled = rows.filter((r) => started(r)).length;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -528,7 +563,7 @@ export function SamplingView({
       <div className="flex items-center gap-2 overflow-x-auto px-4 py-3">
         {thumbs.length === 0 ? (
           <p className="text-[13px] text-muted">
-            Tryk på billedet ovenfor for at fotografere prøven
+            Tryk på billedet ovenfor — hver prøve skal have mindst ét billede
           </p>
         ) : (
           thumbs.map((t) => (
@@ -673,7 +708,7 @@ export function SamplingView({
             </h2>
             <ul className="mt-2 flex flex-col gap-1">
               {rows.map((r, i) =>
-                r.material ? (
+                started(r) ? (
                   <li key={r.id}>
                     <button
                       type="button"
@@ -691,7 +726,11 @@ export function SamplingView({
                       <span className="tabular w-8 shrink-0 font-semibold">
                         {labelFor(r)}
                       </span>
-                      <span className="truncate">{r.material}</span>
+                      <span
+                        className={`truncate ${r.material ? "" : "text-muted"}`}
+                      >
+                        {r.material ?? "Uden materiale"}
+                      </span>
                       <span className="ml-auto shrink-0 truncate text-muted">
                         {r.sample_type ?? ""}
                       </span>

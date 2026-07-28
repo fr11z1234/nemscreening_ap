@@ -38,7 +38,8 @@
 
   --shadow-sm: 0 1px 2px rgb(15 19 23 / 0.05);
   --shadow: 0 1px 3px rgb(15 19 23 / 0.07), 0 1px 2px rgb(15 19 23 / 0.04);
-  --shadow-lg: 0 -8px 32px rgb(15 19 23 / 0.1);
+  /* Panelet haenger i toppen, sa skyggen falder nedad. */
+  --shadow-lg: 0 8px 32px rgb(15 19 23 / 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -66,7 +67,7 @@
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 -8px 32px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
   }
 }
 

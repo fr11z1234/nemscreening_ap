@@ -106,7 +106,11 @@ function Sheet({
   }, [items, recent, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    // Panelet haenger i toppen, ikke i bunden. Et bundpanel med fa traeffere
+    // bliver kort, og pa en telefon lander det sa bag tastaturet — som ikke
+    // krymper dvh pa iOS. Fra toppen star sogefeltet og de forste traeffere
+    // altid over tastaturet.
+    <div className="fixed inset-0 z-50 flex flex-col justify-start">
       <button
         type="button"
         aria-label="Luk"
@@ -118,13 +122,9 @@ function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative mx-auto flex max-h-[85dvh] w-full max-w-xl flex-col rounded-t-2xl bg-surface shadow-sheet"
+        className="safe-t relative mx-auto flex max-h-[85dvh] w-full max-w-xl flex-col rounded-b-2xl bg-surface shadow-sheet"
       >
-        {/* Greb, sa det er tydeligt at panelet kan lukkes ved at trykke ved siden af. */}
-        <div className="flex justify-center pt-2.5">
-          <div className="h-1 w-9 rounded-full bg-border-strong" />
-        </div>
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 pt-3 pb-3">
           <h2 className="font-semibold">{title}</h2>
           <button
             type="button"
@@ -146,7 +146,7 @@ function Sheet({
           />
         </div>
 
-        <ul className="flex-1 overflow-y-auto overscroll-contain safe-b">
+        <ul className="flex-1 overflow-y-auto overscroll-contain">
           {value && (
             <Option label="Ryd valg" muted onSelect={() => onSelect(null)} />
           )}
@@ -181,6 +181,12 @@ function Sheet({
             ))
           )}
         </ul>
+
+        {/* Greb, sa det er tydeligt at panelet kan lukkes ved at trykke ved
+            siden af. Det sidder i den kant panelet ikke er fastgjort til. */}
+        <div className="flex justify-center pb-2.5 pt-2">
+          <div className="h-1 w-9 rounded-full bg-border-strong" />
+        </div>
       </div>
     </div>
   );

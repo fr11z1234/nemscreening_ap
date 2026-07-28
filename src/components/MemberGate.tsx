@@ -12,7 +12,7 @@ import { logout } from "@/app/login/actions";
  *
  * Ligger for sig selv, fordi appen har to bredder: telefonens smalle kolonne
  * til provetagning, og et bredt bord til resultater der laeses pa en pc.
- * Begge layouts skal have det samme tjek, og kun ét sted.
+ * Begge layouts skal have det samme tjek, og kun et sted.
  */
 export async function MemberGate({ children }: { children: React.ReactNode }) {
   const member = await getMember();

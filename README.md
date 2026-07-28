@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nemscreening — screening-app
 
-## Getting Started
+Bygningsscreening fra første besøg til færdig rapport. En screener går rundt i
+en bygning der skal rives ned eller renoveres, fotograferer og udtager prøver
+af materialer, sender prøverne til Eurofins, og laver en rapport ud af svaret.
 
-First, run the development server:
+Appen dækker hele den kæde. Før den fandtes, blev prøverne skrevet ned i
+marken, tastet ind i et regneark, sendt som en fil til laboratoriet, og
+svarene tastet tilbage i hånden.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Kæden
+
+```
+Opret sag ──► Hent bygninger fra BBR ──► Prøvetagning i marken
+                                              │
+                                              ▼
+                                    Eurofins-fil (.xlsx)
+                                              │
+                                     upload hos Eurofins
+                                              │
+                                              ▼
+              Rapport (PDF) ◄── Resultatskema ◄── AllResults-svar (.csv)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Første halvdel foregår på en telefon, ofte uden dækning. Anden halvdel
+foregår på kontorets pc. De to har hvert sit layout — se nedenfor.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Kom i gang
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+cp .env.example .env.local     # udfyld nøglerne
+npm run dev
+```
 
-## Learn More
+`.env.local` skal have Supabase-URL og publishable key, samt en API-nøgle til
+Datafordeleren hvis BBR-opslag skal virke. Uden `.env.local` kan appen ikke nå
+databasen — men verifikationsscriptene nedenfor kører fint uden.
 
-To learn more about Next.js, take a look at the following resources:
+Login er e-mail og kodeord. Adgang kræver en aktiv række i
+`screening.app_users`; det er ikke nok at have en konto i Supabase Auth.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Kontrol
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run verify:eurofins   # eksportfilen mod Eurofins' skabelon
+npm run verify:lab        # indlæsning af labsvar og farvelægning
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-## Deploy on Vercel
+De to `verify`-scripts er projektets egentlige testdækning. De kører uden
+database og uden browser, og de dækker præcis de steder hvor en fejl er dyr:
+en importfil Eurofins afviser, eller et analysesvar der får den forkerte
+farve. **Kør dem efter enhver ændring i `src/lib/eurofins/` eller
+`src/lib/lab/`.**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Hvor tingene ligger
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Sti | Hvad |
+| --- | --- |
+| `src/app/(app)/` | Marken. Smal kolonne, bygget til en telefon. |
+| `src/app/(bred)/` | Kontoret. Bredt bord til resultatskema og rapport. |
+| `src/app/(app)/sager/[id]/proever/` | Prøvetagning: kamera, formular, offline-kø. |
+| `src/lib/offline/` | IndexedDB-kø og synkronisering mod Supabase. |
+| `src/lib/eurofins/` | Eksport til laboratoriet. Se `skabelon/LAESMIG.md`. |
+| `src/lib/lab/` | Indlæsning af svar og grænseværdier. Se `LAESMIG.md`. |
+| `src/lib/bbr/` | Opslag i BBR via Datafordelerens GraphQL. |
+| `scripts/` | Verifikation. Køres med `npm run verify:*`. |
+
+De to `LAESMIG.md`-filer er ikke pynt. De indeholder det, filerne fra Eurofins
+har lært os, og som ikke kan læses ud af koden — hvorfor skabelonen ikke må
+genopbygges, hvad `#` betyder i et labsvar, og hvilke kolonner der bevidst
+ikke er implementeret.
+
+## Databasen
+
+Alt ligger i skemaet `screening`, ikke i `public`. Supabase-klienten er sat op
+med `db: { schema: "screening" }`, så `.from("samples")` rammer
+`screening.samples`.
+
+| Tabel | Noter |
+| --- | --- |
+| `cases` | Sagen. `status` styrer hvad appen viser. |
+| `case_buildings` | Bygninger, typisk hentet fra BBR. |
+| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. |
+| `sample_photos` | Fotos. Filerne ligger i storage-bucket'en `screening-photos`, som er privat. |
+| `exports` | Log over genererede Eurofins-filer. |
+| `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |
+| `app_users` | Medlemskab og rolle: `screener`, `office`, `admin`. |
+
+RLS er slået til overalt. Læsning kræver `screening.is_member()`. Skrivning
+til `lab_results` kræver `screening.is_office()` — altså `office` eller
+`admin`. En screener kan se resultater og hente rapporten, men ikke indlæse
+svar.
+
+## Statusforløbet
+
+`oprettet` → `under_screening` → `proever_taget` → `sendt_til_lab` →
+`afsluttet`.
+
+Statussen er ikke kun en etiket: fra `sendt_til_lab` skifter sagssiden
+primærhandling fra prøvetagning til resultater, fordi arbejdet er flyttet fra
+marken til kontoret.

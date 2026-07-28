@@ -308,7 +308,7 @@ export const STOV_LABEL = {
   nej: "Ikke støvende",
 } as const;
 
-/** Prøvens samlede niveau er det vaerste af dens malinger. */
+/** Provens samlede niveau er det vaerste af dens malinger. */
 export function worstLevel(levels: (LabLevel | null)[]): LabLevel | null {
   if (levels.includes("farligt")) return "farligt";
   if (levels.includes("forurenet")) return "forurenet";

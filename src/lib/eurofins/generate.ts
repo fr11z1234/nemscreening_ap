@@ -81,7 +81,7 @@ export function validateForExport(
       });
     }
 
-    // Perioden slar analyserne fra i prøvetagningen, men en raekke gemt for
+    // Perioden slar analyserne fra i provetagningen, men en raekke gemt for
     // reglen kom til kan stadig baere dem. Sa hellere sige det her end
     // bestille en analyse kunden betaler for uden at kunne finde noget.
     const wrongPeriod = ANALYSIS_FIELDS.filter(

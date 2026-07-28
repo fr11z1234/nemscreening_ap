@@ -12,6 +12,13 @@ import {
   type LabFile,
   type LabRow,
 } from "@/lib/lab/parse";
+import { TilpasBredde } from "@/components/lab/TilpasBredde";
+
+/**
+ * Koblingstabellens designbredde. Smallere end analyseskemaet — den har to
+ * navnekolonner i stedet for fem.
+ */
+const KOBLING_BREDDE = 1320;
 
 type Sample = {
   id: string;
@@ -175,69 +182,81 @@ export function ResultatUpload({
             <Meta label="Sagsnavn hos Eurofins" value={file.caseName} />
           </dl>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-border-strong text-left">
-                  <th className="px-2 py-2 font-medium">Prøvemærke</th>
-                  <th className="px-2 py-2 font-medium">Kobles til</th>
-                  {LAB_PARAMETERS.map((p) => (
-                    <th key={p.key} className="px-2 py-2 text-right font-medium">
-                      {p.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {matched.map(({ row, sample }) => {
-                  // En raekke uden prove gemmes ikke. Den skal se ud som om
-                  // den ikke gor — ellers ligner tallene noget der skal et
-                  // sted hen, og det er praecis den tvivl der er farlig her.
-                  const springesOver = !sample;
-                  return (
-                    <tr
-                      key={row.reference}
-                      className={`border-b border-border ${
-                        springesOver ? "opacity-45" : ""
-                      }`}
-                    >
-                      <td className="tabular px-2 py-1.5">{row.mark}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5">
-                        {sample ? (
-                          <span className="font-semibold text-primary">
-                            {sample.label}
-                          </span>
-                        ) : (
-                          <span className="text-danger">
-                            ingen P{row.mark} — springes over
-                          </span>
-                        )}
-                      </td>
-                      {LAB_PARAMETERS.map((p) => {
-                        const value = row.values[p.key];
-                        const level = classify(p, value);
-                        return (
-                          <td
-                            key={p.key}
-                            className={`tabular whitespace-nowrap px-2 py-1.5 text-right ${
-                              springesOver
-                                ? "text-muted line-through"
-                                : level === "farligt"
-                                  ? "font-semibold text-danger"
-                                  : level === "forurenet"
-                                    ? "font-medium text-warning"
-                                    : "text-muted"
-                            }`}
-                          >
-                            {displayValue(value)}
-                          </td>
-                        );
-                      })}
+          <div className="mt-4">
+            <TilpasBredde bredde={KOBLING_BREDDE}>
+              <div className="skema-ramme">
+                <table className="skema">
+                  <colgroup>
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "21%" }} />
+                    {LAB_PARAMETERS.map((p) => (
+                      <col
+                        key={p.key}
+                        style={{ width: `${70 / LAB_PARAMETERS.length}%` }}
+                      />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Prøvemærke</th>
+                      <th className="skel">Kobles til</th>
+                      {LAB_PARAMETERS.map((p) => (
+                        <th key={p.key} className="text-right">
+                          {p.label}
+                        </th>
+                      ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {matched.map(({ row, sample }) => {
+                      // En raekke uden prove gemmes ikke. Den skal se ud som om
+                      // den ikke gor — ellers ligner tallene noget der skal et
+                      // sted hen, og det er praecis den tvivl der er farlig her.
+                      const springesOver = !sample;
+                      return (
+                        <tr
+                          key={row.reference}
+                          className={springesOver ? "opacity-45" : ""}
+                        >
+                          <td className="tabular">{row.mark}</td>
+                          <td className="skel">
+                            {sample ? (
+                              <span className="font-semibold text-primary">
+                                {sample.label}
+                              </span>
+                            ) : (
+                              <span className="text-danger">
+                                ingen P{row.mark} — springes over
+                              </span>
+                            )}
+                          </td>
+                          {LAB_PARAMETERS.map((p) => {
+                            const value = row.values[p.key];
+                            const level = classify(p, value);
+                            return (
+                              <td
+                                key={p.key}
+                                className={`tabular text-right ${
+                                  springesOver
+                                    ? "text-muted line-through"
+                                    : level === "farligt"
+                                      ? "font-semibold text-danger"
+                                      : level === "forurenet"
+                                        ? "font-medium text-warning"
+                                        : "text-muted"
+                                }`}
+                              >
+                                {displayValue(value)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </TilpasBredde>
           </div>
 
           {misses.length > 0 && (

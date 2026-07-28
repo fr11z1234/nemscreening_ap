@@ -85,6 +85,15 @@ Printes til PDF fra browseren — der er ikke og skal ikke være et
 PDF-bibliotek. Sideskift ligger i `.print-side` i `globals.css`, og farverne er
 tvunget igennem med `print-color-adjust`, ellers kommer skemaet ud i gråtoner.
 
+**Papiret er liggende A4.** Stående giver de seksten kolonner 186 mm at dele,
+og så brækker hvert tal i to linjer. Ændr `@page` med omtanke.
+
+Analyseskemaets streger, kolonnebredder og rækkehøjder ligger i `.skema` i
+`globals.css` — ikke i `ResultatSkema.tsx`. Tabellen er `table-layout: fixed`
+med en `colgroup` i procent, så den passer både i skærmens designbredde og i
+papirets bredde. På skærmen skaleres den ned af `TilpasBredde` i stedet for at
+få en vandret rullebjælke; `@media print` sætter den transform ud af kraft.
+
 ## Om data
 
 Sagerne i Supabase er **testdata** pr. juli 2026 og slettes inden go-live.

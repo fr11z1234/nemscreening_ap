@@ -26,17 +26,35 @@
    */
   color-scheme: light;
 
-  --bg: #f5f7fa; /* bone-100 — samme som sitets theme-color */
+  --bg: #f5f7fa;
+  /* bone-100 — samme som sitets theme-color */
   --surface: #ffffff;
-  --surface-2: #e8edf3; /* bone-200 */
-  --border: #e8edf3; /* bone-200 */
-  --border-strong: #d4dde7; /* bone-300 */
+  --surface-2: #e8edf3;
+  /* bone-200 */
+  --border: #e8edf3;
+  /* bone-200 */
+  --border-strong: #d4dde7;
+  /* bone-300 */
 
-  --fg: #0b1f3a; /* navy-900 — brodteksten baerer maerket */
-  --fg-2: #15315f; /* navy-700 */
-  --muted: #5c7091; /* navy-tonet gra, 4,7:1 pa bone-100 */
+  /*
+   * Skemaets streger er kraftigere end appens ovrige kanter. Bone-300 er nok
+   * til at adskille to kort, men ikke til at folge en raekke pa tvaers af
+   * seksten kolonner — der forsvinder en lys streg mellem de farvede felter.
+   */
+  --grid: #b0bdcd;
+  /* bone-400 */
+  --grid-strong: #6f8299;
+  /* rammen, hovedet og skellet mellem navn og maling */
 
-  --primary: #138345; /* mint-700 — 4,9:1 med hvid tekst */
+  --fg: #0b1f3a;
+  /* navy-900 — brodteksten baerer maerket */
+  --fg-2: #15315f;
+  /* navy-700 */
+  --muted: #5c7091;
+  /* navy-tonet gra, 4,7:1 pa bone-100 */
+
+  --primary: #138345;
+  /* mint-700 — 4,9:1 med hvid tekst */
   --primary-hover: #0f6b38;
   --primary-fg: #ffffff;
   --primary-soft: rgb(19 131 69 / 0.1);
@@ -73,6 +91,8 @@
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-grid: var(--grid);
+  --color-grid-strong: var(--grid-strong);
   --color-fg: var(--fg);
   --color-fg-2: var(--fg-2);
   --color-muted: var(--muted);
@@ -144,6 +164,15 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Browserens egen midterstilling af tabelhoveder passer ingen steder her.
+   I base-laget, sa en text-right i markup'en stadig vinder — ulagt CSS slar
+   alle Tailwinds lag, uanset specificitet. */
+@layer base {
+  th {
+    text-align: left;
+  }
+}
+
 /** Kort: tone og skygge frem for en ramme rundt om alt. */
 @utility card {
   background: var(--surface);
@@ -197,6 +226,140 @@ h2 {
 }
 
 /*
+ * Analyseskemaet.
+ *
+ * Resten af appen adskiller flader med tone og skygge. Skemaet er
+ * undtagelsen: seksten kolonner skal kunne folges bade vandret og lodret, og
+ * uden lodrette streger falder oje't af allerede ved tredje kolonne. Det er
+ * et regneark, og det ma godt se ud som et.
+ */
+.skema-ramme {
+  border: 1px solid var(--grid-strong);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.skema {
+  --skema-luft: 0.2rem;
+  --skema-linjer: 1.35;
+
+  width: 100%;
+  /* Fast layout: kolonnerne staar hvor colgroup siger, uanset om et materiale
+     hedder "Gulv" eller "Skummet fugemasse mellem betonelementer". Uden den
+     ville hver sag fa sin egen kolonnebredde, og to rapporter kunne ikke
+     laegges ved siden af hinanden. */
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: var(--skema-linjer);
+}
+
+.skema th,
+.skema td {
+  padding: var(--skema-luft) 0.45rem;
+  border-right: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+  /* Fast layout klipper ikke af sig selv — et langt ord skal have lov at
+     braekke frem for at lobe ind i nabokolonnen. */
+  overflow-wrap: break-word;
+}
+
+.skema th:last-child,
+.skema td:last-child {
+  border-right: 0;
+}
+
+/* Rammen lukker skemaet af; den sidste raekke skal ikke ogsa goere det. */
+.skema tbody tr:last-child>td,
+.skema tfoot tr:last-child>td {
+  border-bottom: 0;
+}
+
+/*
+ * Hovedet saettes mindre end tallene.
+ *
+ * "Chlorerede paraffiner" og "Kviksølv, Hg" er laengere end deres kolonne er
+ * bred, og et ord der braekker midtvejs — "Chlorere de" — er svaerere at
+ * laese end det samme ord et hak mindre. Tallene er det man kigger efter;
+ * overskriften laeses en gang.
+ */
+.skema thead th {
+  background: var(--surface-2);
+  font-size: 0.85em;
+  font-weight: 600;
+  vertical-align: bottom;
+  border-bottom: 2px solid var(--grid-strong);
+}
+
+/* Graensevaerdierne er en forklaring, ikke maalinger. De skilles fra af en
+   kraftig streg — ikke af en mindre skrift, for sa ville netop de raekker
+   blive lavere end resten. */
+.skema tfoot tr:first-child>td {
+  border-top: 2px solid var(--grid-strong);
+}
+
+.skema tbody td {
+  vertical-align: middle;
+}
+
+/*
+ * Hver raekke er mindst to linjer hoj — ogsa hovedet og graenserne.
+ *
+ * Ellers bestemmer materialets navn raekkehojden, og skemaet bliver en trappe
+ * hvor to prover ved siden af hinanden ikke kan sammenlignes pa et blik. Det
+ * er en mindstehojde: braekker navnet til tre linjer, folger raekken med.
+ *
+ * Hojden staar i em og ikke i rem, sa raekkerne skrumper sammen med skriften
+ * nar skemaet skal ind pa et ark papir.
+ */
+.skema tr {
+  height: calc(2em * var(--skema-linjer) + 2 * var(--skema-luft));
+}
+
+/* Skellet mellem hvad proven er, og hvad der blev maalt i den. */
+.skema .skel {
+  border-right: 2px solid var(--grid-strong);
+}
+
+/*
+ * For bredt indhold skaleres ned frem for at faa en rullebjaelke.
+ *
+ * Et skema man skal rulle vandret i, er et skema man ikke kan overskue — og
+ * overblikket er hele grunden til at det findes. Derfor staar hele bredden
+ * altid pa skaermen; skal et tal laeses, zoomer man ind i browseren, praecis
+ * som man gor pa rapporten. Skalaen saettes af TilpasBredde.
+ *
+ * hidden og ikke auto: browseren regner rulleomradet ud fra indholdets
+ * layoutbredde og ser ikke at transformen har gjort det smallere. Med auto
+ * kom der en rullebjaelke pa noget der passede — og bjaelken tog sin hojde
+ * fra kassen og kappede den nederste raekke over.
+ */
+.tilpas {
+  overflow: hidden;
+}
+
+.tilpas-indhold {
+  transform-origin: top left;
+}
+
+@media screen {
+
+  /*
+   * Rapporten er en PDF man laeser for man printer den, sa den skal ligne
+   * papir allerede pa skaermen. Ellers opdager man forst i printdialogen
+   * hvor siderne knaekker.
+   */
+  .print-side {
+    background: var(--surface);
+    border-radius: 1rem;
+    box-shadow: var(--shadow);
+    padding: 2rem 2.25rem;
+  }
+}
+
+/*
  * Rapporten printes til PDF fra browseren. Uden det her ryger farverne —
  * browsere udelader baggrunde som standard — og hele pointen med skemaet
  * ville forsvinde pa papir.
@@ -216,6 +379,10 @@ h2 {
     --fg: #000000;
     --fg-2: #1a1a1a;
     --muted: #4a5568;
+
+    /* Tynde lyse streger forsvinder i en printer. */
+    --grid: #8fa0b4;
+    --grid-strong: #3c516d;
 
     --level-rent-bg: #b7e8c6;
     --level-rent-fg: #0d3d21;
@@ -247,8 +414,41 @@ h2 {
     break-after: auto;
   }
 
+  /*
+   * Papiret skalerer ikke — der skal skemaet fylde siden ud, ikke passes ind
+   * i en skaermbredde der ikke findes.
+   */
+  .tilpas {
+    height: auto !important;
+    overflow: visible;
+  }
+
+  .tilpas-indhold {
+    width: auto !important;
+    transform: none !important;
+  }
+
+  /* Elleve analysekolonner har brug for bordet ogsa pa papir. */
+  .skema {
+    font-size: 10px;
+  }
+
+  .skema-ramme {
+    /* Afrundede hjorner koster millimeter i marginen og giver intet pa print.
+       Og uden hjorner er der intet at klippe efter: overflow: hidden ville
+       kappe et langt skema over i stedet for at lade det lobe pa naeste
+       side. */
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  /*
+   * Liggende A4. Staaende ville skemaet faa 186 mm at dele mellem seksten
+   * kolonner, og tallene ville staa i to linjer hver — hele pointen med at
+   * kunne laegge en gammel og en ny rapport ved siden af hinanden ryger.
+   */
   @page {
-    size: A4;
+    size: A4 landscape;
     margin: 12mm;
   }
 }

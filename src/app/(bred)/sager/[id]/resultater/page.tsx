@@ -7,11 +7,13 @@ import {
   LevelBadge,
   ResultatSkema,
   SkemaForklaring,
+  SKEMA_BREDDE,
   levelOfSample,
   venterPaStovvurdering,
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
+import { TilpasBredde } from "@/components/lab/TilpasBredde";
 import { readValue } from "@/lib/lab/parametre";
 import { Stovvurdering, type StovProve } from "./Stovvurdering";
 import { getMember } from "@/lib/auth";
@@ -180,12 +182,14 @@ export default async function ResultaterPage({
               <h2 className="font-semibold">Analyseskema</h2>
               <p className="text-sm text-muted">
                 Samme skema som rapporten. Farven følger grænseværdierne
-                nederst.
+                nederst. Zoom ind i browseren, hvis tallene bliver små.
               </p>
             </div>
 
             <div className="mt-4">
-              <ResultatSkema samples={skemaSamples} results={results} />
+              <TilpasBredde bredde={SKEMA_BREDDE}>
+                <ResultatSkema samples={skemaSamples} results={results} />
+              </TilpasBredde>
               <SkemaForklaring visStjerne={manglerStov > 0} />
             </div>
           </section>
@@ -206,7 +210,7 @@ export default async function ResultaterPage({
                   <span className="max-w-52 truncate text-sm text-muted">
                     {s.material ?? "Uden materiale"}
                   </span>
-                  <LevelBadge level={levels[i]} />
+                  <LevelBadge level={levels[i]} erLabprove={s.is_lab_sample} />
                 </li>
               ))}
             </ul>

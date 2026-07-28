@@ -6,11 +6,13 @@ import {
   LevelBadge,
   ResultatSkema,
   SkemaForklaring,
+  SKEMA_BREDDE,
   levelOfSample,
   venterPaStovvurdering,
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
+import { TilpasBredde } from "@/components/lab/TilpasBredde";
 import { readValue, STOV_LABEL } from "@/lib/lab/parametre";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
@@ -152,28 +154,31 @@ export default async function RapportPage({
         </Link>
         <PrintKnap />
         <p className="text-sm text-muted">
-          Vælg «Gem som PDF» i printdialogen. Slå browserens sidehoved og -fod
-          fra, så adressen ikke står på rapporten.
+          Vælg «Gem som PDF» i printdialogen. Siden er sat til liggende A4 — slå
+          browserens sidehoved og -fod fra, så adressen ikke står på rapporten.
         </p>
       </div>
 
       {/* Forside */}
       <section className="print-side">
-        <header className="flex items-start justify-between gap-6 border-b-2 border-fg pb-3">
+        <header className="flex items-start justify-between gap-6 border-b-2 border-fg pb-4">
           <div>
-            <h1 className="text-2xl font-semibold">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              Nemscreening ApS
+            </p>
+            <h1 className="mt-2 text-[1.7rem] font-semibold leading-tight">
               Ressourcekortlægning og miljøscreening
             </h1>
-            <p className="mt-1 text-lg">{sag.case_name}</p>
+            <p className="mt-1 text-lg text-fg-2">{sag.case_name}</p>
           </div>
-          <p className="shrink-0 text-right text-sm text-muted">
-            Nemscreening ApS
+          <p className="shrink-0 pt-1 text-right text-sm text-muted">
+            Udskrevet
             <br />
             {formatDate(new Date().toISOString())}
           </p>
         </header>
 
-        <dl className="mt-4 grid grid-cols-4 gap-x-6 gap-y-3 text-sm">
+        <dl className="mt-5 grid grid-cols-4 gap-x-8 gap-y-4 rounded-xl bg-surface-2 px-5 py-4 text-sm">
           <Felt label="Adresse" value={sag.address_text ?? sag.case_name} />
           <Felt label="Areal" value={sag.area_m2 ? `${sag.area_m2} m²` : null} />
           <Felt label="Byggeår" value={sag.built_year} />
@@ -190,9 +195,11 @@ export default async function RapportPage({
           />
         </dl>
 
-        <h2 className="mt-6 font-semibold">Analyseskema</h2>
+        <Overskrift>Analyseskema</Overskrift>
         <div className="mt-2">
-          <ResultatSkema samples={skemaSamples} results={results} />
+          <TilpasBredde bredde={SKEMA_BREDDE}>
+            <ResultatSkema samples={skemaSamples} results={results} />
+          </TilpasBredde>
           <SkemaForklaring visStjerne={manglerStov} />
         </div>
       </section>
@@ -202,21 +209,28 @@ export default async function RapportPage({
         const urls = photos.get(s.id) ?? [];
         const skema = skemaById.get(s.id)!;
         return (
-          <section key={s.id} className="print-side mt-12 print:mt-0">
-            <header className="flex flex-wrap items-center gap-3 border-b border-border-strong pb-2">
-              <span className="tabular text-xl font-semibold">{s.label}</span>
-              <span className="text-xl">
-                {s.material ?? "Uden materiale"}
-                {s.sample_type && (
-                  <span className="text-muted"> – {s.sample_type}</span>
-                )}
+          <section key={s.id} className="print-side mt-10 print:mt-0">
+            <header className="flex flex-wrap items-center gap-4 border-b-2 border-fg pb-3">
+              <span className="tabular rounded-lg border border-grid-strong px-2.5 py-1 text-lg font-semibold">
+                {s.label}
               </span>
+              <div>
+                <p className="text-lg font-medium leading-tight">
+                  {s.material ?? "Uden materiale"}
+                </p>
+                {s.sample_type && (
+                  <p className="text-sm text-muted">{s.sample_type}</p>
+                )}
+              </div>
               <span className="ml-auto">
-                <LevelBadge level={levelOfSample(results.get(s.id))} />
+                <LevelBadge
+                  level={levelOfSample(results.get(s.id))}
+                  erLabprove={s.is_lab_sample}
+                />
               </span>
             </header>
 
-            <dl className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+            <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 rounded-xl bg-surface-2 px-5 py-3 text-sm">
               <Inline
                 label="Lokalitet"
                 value={
@@ -242,27 +256,46 @@ export default async function RapportPage({
             </dl>
 
             {urls.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div
+                className={`mt-4 grid gap-4 ${
+                  urls.length > 1 ? "grid-cols-2" : "grid-cols-1"
+                }`}
+              >
                 {urls.slice(0, 2).map((url, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}
                     src={url}
                     alt={`${s.label}, billede ${i + 1}`}
-                    className="max-h-[11cm] w-full rounded-lg object-contain"
+                    className="max-h-[9cm] w-full rounded-xl bg-surface-2 object-contain"
                   />
                 ))}
               </div>
             )}
 
-            <div className="mt-4">
-              <ResultatSkema samples={[skema]} results={results} />
-              <SkemaForklaring visStjerne={venterPaStovvurdering(results.get(s.id))} />
+            <Overskrift>Analyseresultat</Overskrift>
+            <div className="mt-2">
+              <TilpasBredde bredde={SKEMA_BREDDE}>
+                <ResultatSkema samples={[skema]} results={results} />
+              </TilpasBredde>
+              <SkemaForklaring
+                visStjerne={venterPaStovvurdering(results.get(s.id))}
+              />
             </div>
           </section>
         );
       })}
     </main>
+  );
+}
+
+/** Afsnitsoverskrift i rapporten — daempet, sa den ikke kappes om pladsen
+    med sagens navn og provenumrene. */
+function Overskrift({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+      {children}
+    </h2>
   );
 }
 

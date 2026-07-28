@@ -17,6 +17,9 @@ import {
  * En raekke pr. prove, elleve analysekolonner, og graenserne nederst. Det er
  * det samme skema pa skaermen og i rapporten — der skal ikke vaere to
  * versioner der kan komme til at sige hver sit.
+ *
+ * Selve stregerne og raekkehojderne ligger i `.skema` i `globals.css`, sa de
+ * kun beskrives et sted.
  */
 
 export type SkemaSample = {
@@ -65,11 +68,24 @@ export function venterPaStovvurdering(result: SkemaResult | undefined): boolean 
   );
 }
 
-export function LevelBadge({ level }: { level: LabLevel | null }) {
+export function LevelBadge({
+  level,
+  erLabprove = true,
+}: {
+  level: LabLevel | null;
+  /**
+   * Om proven overhovedet er sendt til laboratoriet.
+   *
+   * En kortlagt prove uden analyse far aldrig et svar, sa "Afventer svar"
+   * ville love noget der ikke kommer — og fa kontoret til at lede efter en
+   * raekke i Eurofins' fil der ikke findes.
+   */
+  erLabprove?: boolean;
+}) {
   if (!level) {
     return (
       <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-medium text-muted">
-        Afventer svar
+        {erLabprove ? "Afventer svar" : "Ubehandlet"}
       </span>
     );
   }
@@ -82,6 +98,26 @@ export function LevelBadge({ level }: { level: LabLevel | null }) {
   );
 }
 
+/**
+ * Skemaets designbredde i px.
+ *
+ * Bredden er sat efter den laengste kolonneoverskrift, "Chlorerede
+ * paraffiner": under den her braekker ordet midt over. Er der mindre plads pa
+ * skaermen, skaleres hele skemaet ned — se TilpasBredde — frem for at
+ * kolonnerne klemmes hver for sig.
+ */
+export const SKEMA_BREDDE = 1480;
+
+/**
+ * Kolonnebredder i procent af skemaet.
+ *
+ * Procent og ikke px, fordi det samme skema skal passe bade i designbredden
+ * pa skaermen og i papirets bredde, hvor der ikke skaleres.
+ */
+const NAVNEKOLONNER = [5, 11.5, 9, 8, 5.5];
+const ANALYSEKOLONNE =
+  (100 - NAVNEKOLONNER.reduce((sum, n) => sum + n, 0)) / LAB_PARAMETERS.length;
+
 export function ResultatSkema({
   samples,
   results,
@@ -92,22 +128,31 @@ export function ResultatSkema({
   showThresholds?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[13px]">
+    <div className="skema-ramme">
+      <table className="skema">
+        <colgroup>
+          {NAVNEKOLONNER.map((andel, i) => (
+            <col key={i} style={{ width: `${andel}%` }} />
+          ))}
+          {LAB_PARAMETERS.map((p) => (
+            <col key={p.key} style={{ width: `${ANALYSEKOLONNE}%` }} />
+          ))}
+        </colgroup>
+
         <thead>
-          <tr className="border-b border-border-strong text-left align-bottom">
-            <Th className="w-16">Prøvenr.</Th>
-            <Th className="min-w-40">Materiale</Th>
-            <Th className="min-w-32">Prøveart</Th>
-            <Th className="min-w-28">Lokalitet</Th>
-            <Th className="w-20 text-right">Est. ton</Th>
+          <tr>
+            <th>Prøvenr.</th>
+            <th>Materiale</th>
+            <th>Prøveart</th>
+            <th>Lokalitet</th>
+            <th className="skel text-right">Est. ton</th>
             {LAB_PARAMETERS.map((p) => (
-              <Th key={p.key} className="w-20 text-right">
+              <th key={p.key} className="text-right">
                 {p.label}
                 {p.unit && (
                   <span className="block font-normal text-muted">{p.unit}</span>
                 )}
-              </Th>
+              </th>
             ))}
           </tr>
         </thead>
@@ -116,16 +161,16 @@ export function ResultatSkema({
           {samples.map((sample) => {
             const result = results.get(sample.id);
             return (
-              <tr key={sample.id} className="border-b border-border">
-                <Td className="font-semibold">{sample.label}</Td>
-                <Td>{sample.material ?? "—"}</Td>
-                <Td className="text-muted">{sample.sample_type ?? "—"}</Td>
-                <Td className="text-muted">{sample.building_label ?? "—"}</Td>
-                <Td className="tabular text-right text-muted">
+              <tr key={sample.id}>
+                <td className="tabular font-semibold">{sample.label}</td>
+                <td className="font-medium">{sample.material ?? "—"}</td>
+                <td className="text-muted">{sample.sample_type ?? "—"}</td>
+                <td className="text-muted">{sample.building_label ?? "—"}</td>
+                <td className="skel tabular text-right text-muted">
                   {sample.estimated_tons != null
                     ? String(sample.estimated_tons).replace(".", ",")
                     : "—"}
-                </Td>
+                </td>
 
                 {LAB_PARAMETERS.map((p) => {
                   const value = readValue(result?.[p.key] ?? null);
@@ -133,14 +178,14 @@ export function ResultatSkema({
                   const uafklaret =
                     p.key === "asbestos" && venterPaStovvurdering(result);
                   return (
-                    <Td
+                    <td
                       key={p.key}
                       title={
                         uafklaret
                           ? "Asbest er påvist. Angiv om den støver — støvende asbest er farligt affald."
                           : undefined
                       }
-                      className={`tabular whitespace-nowrap text-right ${
+                      className={`tabular text-right ${
                         level ? LEVEL_CLASS[level] : "text-muted"
                       }`}
                     >
@@ -149,7 +194,7 @@ export function ResultatSkema({
                           sagt om det stover. Stjernen siger at farven kan
                           skifte. */}
                       {uafklaret && <span className="font-bold"> *</span>}
-                    </Td>
+                    </td>
                   );
                 })}
               </tr>
@@ -158,19 +203,19 @@ export function ResultatSkema({
         </tbody>
 
         {showThresholds && (
-          <tfoot className="text-xs">
+          <tfoot>
             {(["rent", "forurenet", "farligt"] as LabLevel[]).map((level) => (
-              <tr key={level} className="border-b border-border">
-                <Td className="whitespace-nowrap font-medium" colSpan={5}>
+              <tr key={level}>
+                <td className="skel font-medium" colSpan={5}>
                   {LEVEL_LABEL[level]}
-                </Td>
+                </td>
                 {LAB_PARAMETERS.map((p) => (
-                  <Td
+                  <td
                     key={p.key}
-                    className={`tabular whitespace-nowrap text-right ${LEVEL_CLASS[level]}`}
+                    className={`tabular text-right ${LEVEL_CLASS[level]}`}
                   >
                     {thresholdText(p, level)}
-                  </Td>
+                  </td>
                 ))}
               </tr>
             ))}
@@ -205,34 +250,3 @@ function Forklaring({ term, desc }: { term: string; desc: string }) {
   );
 }
 
-function Th({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <th className={`px-2 py-2 align-bottom font-medium ${className}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  className = "",
-  colSpan,
-  title,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  colSpan?: number;
-  title?: string;
-}) {
-  return (
-    <td colSpan={colSpan} title={title} className={`px-2 py-1.5 ${className}`}>
-      {children}
-    </td>
-  );
-}

@@ -3,6 +3,7 @@ import {
   displayValue,
   LAB_PARAMETERS,
   LEVEL_LABEL,
+  manglerStovvurdering,
   readValue,
   thresholdText,
   worstLevel,
@@ -27,8 +28,17 @@ export type SkemaSample = {
   estimated_tons: number | null;
 };
 
-/** Resultatraekken som den ligger i databasen: en tekst pr. parameter. */
-export type SkemaResult = Partial<Record<LabParameterKey, string | null>>;
+/**
+ * Resultatraekken som den ligger i databasen: en tekst pr. parameter, plus
+ * det ene skon labsvaret ikke indeholder — om asbesten stover.
+ */
+export type SkemaResult = Partial<Record<LabParameterKey, string | null>> & {
+  asbestos_dusty?: boolean | null;
+};
+
+const skonOf = (result: SkemaResult | undefined) => ({
+  stovende: result?.asbestos_dusty ?? null,
+});
 
 /** Tailwind skal kunne se klassenavnene, sa de star ordret. */
 const LEVEL_CLASS: Record<LabLevel, string> = {
@@ -39,8 +49,19 @@ const LEVEL_CLASS: Record<LabLevel, string> = {
 
 export function levelOfSample(result: SkemaResult | undefined): LabLevel | null {
   if (!result) return null;
+  const skon = skonOf(result);
   return worstLevel(
-    LAB_PARAMETERS.map((p) => classify(p, readValue(result[p.key] ?? null))),
+    LAB_PARAMETERS.map((p) =>
+      classify(p, readValue(result[p.key] ?? null), skon),
+    ),
+  );
+}
+
+/** Om proven venter pa at nogen tager stilling til asbestens tilstand. */
+export function venterPaStovvurdering(result: SkemaResult | undefined): boolean {
+  return manglerStovvurdering(
+    readValue(result?.asbestos ?? null),
+    result?.asbestos_dusty,
   );
 }
 
@@ -108,15 +129,26 @@ export function ResultatSkema({
 
                 {LAB_PARAMETERS.map((p) => {
                   const value = readValue(result?.[p.key] ?? null);
-                  const level = classify(p, value);
+                  const level = classify(p, value, skonOf(result));
+                  const uafklaret =
+                    p.key === "asbestos" && venterPaStovvurdering(result);
                   return (
                     <Td
                       key={p.key}
+                      title={
+                        uafklaret
+                          ? "Asbest er påvist. Angiv om den støver — støvende asbest er farligt affald."
+                          : undefined
+                      }
                       className={`tabular whitespace-nowrap text-right ${
                         level ? LEVEL_CLASS[level] : "text-muted"
                       }`}
                     >
                       {displayValue(value)}
+                      {/* Et pavist asbestsvar er ikke faerdigt for nogen har
+                          sagt om det stover. Stjernen siger at farven kan
+                          skifte. */}
+                      {uafklaret && <span className="font-bold"> *</span>}
                     </Td>
                   );
                 })}
@@ -150,13 +182,16 @@ export function ResultatSkema({
 }
 
 /** Forklaringen der altid har staet under skemaet. */
-export function SkemaForklaring() {
+export function SkemaForklaring({ visStjerne = false }: { visStjerne?: boolean }) {
   return (
     <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
       <Forklaring term="I.a." desc="Ikke analyseret" />
       <Forklaring term="I.P." desc="Ikke påvist" />
       <Forklaring term="<" desc="Under detektionsgrænsen" />
       <Forklaring term="Enhed" desc="mg/kg, med mindre andet er angivet" />
+      {visStjerne && (
+        <Forklaring term="*" desc="Asbestens tilstand mangler at blive vurderet" />
+      )}
     </dl>
   );
 }
@@ -188,13 +223,15 @@ function Td({
   children,
   className = "",
   colSpan,
+  title,
 }: {
   children: React.ReactNode;
   className?: string;
   colSpan?: number;
+  title?: string;
 }) {
   return (
-    <td colSpan={colSpan} className={`px-2 py-1.5 ${className}`}>
+    <td colSpan={colSpan} title={title} className={`px-2 py-1.5 ${className}`}>
       {children}
     </td>
   );

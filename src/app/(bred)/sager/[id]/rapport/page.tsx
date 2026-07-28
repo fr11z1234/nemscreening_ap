@@ -7,9 +7,11 @@ import {
   ResultatSkema,
   SkemaForklaring,
   levelOfSample,
+  venterPaStovvurdering,
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
+import { readValue, STOV_LABEL } from "@/lib/lab/parametre";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
 import { PERIOD_LABEL, type Case, type CaseBuilding, type Sample } from "@/lib/types";
@@ -19,6 +21,7 @@ export const metadata = { title: "Rapport · Nemscreening" };
 type LabResultRow = SkemaResult & {
   sample_id: string;
   received_at: string | null;
+  asbestos_dusty: boolean | null;
 };
 
 /**
@@ -125,6 +128,18 @@ export default async function RapportPage({
     estimated_tons: s.estimated_tons,
   }));
   const skemaById = new Map(skemaSamples.map((s) => [s.id, s]));
+  const manglerStov = samples.some((s) =>
+    venterPaStovvurdering(results.get(s.id)),
+  );
+
+  /** Asbestens tilstand, nar der overhovedet er asbest at tage stilling til. */
+  const stovtekst = (sampleId: string): string | null => {
+    const result = results.get(sampleId) as LabResultRow | undefined;
+    if (readValue(result?.asbestos ?? null).state !== "pavist") return null;
+    if (result?.asbestos_dusty === true) return STOV_LABEL.ja;
+    if (result?.asbestos_dusty === false) return STOV_LABEL.nej;
+    return "Ikke vurderet";
+  };
 
   return (
     <main className="flex flex-1 flex-col px-6 pb-16 pt-5 print:px-0 print:pt-0">
@@ -178,7 +193,7 @@ export default async function RapportPage({
         <h2 className="mt-6 font-semibold">Analyseskema</h2>
         <div className="mt-2">
           <ResultatSkema samples={skemaSamples} results={results} />
-          <SkemaForklaring />
+          <SkemaForklaring visStjerne={manglerStov} />
         </div>
       </section>
 
@@ -222,6 +237,7 @@ export default async function RapportPage({
                     : null
                 }
               />
+              <Inline label="Asbestens tilstand" value={stovtekst(s.id)} />
               <Inline label="Bemærkning" value={s.comment} />
             </dl>
 
@@ -241,7 +257,7 @@ export default async function RapportPage({
 
             <div className="mt-4">
               <ResultatSkema samples={[skema]} results={results} />
-              <SkemaForklaring />
+              <SkemaForklaring visStjerne={venterPaStovvurdering(results.get(s.id))} />
             </div>
           </section>
         );

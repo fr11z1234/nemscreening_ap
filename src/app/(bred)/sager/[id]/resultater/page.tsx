@@ -8,9 +8,12 @@ import {
   ResultatSkema,
   SkemaForklaring,
   levelOfSample,
+  venterPaStovvurdering,
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
+import { readValue } from "@/lib/lab/parametre";
+import { Stovvurdering, type StovProve } from "./Stovvurdering";
 import { getMember } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { LEVEL_LABEL, type LabLevel } from "@/lib/lab/parametre";
@@ -22,6 +25,7 @@ export const metadata = { title: "Resultater · Nemscreening" };
 type LabResultRow = SkemaResult & {
   sample_id: string;
   received_at: string | null;
+  asbestos_dusty: boolean | null;
 };
 
 export default async function ResultaterPage({
@@ -94,6 +98,21 @@ export default async function ResultaterPage({
   const tally = (level: LabLevel) => levels.filter((l) => l === level).length;
   const answered = levels.filter((l) => l !== null).length;
   const labSamples = samples.filter((s) => s.is_lab_sample);
+  const manglerStov = samples.filter((s) =>
+    venterPaStovvurdering(results.get(s.id)),
+  ).length;
+
+  // Kun prover hvor asbest faktisk er pavist skal vurderes.
+  const asbestProver: StovProve[] = samples
+    .filter(
+      (s) => readValue(results.get(s.id)?.asbestos ?? null).state === "pavist",
+    )
+    .map((s) => ({
+      sampleId: s.id,
+      label: s.label,
+      material: s.material,
+      stovende: (results.get(s.id) as LabResultRow | undefined)?.asbestos_dusty ?? null,
+    }));
 
   return (
     <>
@@ -166,10 +185,12 @@ export default async function ResultaterPage({
 
             <div className="mt-4">
               <ResultatSkema samples={skemaSamples} results={results} />
-              <SkemaForklaring />
+              <SkemaForklaring visStjerne={manglerStov > 0} />
             </div>
           </section>
         )}
+
+        <Stovvurdering prover={asbestProver} canEdit={canUpload} />
 
         {answered > 0 && (
           <section>

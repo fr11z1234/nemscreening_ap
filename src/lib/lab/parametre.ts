@@ -51,6 +51,14 @@ export type LabParameter = {
       kind: "presence";
       /** Hvad "pavist" betyder for netop denne parameter. */
       pavist: LabLevel;
+      /**
+       * Om et menneskeligt skon kan lofte "pavist" til farligt affald.
+       *
+       * Gaelder asbest: stovende asbest er farligt affald, ikke-stovende er
+       * forurenet. Labsvaret siger kun om asbest er pavist, sa skonnet
+       * saettes i handen pa resultatsiden.
+       */
+      stovKanEskalere?: true;
     }
 );
 
@@ -135,10 +143,8 @@ export const LAB_PARAMETERS: LabParameter[] = [
     unit: null,
     eurofins: ["Asbest i materialeprøver"],
     kind: "presence",
-    // Graensetabellen skelner mellem stovende og ikke stovende asbest, men
-    // labsvaret siger kun om det er pavist. Vi farver derfor gult og lader
-    // vurderingen af stov vaere et menneskeligt skon.
     pavist: "forurenet",
+    stovKanEskalere: true,
   },
   {
     key: "pcb_total",
@@ -248,6 +254,12 @@ function toNumber(text: string): number | null {
   return Number(cleaned);
 }
 
+/** Skon der ikke kan udledes af labsvaret. */
+export type LabSkon = {
+  /** Asbestens tilstand. null betyder at nogen endnu ikke har taget stilling. */
+  stovende?: boolean | null;
+};
+
 /**
  * Hvilket niveau malingen ligger pa. null betyder at der ikke er malt.
  *
@@ -258,18 +270,43 @@ function toNumber(text: string): number | null {
 export function classify(
   parameter: LabParameter,
   value: LabValue,
+  skon: LabSkon = {},
 ): LabLevel | null {
   if (value.state === "ikke_analyseret") return null;
   if (value.state === "ikke_pavist") return "rent";
-  if (value.state === "pavist") {
-    return parameter.kind === "presence" ? parameter.pavist : "forurenet";
-  }
-  if (parameter.kind === "presence") return parameter.pavist;
 
+  if (parameter.kind === "presence") {
+    if (value.state === "tal") return parameter.pavist;
+    // Stovende asbest er farligt affald. Uden en vurdering bliver den staende
+    // pa forurenet — vi gaetter ikke pa noget der afgor hvordan affaldet
+    // handteres pa pladsen.
+    if (parameter.stovKanEskalere && skon.stovende === true) return "farligt";
+    return parameter.pavist;
+  }
+
+  if (value.state === "pavist") return "forurenet";
   if (value.number > parameter.farligtOver) return "farligt";
   if (value.number >= parameter.forurenetFra) return "forurenet";
   return "rent";
 }
+
+/**
+ * Om der mangler en menneskelig vurdering for at niveauet kan staa fast.
+ *
+ * Asbest er pavist, men ingen har sagt om den stover — sa er forskellen
+ * mellem gult og rodt stadig uafklaret.
+ */
+export function manglerStovvurdering(
+  value: LabValue,
+  stovende: boolean | null | undefined,
+): boolean {
+  return value.state === "pavist" && (stovende === null || stovende === undefined);
+}
+
+export const STOV_LABEL = {
+  ja: "Støvende",
+  nej: "Ikke støvende",
+} as const;
 
 /** Prøvens samlede niveau er det vaerste af dens malinger. */
 export function worstLevel(levels: (LabLevel | null)[]): LabLevel | null {

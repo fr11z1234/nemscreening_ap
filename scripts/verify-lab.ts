@@ -11,6 +11,7 @@ import {
   classify,
   displayValue,
   LAB_PARAMETER_BY_KEY,
+  manglerStovvurdering,
   readValue,
   worstLevel,
   type LabLevel,
@@ -181,7 +182,47 @@ check(
   "UTF-8 blev ikke afkodet",
 );
 
-// 10. Turen gennem databasen. Vi gemmer teksten, ikke tallet, sa den skal
+// 10. Asbestens tilstand. Labsvaret siger kun om asbest er pavist; om den
+//     stover afgor forskellen pa forurenet og farligt, og den saettes i
+//     handen. Uden en vurdering ma niveauet ikke gaette.
+const asbest = LAB_PARAMETER_BY_KEY.get("asbestos")!;
+const pavist = readValue("Påvist");
+const ikkePavist = readValue("Ikke påvist");
+
+check(classify(asbest, pavist) === "forurenet", "påvist asbest uden vurdering skulle vaere forurenet");
+check(
+  classify(asbest, pavist, { stovende: null }) === "forurenet",
+  "påvist asbest, tilstand ukendt, skulle vaere forurenet",
+);
+check(
+  classify(asbest, pavist, { stovende: false }) === "forurenet",
+  "ikke-stovende asbest skulle vaere forurenet",
+);
+check(
+  classify(asbest, pavist, { stovende: true }) === "farligt",
+  "stovende asbest skulle vaere farligt affald",
+);
+check(
+  classify(asbest, ikkePavist, { stovende: true }) === "rent",
+  "stov ma ikke lofte en prove hvor der slet ikke er asbest",
+);
+check(
+  manglerStovvurdering(pavist, null) && !manglerStovvurdering(pavist, false),
+  "manglende stovvurdering blev ikke fanget",
+);
+check(
+  !manglerStovvurdering(ikkePavist, null),
+  "en prove uden asbest skal ikke bede om en stovvurdering",
+);
+
+// Stovet ma kun rore asbest. Klorerede paraffiner kan aldrig blive farlige.
+const chlor = LAB_PARAMETER_BY_KEY.get("chlor_paraffins")!;
+check(
+  classify(chlor, pavist, { stovende: true }) === "forurenet",
+  "klorerede paraffiner skulle blive pa forurenet uanset stov",
+);
+
+// 11. Turen gennem databasen. Vi gemmer teksten, ikke tallet, sa den skal
 //     betyde noget efter den er laest tilbage — ikke mindst forskellen pa
 //     "ikke analyseret" og "ikke pavist", der begge ligner ingenting.
 for (const mark of ["1", "3", "4", "6"]) {
@@ -204,7 +245,7 @@ check(
   "en tom kolonne i databasen er ikke analyseret",
 );
 
-// 11. En fil der ikke er en AllResults-fil skal afvises tydeligt.
+// 12. En fil der ikke er en AllResults-fil skal afvises tydeligt.
 let rejected = false;
 try {
   parseLabFile("navn;vaerdi\nnoget;andet");

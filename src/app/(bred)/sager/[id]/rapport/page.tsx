@@ -255,19 +255,23 @@ export default async function RapportPage({
               <Inline label="Bemærkning" value={s.comment} />
             </dl>
 
+            {/* Hojden er sat efter arket, ikke efter billedet: en prove skal
+                kunne vaere pa en side, ogsa forklaringen under skemaet.
+
+                Billederne far deres egen bredde frem for en halv side hver —
+                naesten alle er staaende, sa den halve side var gra kant. Og
+                items-center frem for stretch: et billede er et erstattet
+                element, og flexbox ville traekke det i hojden og forvraenge
+                motivet. */}
             {urls.length > 0 && (
-              <div
-                className={`mt-4 grid gap-4 ${
-                  urls.length > 1 ? "grid-cols-2" : "grid-cols-1"
-                }`}
-              >
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
                 {urls.slice(0, 2).map((url, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}
                     src={url}
                     alt={`${s.label}, billede ${i + 1}`}
-                    className="max-h-[9cm] w-full rounded-xl bg-surface-2 object-contain"
+                    className="max-h-[7cm] max-w-[48%] rounded-xl"
                   />
                 ))}
               </div>
@@ -293,7 +297,7 @@ export default async function RapportPage({
     med sagens navn og provenumrene. */
 function Overskrift({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+    <h2 className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
       {children}
     </h2>
   );

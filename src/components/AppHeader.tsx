@@ -23,7 +23,7 @@ export async function AppHeader() {
           {name}
         </span>
         <form action={logout}>
-          <button className="tap -mr-2 px-2 text-sm text-muted" aria-label="Log ud">
+          <button className="tap -mr-2 px-2 text-sm text-muted hover:text-fg" aria-label="Log ud">
             Log ud
           </button>
         </form>

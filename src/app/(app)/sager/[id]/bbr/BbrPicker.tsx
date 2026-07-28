@@ -197,7 +197,7 @@ export function BbrPicker({
         <button
           type="button"
           onClick={addManual}
-          className="tap rounded-xl border border-border-strong px-4"
+          className="tap rounded-xl border border-border-strong hover:bg-surface-2 px-4"
         >
           Tilføj bygning i hånden
         </button>
@@ -207,7 +207,7 @@ export function BbrPicker({
             type="button"
             onClick={fetchBbr}
             disabled={loading}
-            className="tap text-sm text-muted disabled:opacity-60"
+            className="tap text-sm text-muted hover:text-fg disabled:opacity-60"
           >
             {loading ? "Henter fra BBR…" : "Hent fra BBR igen"}
           </button>
@@ -271,13 +271,13 @@ export function BbrPicker({
           type="button"
           onClick={onSave}
           disabled={saving || !touched}
-          className="tap rounded-lg bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-60"
+          className="tap rounded-lg bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover disabled:opacity-60"
         >
           {saving ? "Gemmer…" : "Oplysningerne er korrekte"}
         </button>
         <Link
           href={`/sager/${caseId}`}
-          className="tap flex items-center justify-center rounded-xl border border-border-strong px-4"
+          className="tap flex items-center justify-center rounded-xl border border-border-strong hover:bg-surface-2 px-4"
         >
           Tilbage
         </Link>
@@ -351,7 +351,7 @@ function BuildingRow({
       className={`rounded-xl transition-colors ${
         row.selected
           ? "bg-primary-soft inset-ring inset-ring-primary-line"
-          : "bg-surface shadow-card"
+          : "bg-surface shadow-card hover:bg-surface-2"
       }`}
     >
       <div className="flex gap-3 p-3">
@@ -377,7 +377,7 @@ function BuildingRow({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="tap shrink-0 self-start px-2 text-sm text-primary"
+          className="tap shrink-0 self-start px-2 text-sm text-primary hover:underline"
         >
           {open ? "Færdig" : "Ret"}
         </button>
@@ -446,7 +446,7 @@ function BuildingRow({
           <button
             type="button"
             onClick={onRemove}
-            className="tap self-start text-sm text-danger"
+            className="tap self-start text-sm text-danger hover:underline"
           >
             Fjern bygningen
           </button>

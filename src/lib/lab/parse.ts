@@ -143,26 +143,30 @@ function normalise(name: string): string {
 /**
  * Kobler svarets provemaerker til sagens prover.
  *
- * Gamle sager blev sendt med maerkerne "1", "2", "3"; appen sender "P1",
- * "P3". Begge dele skal kunne kobles, sa vi sammenligner bade ordret og pa
- * tallet alene.
+ * Eurofins sender kun de prover tilbage, vi har bestilt analyse pa, og de
+ * skriver maerket uden P: sender vi P1, P2, 3, P4, P5, far vi 1, 2, 4, 5
+ * retur. Prove 3 er kortlagt uden analyse og har aldrig vaeret pa
+ * laboratoriet.
+ *
+ * Derfor kobles der KUN til prover med analyse. Ellers ville deres "2" kunne
+ * lande pa en kortlagt prove der tilfaeldigvis hedder 2 — et svar pa den
+ * forkerte prove, som intet i skemaet bagefter ville afslore.
  */
-export function matchRows<T extends { id: string; label: string; seq: number }>(
-  rows: LabRow[],
-  samples: T[],
-): { row: LabRow; sample: T | null }[] {
-  const byLabel = new Map<string, T>();
+export function matchRows<
+  T extends { id: string; label: string; seq: number; is_lab_sample: boolean },
+>(rows: LabRow[], samples: T[]): { row: LabRow; sample: T | null }[] {
+  const byMark = new Map<string, T>();
   for (const sample of samples) {
-    byLabel.set(normaliseMark(sample.label), sample);
-    byLabel.set(normaliseMark(String(sample.seq)), sample);
+    if (!sample.is_lab_sample) continue;
+    byMark.set(normaliseMark(sample.label), sample);
   }
   return rows.map((row) => ({
     row,
-    sample: byLabel.get(normaliseMark(row.mark)) ?? null,
+    sample: byMark.get(normaliseMark(row.mark)) ?? null,
   }));
 }
 
-/** "P1", "p1", " 1 " og "01" er det samme prove­nummer. */
+/** "P1", "p1", " 1 " og "01" er det samme provenummer. */
 function normaliseMark(mark: string): string {
   const trimmed = mark.trim().replace(/^[Pp]/, "");
   const asNumber = Number(trimmed);

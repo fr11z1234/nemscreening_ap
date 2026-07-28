@@ -10,7 +10,7 @@ export function PrintKnap() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="tap rounded-xl bg-primary px-5 font-medium text-primary-fg active:bg-primary-hover"
+      className="tap rounded-xl bg-primary px-5 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
     >
       Gem som PDF
     </button>

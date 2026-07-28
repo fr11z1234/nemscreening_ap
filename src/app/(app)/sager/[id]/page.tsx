@@ -63,7 +63,7 @@ export default async function CasePage({
       <AppHeader />
       <main className="flex flex-1 flex-col pb-32">
         <div className="px-4 pt-4">
-          <Link href="/sager" className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted">
+          <Link href="/sager" className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted hover:text-fg">
             ← Sager
           </Link>
 
@@ -103,7 +103,7 @@ export default async function CasePage({
 
           <Link
             href={`/sager/${id}/bbr`}
-            className="tap mt-1 inline-flex items-center text-sm font-medium text-primary"
+            className="tap mt-1 inline-flex items-center text-sm font-medium text-primary hover:underline"
           >
             {buildings.length ? "Ret bygningsdata" : "Hent data fra BBR"} →
           </Link>
@@ -130,7 +130,7 @@ export default async function CasePage({
                   <li key={s.id}>
                     <Link
                       href={`/sager/${id}/proever?seq=${s.seq}`}
-                      className="card block p-3 transition-shadow active:shadow-raised"
+                      className="card block p-3 transition-shadow hover:shadow-raised active:shadow-raised"
                     >
                       <div className="flex items-center gap-2.5">
                         <span
@@ -191,8 +191,8 @@ export default async function CasePage({
               href={`/sager/${id}/billeder`}
               className={`tap mt-3 flex items-center justify-center gap-2 rounded-xl px-4 font-medium ${
                 withoutPhotos > 0
-                  ? "bg-warning-soft text-warning"
-                  : "border border-border-strong"
+                  ? "bg-warning-soft text-warning hover:opacity-85"
+                  : "border border-border-strong hover:bg-surface-2"
               }`}
             >
               Gennemgå billeder
@@ -218,13 +218,13 @@ export default async function CasePage({
             <>
               <Link
                 href={`/sager/${id}/resultater`}
-                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
               >
                 {harSvar ? "Resultater" : "Indlæs svar fra Eurofins"}
               </Link>
               <Link
                 href={`/sager/${id}/proever`}
-                className="tap flex items-center justify-center rounded-xl border border-border-strong px-4 font-medium"
+                className="tap flex items-center justify-center rounded-xl border border-border-strong hover:bg-surface-2 px-4 font-medium"
               >
                 Prøver
               </Link>
@@ -233,14 +233,14 @@ export default async function CasePage({
             <>
               <Link
                 href={`/sager/${id}/proever`}
-                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
               >
                 {samples.length ? "Fortsæt prøvetagning" : "Begynd prøvetagning"}
               </Link>
               {labCount > 0 && (
                 <Link
                   href={`/sager/${id}/eksport`}
-                  className="tap flex items-center justify-center rounded-xl border border-border-strong px-4 font-medium"
+                  className="tap flex items-center justify-center rounded-xl border border-border-strong hover:bg-surface-2 px-4 font-medium"
                 >
                   Eurofins
                 </Link>

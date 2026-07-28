@@ -76,7 +76,7 @@ export default async function BbrPage({
         <div className="px-4 pt-4 pb-5">
           <Link
             href={`/sager/${id}`}
-            className="tap -ml-2 inline-block px-2 text-muted"
+            className="tap -ml-2 inline-block px-2 text-muted hover:text-fg"
           >
             ← {sag.case_name}
           </Link>

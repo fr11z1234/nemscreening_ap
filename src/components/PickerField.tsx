@@ -33,7 +33,7 @@ export function PickerField({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="tap flex w-full items-center gap-2 rounded-xl bg-surface px-3.5 py-2.5 text-left shadow-card"
+        className="tap flex w-full items-center gap-2 rounded-xl bg-surface px-3.5 py-2.5 text-left shadow-card hover:bg-surface-2"
       >
         <span className={`truncate ${value ? "font-medium" : "text-muted"}`}>
           {value ?? placeholder}
@@ -129,7 +129,7 @@ function Sheet({
           <button
             type="button"
             onClick={onClose}
-            className="tap ml-auto -mr-2 px-2 text-muted"
+            className="tap ml-auto -mr-2 px-2 text-muted hover:text-fg"
           >
             Luk
           </button>
@@ -208,7 +208,7 @@ function Option({
       <button
         type="button"
         onClick={onSelect}
-        className={`tap flex w-full items-center gap-2 px-4 py-3 text-left active:bg-surface-2 ${
+        className={`tap flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-surface-2 active:bg-surface-2 ${
           muted ? "text-muted" : ""
         } ${selected ? "font-medium text-primary" : ""}`}
       >

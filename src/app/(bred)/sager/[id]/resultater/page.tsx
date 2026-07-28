@@ -121,7 +121,7 @@ export default async function ResultaterPage({
         <div>
           <Link
             href={`/sager/${id}`}
-            className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted"
+            className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted hover:text-fg"
           >
             ← {sag.case_name}
           </Link>
@@ -131,7 +131,7 @@ export default async function ResultaterPage({
             {answered > 0 && (
               <Link
                 href={`/sager/${id}/rapport`}
-                className="tap ml-auto flex items-center rounded-xl bg-primary px-5 font-medium text-primary-fg active:bg-primary-hover"
+                className="tap ml-auto flex items-center rounded-xl bg-primary px-5 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
               >
                 Åbn rapport
               </Link>
@@ -166,6 +166,7 @@ export default async function ResultaterPage({
             id: s.id,
             label: s.label,
             seq: s.seq,
+            is_lab_sample: s.is_lab_sample,
           }))}
         />
 

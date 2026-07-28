@@ -58,7 +58,7 @@ export default async function LoginPage({
 
           <button
             type="submit"
-            className="tap mt-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-fg active:bg-primary-hover"
+            className="tap mt-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
           >
             Log ind
           </button>

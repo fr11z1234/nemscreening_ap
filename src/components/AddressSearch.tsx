@@ -86,7 +86,7 @@ export function AddressSearch({
               <button
                 type="button"
                 onClick={() => choose(s)}
-                className="tap block w-full px-3.5 py-2.5 text-left active:bg-surface-2"
+                className="tap block w-full px-3.5 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2"
               >
                 {s.tekst}
               </button>

@@ -12,7 +12,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="tap w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-60"
+      className="tap w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover disabled:opacity-60"
     >
       {pending ? "Opretter…" : "Opret sag"}
     </button>
@@ -94,7 +94,7 @@ export function NewCaseForm() {
         <button
           type="button"
           onClick={() => setShowCustomer((v) => !v)}
-          className="tap text-sm font-medium text-primary"
+          className="tap text-sm font-medium text-primary hover:underline"
         >
           {showCustomer ? "Skjul kundeoplysninger" : "Tilføj kundeoplysninger"}
         </button>
@@ -140,7 +140,7 @@ export function NewCaseForm() {
         <SubmitButton />
         <Link
           href="/sager"
-          className="tap inline-flex items-center justify-center rounded-xl border border-border-strong px-4"
+          className="tap inline-flex items-center justify-center rounded-xl border border-border-strong hover:bg-surface-2 px-4"
         >
           Annullér
         </Link>

@@ -142,7 +142,7 @@ function Valg({
       disabled={disabled}
       aria-pressed={aktiv}
       className={`tap rounded-lg px-3 text-sm font-medium disabled:opacity-50 ${
-        aktiv ? fill : "bg-surface shadow-card"
+        aktiv ? fill : "bg-surface shadow-card hover:bg-surface-2"
       }`}
     >
       {children}

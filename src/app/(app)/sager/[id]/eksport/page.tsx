@@ -72,7 +72,7 @@ export default async function ExportPage({
       <AppHeader />
       <main className="flex flex-1 flex-col px-4 pb-12">
         <div className="pt-4 pb-4">
-          <Link href={`/sager/${id}`} className="tap -ml-2 inline-block px-2 text-muted">
+          <Link href={`/sager/${id}`} className="tap -ml-2 inline-block px-2 text-muted hover:text-fg">
             ← {sag.case_name}
           </Link>
           <h1 className="mt-2 text-xl font-semibold">Eurofins-fil</h1>
@@ -160,7 +160,7 @@ export default async function ExportPage({
             <a
               href={`/api/sager/${id}/eksport/eurofins`}
               download
-              className="tap flex items-center justify-center rounded-lg bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+              className="tap flex items-center justify-center rounded-lg bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
             >
               Hent Eurofins-fil
             </a>
@@ -173,7 +173,7 @@ export default async function ExportPage({
                 await setCaseStatus(id, "sendt_til_lab");
               }}
             >
-              <button className="tap w-full rounded-xl border border-border-strong px-4">
+              <button className="tap w-full rounded-xl border border-border-strong hover:bg-surface-2 px-4">
                 Markér som sendt til lab
               </button>
             </form>

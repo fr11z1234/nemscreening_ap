@@ -84,7 +84,7 @@ export default async function PhotosPage({
         <div className="pt-4">
           <Link
             href={`/sager/${id}`}
-            className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted"
+            className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted hover:text-fg"
           >
             ← {sag.case_name}
           </Link>
@@ -139,7 +139,7 @@ export default async function PhotosPage({
                     {urls.length === 0 ? (
                       <Link
                         href={`/sager/${id}/proever?seq=${s.seq}`}
-                        className="tap mt-2 flex items-center justify-center rounded-xl bg-warning-soft text-sm font-medium text-warning"
+                        className="tap mt-2 flex items-center justify-center rounded-xl bg-warning-soft text-sm font-medium text-warning hover:opacity-85"
                       >
                         Mangler billeder — tag dem nu
                       </Link>

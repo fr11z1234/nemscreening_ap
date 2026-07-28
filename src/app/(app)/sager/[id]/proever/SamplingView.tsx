@@ -536,7 +536,7 @@ export function SamplingView({
     <div className="flex flex-1 flex-col">
       <header className="safe-t sticky top-0 z-20 border-b border-border bg-surface">
         <div className="flex h-12 items-center gap-1 px-2">
-          <Link href={`/sager/${caseId}`} className="tap px-2 text-muted">
+          <Link href={`/sager/${caseId}`} className="tap px-2 text-muted hover:text-fg">
             ←
           </Link>
 
@@ -545,7 +545,7 @@ export function SamplingView({
             onClick={onPrev}
             disabled={index === 0 || busy}
             aria-label="Forrige prøve"
-            className="tap px-2 text-lg disabled:opacity-25"
+            className="tap px-2 text-lg hover:text-primary disabled:opacity-25"
           >
             ‹
           </button>
@@ -564,7 +564,7 @@ export function SamplingView({
             onClick={onNext}
             disabled={busy}
             aria-label="Næste prøve"
-            className="tap px-2 text-lg disabled:opacity-25"
+            className="tap px-2 text-lg hover:text-primary disabled:opacity-25"
           >
             ›
           </button>
@@ -613,7 +613,7 @@ export function SamplingView({
                 <button
                   type="button"
                   onClick={retryCamera}
-                  className="tap rounded-lg border border-white/40 px-4"
+                  className="tap rounded-lg border border-white/40 px-4 hover:bg-white/10"
                 >
                   Prøv igen
                 </button>
@@ -622,7 +622,7 @@ export function SamplingView({
                 <button
                   type="button"
                   onClick={openFilePicker}
-                  className="tap rounded-lg bg-white px-4 text-black"
+                  className="tap rounded-lg bg-white px-4 text-black hover:bg-white/85"
                 >
                   Brug systemets kamera
                 </button>
@@ -636,7 +636,7 @@ export function SamplingView({
             type="button"
             onClick={toggleTorch}
             aria-pressed={torchOn}
-            className="tap absolute right-3 top-3 rounded-full bg-black/50 px-3 text-white"
+            className="tap absolute right-3 top-3 rounded-full bg-black/50 px-3 text-white hover:bg-black/70"
           >
             {torchOn ? "Lys fra" : "Lys til"}
           </button>
@@ -733,7 +733,7 @@ export function SamplingView({
                 className={`tap rounded-xl px-3 transition-colors ${
                   draft.period === p
                     ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
-                    : "bg-surface shadow-card"
+                    : "bg-surface shadow-card hover:bg-surface-2"
                 }`}
               >
                 {PERIOD_LABEL[p]}
@@ -774,7 +774,7 @@ export function SamplingView({
                   className={`tap rounded-xl px-3 text-sm transition-colors ${
                     draft[a.key]
                       ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
-                      : "bg-surface shadow-card"
+                      : "bg-surface shadow-card hover:bg-surface-2"
                   } ${applies ? "" : "opacity-40"}`}
                 >
                   {a.label}
@@ -808,7 +808,7 @@ export function SamplingView({
             type="button"
             onClick={deleteSample}
             disabled={busy}
-            className="tap -mx-1 self-start px-1 text-left text-sm font-medium text-danger disabled:opacity-50"
+            className="tap -mx-1 self-start px-1 text-left text-sm font-medium text-danger hover:underline disabled:opacity-50"
           >
             Slet prøve {draft.seq}
           </button>
@@ -833,7 +833,7 @@ export function SamplingView({
                       className={`tap flex w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm transition-colors ${
                         i === index
                           ? "bg-primary-soft inset-ring inset-ring-primary-line"
-                          : "bg-surface shadow-card"
+                          : "bg-surface shadow-card hover:bg-surface-2"
                       }`}
                     >
                       <span className="tabular w-8 shrink-0 font-semibold">
@@ -867,7 +867,7 @@ export function SamplingView({
             type="button"
             onClick={onNext}
             disabled={busy}
-            className="tap flex-1 rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-60"
+            className="tap flex-1 rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover disabled:opacity-60"
           >
             {isLastRow ? "Næste prøve" : "Næste"}
           </button>
@@ -875,7 +875,7 @@ export function SamplingView({
             type="button"
             onClick={onFinish}
             disabled={busy}
-            className="tap rounded-xl border border-border-strong px-5 font-medium disabled:opacity-60"
+            className="tap rounded-xl border border-border-strong hover:bg-surface-2 px-5 font-medium disabled:opacity-60"
           >
             Afslut
           </button>

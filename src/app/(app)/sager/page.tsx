@@ -48,7 +48,7 @@ export default async function SagerPage({
           <h1 className="text-[26px] font-semibold leading-none">Sager</h1>
           <Link
             href="/sager/ny"
-            className="tap ml-auto inline-flex items-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+            className="tap ml-auto inline-flex items-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
           >
             Ny sag
           </Link>
@@ -99,7 +99,7 @@ export default async function SagerPage({
             {!q && (
               <Link
                 href="/sager/ny"
-                className="tap mt-3 inline-flex items-center text-sm font-medium text-primary"
+                className="tap mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline"
               >
                 Opret den første sag →
               </Link>
@@ -113,7 +113,7 @@ export default async function SagerPage({
                 <li key={c.id}>
                   <Link
                     href={`/sager/${c.id}`}
-                    className="card block p-3.5 transition-shadow active:shadow-raised"
+                    className="card block p-3.5 transition-shadow hover:shadow-raised active:shadow-raised"
                   >
                     <div className="flex items-start gap-3">
                       <span className="font-medium leading-snug">

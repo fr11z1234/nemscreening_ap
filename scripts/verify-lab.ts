@@ -148,18 +148,48 @@ check(worstLevel(levelsFor("3")) === "forurenet", "P3 skulle vaere forurenet");
 check(worstLevel([null, null]) === null, "en prove uden malinger har intet niveau");
 check(worstLevel([null, "rent"]) === "rent", "en prove med kun rene malinger er ren");
 
-// 8. Koblingen til sagens prover. Gamle svar har "1", nye har "P1".
+// 8. Koblingen til sagens prover.
+//
+//    Eurofins sender kun de prover tilbage vi har bestilt analyse pa, og de
+//    skriver maerket uden P. Sender vi P1, 2, P3, P4, 5, far vi 1, 3, 4
+//    retur — 2 og 5 er kortlagte materialer der aldrig har vaeret pa
+//    laboratoriet. Deres tal ma derfor kun ramme prover med analyse.
+const lab = (id: string, seq: number) => ({
+  id,
+  label: `P${seq}`,
+  seq,
+  is_lab_sample: true,
+});
+const kortlagt = (id: string, seq: number) => ({
+  id,
+  label: String(seq),
+  seq,
+  is_lab_sample: false,
+});
+
 const samples = [
-  { id: "a", label: "P1", seq: 1 },
-  { id: "b", label: "P2", seq: 2 },
-  { id: "c", label: "3", seq: 3 },
-  { id: "d", label: "P4", seq: 4 },
+  lab("a", 1),
+  kortlagt("b", 2),
+  lab("c", 3),
+  lab("d", 4),
+  kortlagt("e", 5),
 ];
 const matched = matchRows(file.rows, samples);
+
 check(matched[0].sample?.id === "a", "maerket 1 fandt ikke P1");
-check(matched[2].sample?.id === "c", "maerket 3 fandt ikke prove 3");
+check(
+  matched[1].sample === null,
+  "maerket 2 blev koblet til den kortlagte prove 2 — den har aldrig vaeret pa lab",
+);
+check(matched[2].sample?.id === "c", "maerket 3 fandt ikke P3");
+check(matched[3].sample?.id === "d", "maerket 4 fandt ikke P4");
+check(
+  matched[4].sample === null,
+  "maerket 5 blev koblet til den kortlagte prove 5",
+);
 check(matched[5].sample === null, "maerket 6 blev koblet til en prove der ikke findes");
 
+// Skulle Eurofins en dag skrive P'et med, skal det stadig ramme.
 const newStyle = parseLabFile(CSV.replace(/\n862-2026-03815501;1;/, "\n862-2026-03815501;P1;"));
 check(
   matchRows(newStyle.rows, samples)[0].sample?.id === "a",

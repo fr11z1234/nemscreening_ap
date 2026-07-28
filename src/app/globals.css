@@ -143,6 +143,22 @@ button {
   font-size: 16px;
 }
 
+/*
+ * Tailwind v4 giver knapper cursor: default. Det er browserens egen opforsel,
+ * men appen har faet en halvdel der bruges pa en pc, og der forventer folk en
+ * handpeger pa alt der kan trykkes. Deaktiverede knapper skal ikke love noget.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label[for],
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 /* Store overskrifter samler sig med lidt strammere spatiering. */
 h1,
 h2 {

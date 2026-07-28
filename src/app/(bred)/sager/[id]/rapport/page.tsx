@@ -146,7 +146,7 @@ export default async function RapportPage({
       <div className="print-skjul mb-6 flex flex-wrap items-center gap-3">
         <Link
           href={`/sager/${id}/resultater`}
-          className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted"
+          className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted hover:text-fg"
         >
           ← Resultater
         </Link>

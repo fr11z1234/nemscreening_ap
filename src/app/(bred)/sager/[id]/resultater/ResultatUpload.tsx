@@ -13,7 +13,13 @@ import {
   type LabRow,
 } from "@/lib/lab/parse";
 
-type Sample = { id: string; label: string; seq: number };
+type Sample = {
+  id: string;
+  label: string;
+  seq: number;
+  /** Kun prover med analyse kan modtage et svar. */
+  is_lab_sample: boolean;
+};
 
 type Matched = { row: LabRow; sample: Sample | null };
 
@@ -48,8 +54,9 @@ export function ResultatUpload({
   );
   const hits = matched.filter((m) => m.sample);
   const misses = matched.filter((m) => !m.sample);
+  // Kortlagte prover uden analyse far aldrig et svar, sa de er ikke savnede.
   const untouched = samples.filter(
-    (s) => !hits.some((m) => m.sample?.id === s.id),
+    (s) => s.is_lab_sample && !hits.some((m) => m.sample?.id === s.id),
   );
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -119,9 +126,10 @@ export function ResultatUpload({
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h2 className="font-semibold">Indlæs svar fra Eurofins</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            AllResults-filen, som den hentes i Eurofins Online. Prøverne kobles
-            på prøvemærket — deres 1 er vores P1.
+          <p className="mt-0.5 max-w-2xl text-sm text-muted">
+            AllResults-filen, som den hentes i Eurofins Online. Deres 1 er vores
+            P1. Kortlagte prøver uden analyse har aldrig været på laboratoriet
+            og kobles derfor ikke.
           </p>
         </div>
         {canUpload ? (
@@ -130,7 +138,7 @@ export function ResultatUpload({
               type="button"
               onClick={() => fileInput.current?.click()}
               disabled={busy}
-              className="tap ml-auto rounded-xl border border-border-strong px-4 font-medium disabled:opacity-50"
+              className="tap ml-auto rounded-xl border border-border-strong hover:bg-surface-2 px-4 font-medium disabled:opacity-50"
             >
               Vælg fil
             </button>
@@ -190,7 +198,9 @@ export function ResultatUpload({
                           {sample.label}
                         </span>
                       ) : (
-                        <span className="text-danger">ingen prøve fundet</span>
+                        <span className="text-danger">
+                          ingen P{row.mark} på sagen
+                        </span>
                       )}
                     </td>
                     {LAB_PARAMETERS.map((p) => {
@@ -219,10 +229,11 @@ export function ResultatUpload({
 
           {misses.length > 0 && (
             <p className="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">
-              {misses.length} række
-              {misses.length === 1 ? "" : "r"} i filen (
+              {misses.length} række{misses.length === 1 ? "" : "r"} i filen (
               {misses.map((m) => m.row.mark).join(", ")}) passer ikke til nogen
-              prøve på sagen. De gemmes ikke. Er det den rigtige sag?
+              analyseret prøve på sagen — deres {misses[0].row.mark} skal svare
+              til vores P{misses[0].row.mark}. De gemmes ikke. Er det den
+              rigtige sag?
             </p>
           )}
 
@@ -239,7 +250,7 @@ export function ResultatUpload({
               type="button"
               onClick={save}
               disabled={busy || hits.length === 0}
-              className="tap rounded-xl bg-primary px-5 font-medium text-primary-fg active:bg-primary-hover disabled:opacity-50"
+              className="tap rounded-xl bg-primary px-5 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover disabled:opacity-50"
             >
               {busy
                 ? "Gemmer…"
@@ -252,7 +263,7 @@ export function ResultatUpload({
                 setFilename(null);
               }}
               disabled={busy}
-              className="tap px-2 text-sm text-muted disabled:opacity-50"
+              className="tap px-2 text-sm text-muted hover:text-fg disabled:opacity-50"
             >
               Fortryd
             </button>

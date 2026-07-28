@@ -15,6 +15,17 @@
  * baerer ord.
  */
 :root {
+  /*
+   * Appen er lys, uanset hvad styresystemet star pa.
+   *
+   * Den folgede for styresystemet, og pa en mork maskine blev navy-fladerne
+   * svaere at navigere i — isaer resultatskemaet, hvor de farvede felter skal
+   * kunne skelnes fra hinanden pa et blik. color-scheme sikrer at ogsa
+   * rullebjaelker, filvaelgere og datofelter kommer lyse, ikke kun vores egne
+   * flader. Paletten er den samme som for: nemscreening.dk's egen.
+   */
+  color-scheme: light;
+
   --bg: #f5f7fa; /* bone-100 — samme som sitets theme-color */
   --surface: #ffffff;
   --surface-2: #e8edf3; /* bone-200 */
@@ -55,43 +66,6 @@
   --shadow-lg: 0 8px 32px rgb(15 19 23 / 0.1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1f3a; /* navy-900 — sitets morke theme-color */
-    --surface: #0e2244; /* navy-800 */
-    --surface-2: #15315f; /* navy-700 */
-    --border: #15315f; /* navy-700 */
-    --border-strong: #2e599f; /* navy-500 */
-
-    --fg: #f5f7fa; /* bone-100 */
-    --fg-2: #d4dde7; /* bone-300 */
-    --muted: #b8c4d3; /* bone-400 — 9,5:1 pa navy-900 */
-
-    --primary: #2ee57a; /* mint-400 */
-    --primary-hover: #5fe69d; /* mint-300 */
-    --primary-fg: #0b1f3a;
-    --primary-soft: rgb(46 229 122 / 0.14);
-    --primary-line: rgb(46 229 122 / 0.32);
-
-    --danger: #ff6b6b;
-    --danger-soft: rgb(229 72 72 / 0.18);
-    --warning: #fbbf24;
-    --warning-soft: rgb(251 191 36 / 0.13);
-
-    /* Daempet, sa et skema fuldt af farvede felter ikke lyser i et morkt rum.
-       Print bruger altid de lyse — se @media print. */
-    --level-rent-bg: #14472a;
-    --level-rent-fg: #9be8b6;
-    --level-forurenet-bg: #4a3a00;
-    --level-forurenet-fg: #ffdf70;
-    --level-farligt-bg: #5c1616;
-    --level-farligt-fg: #ffb0b0;
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
-  }
-}
 
 @theme inline {
   --color-bg: var(--bg);
@@ -226,6 +200,11 @@ h2 {
  * Rapporten printes til PDF fra browseren. Uden det her ryger farverne —
  * browsere udelader baggrunde som standard — og hele pointen med skemaet
  * ville forsvinde pa papir.
+ *
+ * Papir er hvidt, ikke bone, og kanter skal vaere kraftigere for at overleve
+ * en printer. Niveaufarverne gentages her som sikkerhedsnet: skulle appen en
+ * dag fa et morkt tema igen, ma en rapport printet fra en mork skaerm ikke
+ * komme ud i morke flader.
  */
 @media print {
   :root {

@@ -68,6 +68,17 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
   kun *om* asbest er påvist; om den støver afgør forurenet mod farligt, og det
   må ikke gættes.
 
+## Udseende
+
+Appen er **lys, altid** — den følger ikke styresystemet. Paletten er
+nemscreening.dk's egen (navy, mint, bone) og ligger i `:root` i `globals.css`
+sammen med `color-scheme: light`. Tilføj ikke `dark:`-varianter eller et
+`prefers-color-scheme`-blok uden at spørge; et halvt mørkt tema er værre end
+ingen.
+
+Knapper har både `hover:` og `active:`. Tailwinds `hover` sidder bag
+`@media (hover: hover)`, så den ikke hænger fast efter et tryk på telefonen.
+
 ## Rapporten
 
 Printes til PDF fra browseren — der er ikke og skal ikke være et

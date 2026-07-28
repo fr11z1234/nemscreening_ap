@@ -12,7 +12,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Nemscreening",
-    statusBarStyle: "black-translucent",
+    // black-translucent tegner altid statuslinjens tekst hvid. Pa en lys app
+    // er den dermed usynlig — "default" giver mork tekst pa lys bund.
+    statusBarStyle: "default",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -27,11 +29,9 @@ export const viewport: Viewport = {
   // Zoom er bevidst IKKE slaet fra — felterne er 16px, sa iOS zoomer ikke af
   // sig selv, og screeneren kan stadig forstorre et billede.
   viewportFit: "cover",
-  // Samme vaerdier som nemscreening.dk, sa browserlinjen matcher pa tvaers.
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f7fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1f3a" },
-  ],
+  // Appen er lys uanset styresystemet, sa browserlinjen skal ogsa vaere det.
+  // Ellers far en bruger med morkt tema en navy stribe over en bone-flade.
+  themeColor: "#f5f7fa",
 };
 
 export default function RootLayout({

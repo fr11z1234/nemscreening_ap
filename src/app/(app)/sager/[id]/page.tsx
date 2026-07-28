@@ -14,7 +14,10 @@ import {
 
 export const metadata = { title: "Sag · Nemscreening" };
 
-type SampleRow = Sample & { sample_photos: { count: number }[] };
+type SampleRow = Sample & {
+  sample_photos: { count: number }[];
+  lab_results: { count: number }[];
+};
 
 export default async function CasePage({
   params,
@@ -34,7 +37,7 @@ export default async function CasePage({
       .returns<CaseBuilding[]>(),
     supabase
       .from("samples")
-      .select("*, sample_photos(count)")
+      .select("*, sample_photos(count), lab_results(count)")
       .eq("case_id", id)
       .order("seq")
       .returns<SampleRow[]>(),
@@ -49,6 +52,11 @@ export default async function CasePage({
   const buildingLabel = new Map(buildings.map((b) => [b.id, b.label]));
   const photosOf = (s: SampleRow) => s.sample_photos?.[0]?.count ?? 0;
   const withoutPhotos = samples.filter((s) => photosOf(s) === 0).length;
+
+  // Efter afsendelse handler sagen om svar, ikke om prover.
+  const afventerSvar =
+    sag.status === "sendt_til_lab" || sag.status === "afsluttet";
+  const harSvar = samples.some((s) => (s.lab_results?.[0]?.count ?? 0) > 0);
 
   return (
     <>
@@ -199,22 +207,45 @@ export default async function CasePage({
       </main>
 
       {/* Primaerhandlingen bliver i tommelfingerens raekkevidde, ogsa nar
-          provelisten er lang. */}
+          provelisten er lang.
+
+          Nar sagen er sendt til laboratoriet, skifter arbejdet karakter: det
+          foregar pa kontoret, og det handler om svar frem for om prover. Sa
+          bytter knapperne plads. */}
       <div className="safe-b sticky bottom-0 z-20 mt-auto border-t border-border bg-surface/95 px-4 pt-3 backdrop-blur">
         <div className="flex gap-2.5">
-          <Link
-            href={`/sager/${id}/proever`}
-            className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
-          >
-            {samples.length ? "Fortsæt prøvetagning" : "Begynd prøvetagning"}
-          </Link>
-          {labCount > 0 && (
-            <Link
-              href={`/sager/${id}/eksport`}
-              className="tap flex items-center justify-center rounded-xl border border-border-strong px-4 font-medium"
-            >
-              Eurofins
-            </Link>
+          {afventerSvar ? (
+            <>
+              <Link
+                href={`/sager/${id}/resultater`}
+                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+              >
+                {harSvar ? "Resultater" : "Indlæs svar fra Eurofins"}
+              </Link>
+              <Link
+                href={`/sager/${id}/proever`}
+                className="tap flex items-center justify-center rounded-xl border border-border-strong px-4 font-medium"
+              >
+                Prøver
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href={`/sager/${id}/proever`}
+                className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg active:bg-primary-hover"
+              >
+                {samples.length ? "Fortsæt prøvetagning" : "Begynd prøvetagning"}
+              </Link>
+              {labCount > 0 && (
+                <Link
+                  href={`/sager/${id}/eksport`}
+                  className="tap flex items-center justify-center rounded-xl border border-border-strong px-4 font-medium"
+                >
+                  Eurofins
+                </Link>
+              )}
+            </>
           )}
         </div>
       </div>

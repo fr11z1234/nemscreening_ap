@@ -36,6 +36,19 @@
   --warning: #b45309;
   --warning-soft: rgb(180 83 9 / 0.1);
 
+  /*
+   * Rent, forurenet, farligt. De tre farver er hele pointen i rapporten, og
+   * de er de samme som i det regneark kunderne har faet i arevis — derfor
+   * maettede flader og ikke sarte toner. Teksten er morknet nok til at holde
+   * WCAG AA oven pa fladen.
+   */
+  --level-rent-bg: #b7e8c6;
+  --level-rent-fg: #0d3d21;
+  --level-forurenet-bg: #ffe680;
+  --level-forurenet-fg: #4d3800;
+  --level-farligt-bg: #ffb3b3;
+  --level-farligt-fg: #6b1111;
+
   --shadow-sm: 0 1px 2px rgb(15 19 23 / 0.05);
   --shadow: 0 1px 3px rgb(15 19 23 / 0.07), 0 1px 2px rgb(15 19 23 / 0.04);
   /* Panelet haenger i toppen, sa skyggen falder nedad. */
@@ -64,6 +77,15 @@
     --danger-soft: rgb(229 72 72 / 0.18);
     --warning: #fbbf24;
     --warning-soft: rgb(251 191 36 / 0.13);
+
+    /* Daempet, sa et skema fuldt af farvede felter ikke lyser i et morkt rum.
+       Print bruger altid de lyse — se @media print. */
+    --level-rent-bg: #14472a;
+    --level-rent-fg: #9be8b6;
+    --level-forurenet-bg: #4a3a00;
+    --level-forurenet-fg: #ffdf70;
+    --level-farligt-bg: #5c1616;
+    --level-farligt-fg: #ffb0b0;
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
@@ -164,4 +186,74 @@ h2 {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Farvede felter i analyseskemaet. Navnene skrives ud, sa Tailwind kan finde
+   dem i kildekoden — en klasse sat sammen i en skabelonstreng ville aldrig
+   blive genereret. */
+@utility level-rent {
+  background: var(--level-rent-bg);
+  color: var(--level-rent-fg);
+}
+
+@utility level-forurenet {
+  background: var(--level-forurenet-bg);
+  color: var(--level-forurenet-fg);
+}
+
+@utility level-farligt {
+  background: var(--level-farligt-bg);
+  color: var(--level-farligt-fg);
+}
+
+/*
+ * Rapporten printes til PDF fra browseren. Uden det her ryger farverne —
+ * browsere udelader baggrunde som standard — og hele pointen med skemaet
+ * ville forsvinde pa papir.
+ */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f2f4f7;
+    --border: #c9d2dd;
+    --border-strong: #96a4b6;
+    --fg: #000000;
+    --fg-2: #1a1a1a;
+    --muted: #4a5568;
+
+    --level-rent-bg: #b7e8c6;
+    --level-rent-fg: #0d3d21;
+    --level-forurenet-bg: #ffe680;
+    --level-forurenet-fg: #4d3800;
+    --level-farligt-bg: #ffb3b3;
+    --level-farligt-fg: #6b1111;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+    color: #000000;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Alt der kun giver mening pa skaermen: knapper, navigation, sidehoved. */
+  .print-skjul {
+    display: none !important;
+  }
+
+  .print-side {
+    break-after: page;
+    break-inside: avoid;
+  }
+
+  .print-side:last-child {
+    break-after: auto;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
 }

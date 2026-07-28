@@ -9,6 +9,7 @@ import { compressImageFile } from "@/lib/camera/compress";
 import { PickerField } from "@/components/PickerField";
 import { flush, PHOTO_BUCKET } from "@/lib/offline/sync";
 import {
+  dropSampleEverywhere,
   enqueuePhoto,
   pendingCounts,
   savePendingSample,
@@ -174,6 +175,8 @@ export function SamplingView({
     formatDecimal(initialSamples[startIndex]?.estimated_tons ?? null),
   );
   const [pending, setPending] = useState({ samples: 0, photos: 0 });
+  /** Sidste forsog efterlod noget i koen — typisk fordi der ikke er daekning. */
+  const [stalled, setStalled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -214,12 +217,39 @@ export function SamplingView({
     setPending(await pendingCounts());
   }, []);
 
+  const sync = useCallback(async () => {
+    const res = await flush(supabase);
+    setStalled(res.failed > 0);
+    await refreshPending();
+    return res;
+  }, [supabase, refreshPending]);
+
+  /**
+   * Tommer koen kort efter at screeneren er holdt op med at aendre noget.
+   *
+   * Uden den ville en raekke blive liggende til naeste sideskift, og
+   * ventebanneret dukke op ved hvert eneste tastetryk.
+   */
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleSync = useCallback(() => {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => void sync(), 1500);
+  }, [sync]);
+
+  useEffect(
+    () => () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    },
+    [],
+  );
+
   const persist = useCallback(
     async (d: Draft) => {
       await savePendingSample({ ...d, touchedAt: Date.now() });
       await refreshPending();
+      scheduleSync();
     },
-    [refreshPending],
+    [refreshPending, scheduleSync],
   );
 
   const update = useCallback(
@@ -234,12 +264,6 @@ export function SamplingView({
     },
     [index, persist],
   );
-
-  const sync = useCallback(async () => {
-    const res = await flush(supabase);
-    await refreshPending();
-    return res;
-  }, [supabase, refreshPending]);
 
   useEffect(() => {
     // At tomme uploadkoen mod Supabase er synkronisering med et eksternt
@@ -345,6 +369,79 @@ export function SamplingView({
       .from(PHOTO_BUCKET)
       .remove([`${caseId}/${draft.id}/${id}.jpg`]);
     void refreshPending();
+  }
+
+  /**
+   * Sletter den aktuelle prove med billeder og det hele.
+   *
+   * Det lokale slettes forst. Ellers kunne en synk der allerede er i gang na
+   * at skrive raekken op igen, eller et foto uden prove blive liggende i koen
+   * og fejle pa fremmednoglen resten af dagen.
+   */
+  async function deleteSample() {
+    if (
+      !window.confirm(
+        `Slet prøve ${draft.seq}? Billeder og analyser følger med, og det kan ikke fortrydes.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+      await dropSampleEverywhere(draft.id);
+
+      // Raekkerne i sample_photos falder med proven, men filerne i storage
+      // skal fjernes selv — og stierne skal laeses for raekkerne er vaek.
+      const { data: stored } = await supabase
+        .from("sample_photos")
+        .select("storage_path")
+        .eq("sample_id", draft.id)
+        .returns<{ storage_path: string }[]>();
+
+      await supabase.from("samples").delete().eq("id", draft.id);
+      if (stored?.length) {
+        await supabase.storage
+          .from(PHOTO_BUCKET)
+          .remove(stored.map((r) => r.storage_path));
+      }
+
+      for (const t of photos[draft.id] ?? []) {
+        if (!t.local) continue;
+        URL.revokeObjectURL(t.url);
+        localUrls.current.delete(t.url);
+      }
+      setPhotos((p) => {
+        const next = { ...p };
+        delete next[draft.id];
+        return next;
+      });
+
+      const remaining = rows.filter((r) => r.id !== draft.id);
+      const last = remaining[remaining.length - 1];
+      const nextSeq =
+        Math.max(0, ...remaining.filter((r) => started(r)).map((r) => r.seq)) + 1;
+
+      // Der skal altid ligge en blank raekke klar i enden. Slettes den sidste
+      // prove, arver den blanke nummeret igen — ellers ville naeste prove
+      // springe et nummer over uden grund.
+      if (!last || started(last)) {
+        remaining.push(nextDraft(caseId, nextSeq, userId, last));
+      } else {
+        remaining[remaining.length - 1] = { ...last, seq: nextSeq };
+      }
+
+      const target = Math.min(index, remaining.length - 1);
+      setRows(remaining);
+      setIndex(target);
+      setTonsText(formatDecimal(remaining[target]?.estimated_tons ?? null));
+      setNotice(null);
+      await refreshPending();
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   /**
@@ -476,9 +573,12 @@ export function SamplingView({
             {filled} registreret
           </span>
         </div>
-        {unsynced > 0 && (
+        {/* Kun nar der er noget galt. Koen fyldes og tommes hele tiden under
+            normalt arbejde, og et banner ved hvert tastetryk laerer screeneren
+            at overse det — netop nar daekningen svigter. */}
+        {stalled && unsynced > 0 && (
           <p className="bg-warning-soft px-4 py-1 text-xs text-warning">
-            {unsynced} ting venter på at blive sendt
+            {unsynced} ting venter på forbindelse
           </p>
         )}
       </header>
@@ -700,6 +800,19 @@ export function SamplingView({
             className="w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none"
           />
         </label>
+
+        {/* Sletning ligger nederst og uden flade: den skal kunne findes, men
+            aldrig rammes pa vej ned gennem felterne. */}
+        {started(draft) && (
+          <button
+            type="button"
+            onClick={deleteSample}
+            disabled={busy}
+            className="tap -mx-1 self-start px-1 text-left text-sm font-medium text-danger disabled:opacity-50"
+          >
+            Slet prøve {draft.seq}
+          </button>
+        )}
 
         {filled > 0 && (
           <section>

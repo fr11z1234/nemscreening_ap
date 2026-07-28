@@ -67,6 +67,22 @@ export async function dropPhoto(id: string) {
   await del(id, photoStore);
 }
 
+/**
+ * Fjerner alt lokalt der horer til en prove.
+ *
+ * Kaldes nar proven slettes. Bliver noget liggende, ville naeste synk
+ * genskabe raekken — eller lade et foto uden prove blokere koen for evigt.
+ */
+export async function dropSampleEverywhere(sampleId: string) {
+  const photos = await entries<string, PendingPhoto>(photoStore);
+  await Promise.all([
+    del(sampleId, sampleStore),
+    ...photos
+      .filter(([, p]) => p.sample_id === sampleId)
+      .map(([key]) => del(key, photoStore)),
+  ]);
+}
+
 export async function allPendingPhotos(): Promise<PendingPhoto[]> {
   const rows = await entries<string, PendingPhoto>(photoStore);
   return rows.map(([, v]) => v);

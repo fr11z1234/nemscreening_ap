@@ -42,5 +42,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Testfilen fra npm run verify:eurofins
+.eurofins-test.xlsx
+
 # Skal sta sidst: en senere .env*-regel ville ellers ophaeve undtagelsen.
 !.env.example

@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  eurofinsFilename,
-  generateEurofinsCsv,
+  generateEurofinsXlsx,
   validateForExport,
   type ExportSample,
 } from "@/lib/eurofins/generate";
-import { DEFAULT_ANALYSES_DETAILS } from "@/lib/eurofins/template";
+import { loadOrderTemplate } from "@/lib/eurofins/skabelon";
 import type { Case, Sample } from "@/lib/types";
+
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /**
  * Genererer Eurofins-import-filen for en sag og logger eksporten.
  *
- * Filen skrives som UTF-8 MED BOM. Uden den viser Excel danske tegn som
- * mojibake nar filen abnes lokalt for upload — praecis den fejl der ses i den
- * skabelon vi fik udleveret ("PrÃ¸vedetaljer" i stedet for "Prøvedetaljer").
+ * Filen er Eurofins' egen .xlsx-skabelon med proeverne skrevet ind i
+ * Sample_Data. Vi genererer ikke en ny projektmappe: de skjulte ark — isaer
+ * Order_Metadata med kunde-, kontrakt- og ordreskabelonnoglen — er det deres
+ * import bruger til at genkende ordren.
  */
 export async function GET(
   _request: Request,
@@ -30,7 +33,7 @@ export async function GET(
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
   }
 
-  const [caseRes, samplesRes, settingRes] = await Promise.all([
+  const [caseRes, samplesRes] = await Promise.all([
     supabase.from("cases").select("*").eq("id", id).maybeSingle<Case>(),
     supabase
       .from("samples")
@@ -38,11 +41,6 @@ export async function GET(
       .eq("case_id", id)
       .order("seq")
       .returns<Sample[]>(),
-    supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "eurofins_analyses_details")
-      .maybeSingle<{ value: string }>(),
   ]);
 
   const sag = caseRes.data;
@@ -71,17 +69,15 @@ export async function GET(
     );
   }
 
-  const { csv, rowCount } = generateEurofinsCsv({
+  const { file, filename, rowCount } = generateEurofinsXlsx({
+    template: loadOrderTemplate(),
     caseName: sag.case_name,
     samples,
-    analysesDetails: settingRes.data?.value ?? DEFAULT_ANALYSES_DETAILS,
   });
-
-  const filename = eurofinsFilename(sag.case_name);
 
   await supabase.from("exports").insert({
     case_id: id,
-    kind: "eurofins_csv",
+    kind: "eurofins_xlsx",
     filename,
     row_count: rowCount,
     sample_ids: (samplesRes.data ?? [])
@@ -90,9 +86,10 @@ export async function GET(
     generated_by: user.id,
   });
 
-  return new NextResponse("﻿" + csv, {
+  return new NextResponse(new Uint8Array(file), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Type": XLSX_MIME,
+      "Content-Length": String(file.length),
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "no-store",
     },

@@ -193,9 +193,10 @@ export default async function ExportPage({
         )}
 
         <p className="mt-10 text-xs leading-relaxed text-muted">
-          Filen hentes som CSV og uploades til Eurofins som den er. Kolonne 1 er
-          prøvemærkning, kolonne 2 er sagsnavnet, og de 17 analysekolonner
-          markeres med 1 eller 0.
+          Filen er Eurofins&nbsp;egen Excel-skabelon med prøverne skrevet ind.
+          Upload den som den er — lad være med at åbne og gemme den først, og
+          lad være med at omdøbe den. Navnet og de skjulte ark er det, Eurofins
+          bruger til at genkende kunde, kontrakt og ordreskabelon.
         </p>
       </main>
     </>

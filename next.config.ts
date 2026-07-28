@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
     "*.loca.lt",
     "*.ngrok-free.app",
   ],
+
+  // Eurofins-skabelonen laeses med fs pa serveren. Filsporingen kan ikke se
+  // den, fordi stien bygges af strenge, sa den skal navngives her — ellers
+  // findes filen i dev og mangler i produktion.
+  outputFileTracingIncludes: {
+    "/api/sager/[id]/eksport/eurofins": ["src/lib/eurofins/skabelon/**"],
+  },
 };
 
 export default nextConfig;

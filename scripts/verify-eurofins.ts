@@ -1,31 +1,30 @@
 /**
- * Kontrollerer at den genererede Eurofins-CSV har praecis den struktur
- * skabelonen kraever. Koeres med: npx tsx scripts/verify-eurofins.ts
+ * Kontrollerer at den genererede .xlsx er Eurofins' egen skabelon med proever
+ * skrevet ind — og ikke en ny projektmappe der ligner. Koeres med:
+ *   npm run verify:eurofins
  *
- * Provedataen herunder svarer til de forste raekker i det nuvaerende ark (2.csv),
- * sa outputtet kan sammenlignes direkte med det I sender i dag.
+ * Provedataen herunder svarer til de forste raekker i det nuvaerende ark, sa
+ * outputtet kan sammenlignes direkte med det I sender i dag.
  */
+import { writeFileSync } from "node:fs";
 import {
-  generateEurofinsCsv,
+  generateEurofinsXlsx,
   validateForExport,
   type ExportSample,
 } from "../src/lib/eurofins/generate";
-import { EUROFINS_COLUMN_COUNT } from "../src/lib/eurofins/template";
+import { loadOrderTemplate } from "../src/lib/eurofins/skabelon";
+import { EUROFINS_ANALYSES } from "../src/lib/eurofins/template";
+import { readPart, readZip } from "../src/lib/eurofins/zip";
+import { MAX_SAMPLES, readOrderMetadata } from "../src/lib/eurofins/xlsx";
 
-function countFields(line: string): number {
-  let fields = 1;
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') i++;
-      else inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
-      fields++;
-    }
-  }
-  return fields;
-}
+let failures = 0;
+const fail = (msg: string) => {
+  console.error(`  FEJL: ${msg}`);
+  failures++;
+};
+const check = (ok: boolean, msg: string) => {
+  if (!ok) fail(msg);
+};
 
 const sample = (
   seq: number,
@@ -55,77 +54,201 @@ const sample = (
 };
 
 const samples: ExportSample[] = [
-  sample(1, "Træ", "Hvid maling", {
-    analysis_pcb: true,
-    analysis_metals: true,
-  }),
+  sample(1, "Træ", "Hvid maling", { analysis_pcb: true, analysis_metals: true }),
   sample(2, "Træ", "Sort maling", { analysis_pcb: true, analysis_metals: true }),
   sample(3, "Træ", "Hvid maling", { analysis_pcb: true, analysis_metals: true }),
   sample(4, "Tapet", "Hvid maling", { analysis_metals: true }),
   sample(5, "Tapet", "Grå maling", { analysis_metals: true }),
-  sample(6, "Vinduer", "Hvid maling", { analysis_metals: true }),
+  sample(6, "Vinduer", "Hvid maling", { analysis_asbestos: true, analysis_pah: true }),
   // Kortlagte materialer uden analyse — skal IKKE med i filen.
   sample(7, "Jern og metal", "Ubehandlet", {}),
   sample(8, "Beton (undtagen, gasbeton, letbeton)", "Ubehandlet", {}),
 ];
 
 const caseName = "Nørrebrogade 12, 2200 København N";
-const { csv, rowCount } = generateEurofinsCsv({ caseName, samples });
-
-const lines = csv.split("\r\n").filter((l, i, arr) => i < arr.length - 1);
-
-let failures = 0;
-const fail = (msg: string) => {
-  console.error(`  FEJL: ${msg}`);
-  failures++;
-};
-
-console.log(csv.replace(/\r\n/g, "\n"));
-console.log("---");
-
-// 1. Alle raekker skal have samme antal kolonner som skabelonen.
-lines.forEach((line, i) => {
-  const n = countFields(line);
-  if (n !== EUROFINS_COLUMN_COUNT) {
-    fail(`raekke ${i + 1} har ${n} kolonner, forventede ${EUROFINS_COLUMN_COUNT}`);
-  }
+const template = loadOrderTemplate();
+const { file, filename, rowCount } = generateEurofinsXlsx({
+  template,
+  caseName,
+  samples,
+  now: new Date("2026-07-28T09:00:00Z"),
 });
 
-// 2. Kun prover med analyse kommer med.
-if (rowCount !== 6) fail(`forventede 6 dataraekker, fik ${rowCount}`);
-if (csv.includes("Jern og metal")) fail("kortlagt materiale endte i filen");
+const before = new Map(readZip(template).map((e) => [e.name, e]));
+const after = new Map(readZip(file).map((e) => [e.name, e]));
 
-// 3. Header- og footerblokke ordret.
-if (!lines[0].startsWith("Prøvedetaljer,,Analyses Details (YVD5SC230009)"))
-  fail("forste raekke matcher ikke skabelonen");
-if (!lines[1].startsWith("Tekst,Tekst,[AAA].[PVL7X]"))
-  fail("kodelinjen matcher ikke skabelonen");
-if (!lines[2].startsWith("Prøvemærkning*,Sagsnavn,"))
-  fail("kolonneoverskrifterne matcher ikke skabelonen");
-if (!lines.some((l) => l.startsWith("SampleCustomerReference,SampleDescription,Standard")))
-  fail("footerblokken mangler");
-if (!lines.some((l) => l.startsWith("FreeText,FreeText,")))
-  fail("FreeText-raekken mangler");
+// 1. Alle dele skal vaere der, i samme raekkefolge.
+const namesBefore = [...before.keys()].join("|");
+const namesAfter = [...after.keys()].join("|");
+check(namesBefore === namesAfter, `delene aendrede sig:\n  ${namesBefore}\n  ${namesAfter}`);
 
-// 4. Mapping: P1 har PCB (kol. 3) og metaller+Hg (kol. 10), intet andet.
-const p1 = lines.find((l) => l.startsWith("P1,"))!;
-const p1Flags = p1.slice(p1.lastIndexOf('",') + 2).split(",");
-const expected = ["1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0"];
-if (p1Flags.join(",") !== expected.join(",")) {
-  fail(`P1 analyseflag var [${p1Flags}], forventede [${expected}]`);
+// 2. Alt andet end de to dele vi skriver i skal vaere byte for byte det samme.
+const rewritten = new Set(["xl/worksheets/sheet1.xml", "xl/sharedStrings.xml"]);
+for (const [name, original] of before) {
+  const copy = after.get(name);
+  if (!copy) continue;
+  if (rewritten.has(name)) continue;
+  check(
+    original.crc32 === copy.crc32 && original.data.equals(copy.data),
+    `${name} blev aendret — den skulle kopieres uroert`,
+  );
 }
 
-// 5. Sagsnavn med komma skal vaere quotet.
-if (!p1.includes(`"${caseName}"`)) fail("sagsnavn med komma blev ikke quotet");
-
-// 6. Valideringen fanger en sag uden analyser.
-const noAnalyses = validateForExport("Testvej 1", [samples[6]]);
-if (!noAnalyses.some((i) => i.level === "error"))
-  fail("valideringen fangede ikke en sag uden analyser");
-
-console.log(
-  failures === 0
-    ? `OK — ${lines.length} raekker, ${EUROFINS_COLUMN_COUNT} kolonner, ${rowCount} prover til laboratoriet.`
-    : `${failures} fejl.`,
+// 3. De skjulte ark og ordrenoglerne overlever.
+const meta = readOrderMetadata(file);
+check(meta.customerId === "A01466717NKH", `kunde-id blev ${meta.customerId}`);
+check(meta.contractId === "VL0001974001", `kontrakt-id blev ${meta.contractId}`);
+check(
+  meta.orderTemplateId === "YVD5SC230009",
+  `ordreskabelon-id blev ${meta.orderTemplateId}`,
 );
+
+const workbook = readPart(after.get("xl/workbook.xml")!);
+for (const sheet of [
+  "Sample_Data",
+  "Order_Metadata",
+  "OSIS_Products",
+  "OSIS_AF",
+  "OSIS_ListOfChoices",
+  "sandbox",
+]) {
+  check(workbook.includes(`name="${sheet}"`), `arket ${sheet} mangler`);
+}
+for (const range of ["SampleDetailsRange", "ProductList", "Matrix", "BooleanList"]) {
+  check(workbook.includes(`name="${range}"`), `det navngivne omrade ${range} mangler`);
+}
+check(
+  workbook.includes('workbookAlgorithmName="SHA-512"'),
+  "projektmappens beskyttelse blev fjernet",
+);
+
+// 4. Sample_Data: header, footer og laas skal staa uroert.
+const sheet1 = readPart(after.get("xl/worksheets/sheet1.xml")!);
+const sheet1Before = readPart(before.get("xl/worksheets/sheet1.xml")!);
+
+for (const marker of [
+  '<x:sheetProtection password="E7F0"',
+  '<x:mergeCell ref="A1:B1" />',
+  '<x:mergeCell ref="C1:S1" />',
+  '<x:dataValidations count="3">',
+  'sqref="C4:S303"',
+  '<x:dimension ref="A1:S308" />',
+]) {
+  check(sheet1.includes(marker), `Sample_Data mangler ${marker}`);
+}
+
+const strings = [
+  ...readPart(after.get("xl/sharedStrings.xml")!).matchAll(
+    /<x:t[^>]*>([\s\S]*?)<\/x:t>/g,
+  ),
+].map((m) => m[1]);
+const cellText = (ref: string, xml = sheet1): string | null => {
+  const m = new RegExp(`<x:c r="${ref}"[^>]*t="s"[^>]*><x:v>(\\d+)</x:v>`).exec(xml);
+  return m ? strings[Number(m[1])] : null;
+};
+const cellNumber = (ref: string, xml = sheet1): string | null => {
+  const m = new RegExp(`<x:c r="${ref}"(?![^>]*t=")[^>]*><x:v>([^<]*)</x:v>`).exec(xml);
+  return m ? m[1] : null;
+};
+
+check(cellText("A1") === "Prøvedetaljer", "raekke 1 blev aendret");
+check(
+  cellText("C1") === "Analyses Details (YVD5SC230009)",
+  "aftalekoden i C1 blev aendret",
+);
+check(cellText("A2") === "Tekst", "kodelinjens A2 blev aendret");
+check(cellText("C2") === "[AAA].[PVL7X]", "foerste analysekode blev aendret");
+check(cellText("A3") === "Prøvemærkning*", "kolonneoverskriften i A3 blev aendret");
+check(cellText("B3") === "Sagsnavn", "kolonneoverskriften i B3 blev aendret");
+check(
+  cellText("A305") === "SampleCustomerReference",
+  "footerraekken 305 flyttede sig",
+);
+check(cellText("B305") === "SampleDescription", "footerraekken 305 flyttede sig");
+check(cellText("C305") === "Standard", "footerraekken 305 flyttede sig");
+check(cellText("A307") === "*", "stjernen i raekke 307 flyttede sig");
+check(cellText("A308") === "FreeText", "FreeText-raekken flyttede sig");
+
+// 5. Proeverne staar fra raekke 4 og frem, med sagsnavnet i kolonne B.
+check(rowCount === 6, `forventede 6 dataraekker, fik ${rowCount}`);
+for (let i = 0; i < 6; i++) {
+  const row = 4 + i;
+  check(cellText(`A${row}`) === `P${i + 1}`, `A${row} blev ${cellText(`A${row}`)}`);
+  check(cellText(`B${row}`) === caseName, `B${row} blev ${cellText(`B${row}`)}`);
+}
+check(!sheet1.includes("Jern og metal"), "kortlagt materiale endte i filen");
+
+// 6. Kortlaegningen: P1 har PCB (C) og 6 metaller+Hg (J), intet andet.
+//    P6 har asbest (F) og PAH (Q).
+const flagsOf = (row: number) =>
+  EUROFINS_ANALYSES.map((_, i) =>
+    cellNumber(String.fromCharCode(67 + i) + row),
+  ).join("");
+const pcb = EUROFINS_ANALYSES.findIndex((a) => a.mappedFrom === "analysis_pcb");
+const hg = EUROFINS_ANALYSES.findIndex((a) => a.mappedFrom === "analysis_metals");
+const asbest = EUROFINS_ANALYSES.findIndex((a) => a.mappedFrom === "analysis_asbestos");
+const pah = EUROFINS_ANALYSES.findIndex((a) => a.mappedFrom === "analysis_pah");
+const expect = (...on: number[]) =>
+  EUROFINS_ANALYSES.map((_, i) => (on.includes(i) ? "1" : "0")).join("");
+
+check(flagsOf(4) === expect(pcb, hg), `P1 blev ${flagsOf(4)}`);
+check(flagsOf(9) === expect(asbest, pah), `P6 blev ${flagsOf(9)}`);
+
+// 7. Heltal, aldrig 0.0 — skabelonens validering pa C4:S303 er "whole".
+const decimals = [...sheet1.matchAll(/<x:v>(-?\d+\.\d+)<\/x:v>/g)];
+check(decimals.length === 0, `${decimals.length} celler blev skrevet som decimaltal`);
+
+// 8. De ubrugte proeveraekker staar som skabelonen efterlod dem.
+const rowXml = (n: number, xml: string) =>
+  new RegExp(`<x:row r="${n}"[\\s\\S]*?</x:row>`).exec(xml)?.[0] ?? "";
+for (const n of [10, 150, 303]) {
+  check(
+    rowXml(n, sheet1) === rowXml(n, sheet1Before),
+    `raekke ${n} blev aendret, selv om den ikke bruges`,
+  );
+}
+
+// 9. Strengtabellen udvides bagi, sa skabelonens egne indekser staar fast.
+const stringsBefore = [
+  ...readPart(before.get("xl/sharedStrings.xml")!).matchAll(
+    /<x:t[^>]*>([\s\S]*?)<\/x:t>/g,
+  ),
+].map((m) => m[1]);
+check(
+  strings.slice(0, stringsBefore.length).join(" ") ===
+    stringsBefore.join(" "),
+  "skabelonens egne strenge blev flyttet rundt",
+);
+check(
+  strings.length === stringsBefore.length + 7,
+  `forventede 7 nye strenge (6 maerkninger + sagsnavn), fik ${strings.length - stringsBefore.length}`,
+);
+
+// 10. Filnavnet er det Eurofins selv giver skabelonen.
+check(
+  filename === "A01466717NKH-YVD5SC230009-VL0001974001-2026-07-28.xlsx",
+  `filnavnet blev ${filename}`,
+);
+
+// 11. Valideringen fanger de sager der ikke kan eksporteres.
+check(
+  validateForExport("Testvej 1", [samples[6]]).some((i) => i.level === "error"),
+  "valideringen fangede ikke en sag uden analyser",
+);
+check(
+  validateForExport(
+    "Testvej 1",
+    Array.from({ length: MAX_SAMPLES + 1 }, (_, i) =>
+      sample(i + 1, "Træ", "Maling", { analysis_pcb: true }),
+    ),
+  ).some((i) => i.message.includes("plads til")),
+  `valideringen fangede ikke mere end ${MAX_SAMPLES} proever`,
+);
+
+const out = new URL("../.eurofins-test.xlsx", import.meta.url);
+writeFileSync(out, file);
+
+console.log(`${filename} — ${file.length} bytes, ${rowCount} proever til laboratoriet`);
+console.log(`skrevet til ${out.pathname.slice(1)} sa den kan abnes i Excel`);
+console.log(failures === 0 ? "OK" : `${failures} fejl.`);
 process.exit(failures === 0 ? 0 : 1);

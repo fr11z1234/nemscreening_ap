@@ -76,9 +76,3 @@ export const EUROFINS_ANALYSES: EurofinsAnalysis[] = [
     name: "Enkeltstående analyser.Kulbrintefraktioner (THC) - Ref1 ",
   },
 ];
-
-/** 2 tekstkolonner + 17 analysekolonner. */
-export const EUROFINS_COLUMN_COUNT = 2 + EUROFINS_ANALYSES.length;
-
-/** Aftalekoden i skabelonens forste raekke. Overskrives af screening.app_settings. */
-export const DEFAULT_ANALYSES_DETAILS = "YVD5SC230009";

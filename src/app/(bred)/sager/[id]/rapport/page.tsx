@@ -347,7 +347,7 @@ export default async function RapportPage({
         return (
           <section key={s.id} className="print-side mt-10 print:mt-0">
             {sidehoved}
-            <header className="flex flex-wrap items-center gap-4 border-b-2 border-fg pb-3">
+            <header className="flex flex-wrap items-center gap-4 border-b-2 border-fg pb-2">
               <span className="tabular rounded-lg border border-grid-strong px-2.5 py-1 text-lg font-semibold">
                 {s.label}
               </span>
@@ -367,7 +367,13 @@ export default async function RapportPage({
               </span>
             </header>
 
-            <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 rounded-xl bg-surface-2 px-5 py-3 text-sm">
+            {/* Oplysningerne er noget man slar op, ikke noget man laeser: tre
+                korte vaerdier man lober oje't hen over en gang. Derfor er
+                baren holdt sa lav som skriften tillader — af de knap 16 mm
+                den fyldte for, var de ti luft. Hver millimeter den ikke
+                tager, gar til billederne, og det er billederne siden findes
+                for. */}
+            <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 rounded-xl bg-surface-2 px-5 py-2 text-xs">
               <Inline
                 label="Lokalitet"
                 value={
@@ -398,16 +404,29 @@ export default async function RapportPage({
                 max-h siger, uanset hvad der staar i den.
 
                 Hojden er sat efter arket og ikke efter billedet: en prove
-                skal kunne vaere pa en side, ogsa forklaringen under skemaet. */}
+                skal kunne vaere pa en side, ogsa forklaringen under skemaet.
+
+                Regnestykket bag de 8,5 cm: arket er 210 mm hojt, polstringen
+                tager 24, sa der er 186 at dele. Alt det andet pa siden —
+                sidehoved, provehoved, oplysninger, overskrift, skema og
+                forklaring — fylder omkring 91 mm, og luften herover tre. Der
+                er altsa plads til 92 mm billede.
+
+                De sidste syv er slup, og de er der af en grund: braekker et
+                materialenavn om pa to linjer, eller lober oplysningerne over
+                pa to, koster det seks millimeter af det samme budget. Slupet
+                raekker til praecis et af de brud. Sker begge to, ryger skemaet
+                ned pa naeste side — og sa er hele pointen med en prove pa en
+                side vaek. */}
             {urls.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="mt-3 grid grid-cols-2 gap-4">
                 {urls.slice(0, 2).map((url, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={url}
                     src={url}
                     alt={`${s.label}, billede ${i + 1}`}
-                    className="h-[7cm] w-full rounded-xl bg-surface-2 object-contain"
+                    className="h-[8.5cm] w-full rounded-xl bg-surface-2 object-contain"
                   />
                 ))}
               </div>

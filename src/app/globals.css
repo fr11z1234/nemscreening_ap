@@ -352,10 +352,12 @@ h2 {
 /*
  * Rapportens forside.
  *
- * Navy i fuld flade med maerkets mint henover. Farverne er de samme som
- * resten af appen — se :root — men mintet star her i fuld styrke og ikke i
- * den morknede udgave, der skal baere tekst: pa forsiden er den en flade,
- * ikke en skrift, sa den behover ikke holde WCAG-kontrast mod hvid.
+ * Ejendommen fylder hele arket. Alt andet ligger ovenpa, og laget skal vaere
+ * saa let som teksten tillader — det er huset kunden skal se, ikke vores
+ * grafik. Er der ikke taget et forsidebillede, star navy'en alene.
+ *
+ * Mintet i figuren star i fuld styrke og ikke i den morknede udgave: her er
+ * den en flade og ikke en skrift, sa den behover ikke holde WCAG mod hvid.
  */
 .forside {
   position: relative;
@@ -366,6 +368,29 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+}
+
+.forside-foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * To gradienter og ingen heldaekkende flade.
+ *
+ * Toppen faar lige nok morke til at maerket kan ses mod en lys himmel;
+ * bunden nok til at overskriften kan laeses. Midten — huset — bliver rort
+ * saa lidt som muligt.
+ */
+.forside-slor {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgb(11 31 58 / 0.55) 0%, rgb(11 31 58 / 0) 22%),
+    linear-gradient(to top, rgb(11 31 58 / 0.82) 0%, rgb(11 31 58 / 0.45) 24%, rgb(11 31 58 / 0) 46%);
 }
 
 .forside-figur {
@@ -472,7 +497,6 @@ h2 {
    * hvor siderne knaekker.
    */
   .print-side,
-  .print-flyd,
   .print-bilag,
   .forside {
     background: var(--surface);
@@ -549,36 +573,33 @@ h2 {
   }
 
   /*
-   * Forsiden gaar til papirets kant.
+   * EN sidestorrelse og EN margin for hele dokumentet.
    *
-   * Egen navngiven side, fordi marginen skal vaere nul netop her — resten af
-   * rapporten skal beholde sine 12 mm. Hojden saettes til hele arket, saa
-   * fladen ikke stopper halvvejs nede.
+   * Marginen ligger ikke pa @page men som polstring inde i hver sektion.
+   * Det lyder omvendt, men det er det eneste der giver bade en forside der
+   * gaar til kant OG et analyseskema der passer.
+   *
+   * Vi provede med navngivne sider — @page forside med margin nul og @page
+   * bilag i staaende — og sa blev skemaet klippet. Browseren satte indholdet
+   * op mod det ene sidebokse-maal og tegnede det ind i det andet: 297 mm mod
+   * 273 mm, altsa otte procent skaaret af i hojre side. Det svarede til
+   * halvanden analysekolonne, og de kolonner er hele grunden til at
+   * rapporten findes.
    */
-  @page forside {
-    size: A4 landscape;
-    margin: 0;
+  .print-side,
+  .print-bilag {
+    padding: 12mm;
   }
 
+  /* Forsiden er den ene der skal helt ud til kanten. */
   .forside {
-    page: forside;
     break-after: page;
     break-inside: avoid;
     aspect-ratio: auto;
     width: 100%;
     height: 100vh;
+    padding: 0;
     border-radius: 0;
-  }
-
-  /*
-   * Metodeafsnittet er laengere end en side og skal have lov at lobe videre.
-   *
-   * .print-side holder en side samlet — rigtigt for en prove med to billeder
-   * og et skema, forkert for fem sider tekst, hvor browseren sa ville
-   * efterlade et halvt tomt ark hver gang.
-   */
-  .print-flyd {
-    break-before: page;
   }
 
   /*
@@ -605,23 +626,27 @@ h2 {
   }
 
   /*
-   * Bilaget fra Eurofins er staaende A4.
+   * Bilaget fra Eurofins er staaende sider pa et liggende ark.
    *
-   * Uden en navngiven side ville hver bilagsside blive lagt ned som resten af
-   * rapporten, og siden ville sta som et smalt frimaerke midt i et bredt ark.
-   * Kan browseren ikke navngivne sider, falder den tilbage til liggende — sa
-   * er bilaget stadig laesbart, bare med luft i siderne.
+   * Vi provede at give dem deres egen staaende @page, men to sidestorrelser i
+   * samme dokument klippede analyseskemaet — se ovenfor. Et bilag med luft i
+   * siderne er til at leve med; et skema uden sine sidste kolonner er ikke.
+   *
+   * Billedet faar hele hojden og centreres, sa siden bliver saa stor som
+   * arket tillader.
    */
-  @page bilag {
-    size: A4 portrait;
-    margin: 8mm;
-  }
-
   .print-bilag {
-    page: bilag;
     break-after: page;
     break-inside: avoid;
     max-width: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .print-bilag img {
+    flex: 1;
+    min-height: 0;
+    object-fit: contain;
   }
 
   .print-bilag:last-child {
@@ -661,8 +686,13 @@ h2 {
    * kolonner, og tallene ville staa i to linjer hver — hele pointen med at
    * kunne laegge en gammel og en ny rapport ved siden af hinanden ryger.
    */
+  /*
+   * Marginen er nul HER og ligger i stedet som polstring i hver sektion.
+   * Se forklaringen ved .print-side ovenfor: to sidebokse i samme dokument
+   * kostede halvanden analysekolonne.
+   */
   @page {
     size: A4 landscape;
-    margin: 12mm;
+    margin: 0;
   }
 }

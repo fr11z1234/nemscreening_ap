@@ -25,11 +25,12 @@ Opret sag ──► Hent bygninger fra BBR ──► Prøvetagning i marken
 Første halvdel foregår på en telefon, ofte uden dækning. Anden halvdel
 foregår på kontorets pc. De to har hvert sit layout — se nedenfor.
 
-Ud over analysesvaret lægger kontoret bilag på sagen: et forsidebillede af
-ejendommen, en plantegning, og de PDF'er Eurofins sender med —
-analyserapporten og typisk et asbestappendiks. Alle er frivillige og havner i
-den færdige rapport: forsidebilledet på side 2, plantegningen på sin egen
-side, Eurofins-dokumenterne bagest i den rækkefølge kontoret sætter dem.
+Forsidebilledet af ejendommen tages allerede når sagen oprettes, og bliver
+baggrund på rapportens forside. Resten af bilagene lægger kontoret på
+bagefter: en plantegning, og de PDF'er Eurofins sender med — analyserapporten
+og typisk et asbestappendiks. Alle er frivillige og havner i den færdige
+rapport: plantegningen på sin egen side, Eurofins-dokumenterne bagest i den
+rækkefølge kontoret sætter dem.
 
 ## Kom i gang
 

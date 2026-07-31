@@ -1,25 +1,15 @@
 # Logoet
 
-De to filer her er **midlertidige**. De har firmanavnet, men ikke husmærket —
-med vilje, så en rapport med pladsholderen ikke kan forveksles med en færdig.
+`logo-klar.png` er mærket. Det bruges gennem `src/components/Logo.tsx` og
+ingen andre steder — i rapportens sidehoved på hver side, og på forsiden.
 
-Læg de rigtige filer ind under de samme navne:
+Der er **kun én fil**. Mintet er lyst nok til at bære både på hvidt papir og
+på forsidens mørke billede, så der er ingen hvid udgave at holde ajour.
 
-| Fil | Bruges hvor |
-| --- | --- |
-| `nemscreening.svg` | Sidehovedet på alle rapportens sider. Mørk tekst, lys baggrund. |
-| `nemscreening-hvid.svg` | Rapportens forside. Hvid udgave, navy baggrund. |
+Filen er 384 × 113 px. Ved de højder den bruges i — 28 px i sidehovedet, 44 px
+på forsiden — svarer det til over 200 dpi på papir, og rapporten ender i en
+PDF. Skal mærket væsentligt større end det, bliver det grynet, og så skal der
+en SVG til i stedet.
 
-Krav til filerne:
-
-- **SVG**, så mærket er skarpt i en PDF uanset zoom. En PNG bliver grynet i
-  print, hvor rapporten ender.
-- **Ingen fast bredde og højde** på `<svg>`-elementet, kun `viewBox`.
-  Komponenten sætter højden (`h-7` i sidehovedet, `h-11` på forsiden) og
-  regner bredden ud fra `viewBox`. Med hårdkodede mål vil mærket enten blive
-  klippet eller stå i den forkerte størrelse.
-- Beskær tomrummet væk omkring mærket, ellers står det og flyder i hovedet.
-
-Filerne bruges gennem `src/components/Logo.tsx` og ingen andre steder.
-Fejler en af dem, viser browseren alt-teksten «Nem Screening» — en rapport med
-firmanavnet i skrift er bedre end en med et tomt hul.
+Skiftes filen ud, så behold navnet. Beskær tomrummet væk omkring mærket,
+ellers står det og flyder i hovedet.

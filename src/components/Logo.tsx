@@ -1,27 +1,20 @@
 /**
- * Maerket, som det skal sta pa hver side i rapporten.
+ * Maerket, som det staar i rapportens sidehoved og pa forsiden.
  *
- * Filerne ligger i public/logo/ og er ikke tegnet i kode: et logo hortet
- * efter et skaermbillede rammer aldrig helt, og det her er det forste kunden
- * ser. Slar filen fejl, viser browseren alt-teksten — en rapport med
- * firmanavnet i skrift er bedre end en med et tomt hul.
+ * En fil og ikke to: mintet er lyst nok til at baere bade pa hvidt papir og
+ * pa forsidens morke billede, sa der er ingen hvid udgave at holde ajour.
  *
- * Den hvide udgave er til forsiden, hvor baggrunden er navy. Den morke er
- * til alt andet.
+ * Filen er 384 px bred. Ved de hojder den bruges i — 28 px i hovedet, 44 px
+ * pa forsiden — svarer det til over 200 dpi pa papir, sa den kan taale at
+ * blive printet. Skal den vaesentligt storre, skal der en SVG til.
  */
-export function Logo({
-  hvid = false,
-  className = "",
-}: {
-  hvid?: boolean;
-  className?: string;
-}) {
+export function Logo({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={hvid ? "/logo/nemscreening-hvid.svg" : "/logo/nemscreening.svg"}
+      src="/logo/logo-klar.png"
       alt="Nem Screening"
-      className={`object-contain ${hvid ? "text-white" : "text-fg"} ${className}`}
+      className={`object-contain ${className}`}
     />
   );
 }

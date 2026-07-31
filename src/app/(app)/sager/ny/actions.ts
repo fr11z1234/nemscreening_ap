@@ -4,7 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export type CreateCaseState = { error?: string };
+/**
+ * Sagen omdirigerer ikke selv.
+ *
+ * Forsidebilledet tages for sagen findes, sa det kan forst laegges op nar vi
+ * har et id. Derfor gives id'et tilbage til browseren, som uploader billedet
+ * og ForST derefter navigerer videre.
+ */
+export type CreateCaseState = { error?: string; caseId?: string };
 
 export async function createCase(
   _prev: CreateCaseState,
@@ -42,5 +49,5 @@ export async function createCase(
   if (error) return { error: `Kunne ikke oprette sagen: ${error.message}` };
 
   revalidatePath("/sager");
-  redirect(`/sager/${data.id}`);
+  return { caseId: data.id };
 }

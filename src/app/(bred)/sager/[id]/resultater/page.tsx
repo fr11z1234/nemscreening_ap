@@ -223,7 +223,7 @@ export default async function ResultaterPage({
 
         <RapportFiler
           caseId={id}
-          canUpload={canUpload}
+          canUploadLab={canUpload}
           state={rapportFiler}
         />
 

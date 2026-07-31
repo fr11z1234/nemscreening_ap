@@ -55,12 +55,16 @@ type BilledeKind = keyof typeof BILLEDER;
  */
 export function RapportFiler({
   caseId,
-  canUpload,
+  canUploadLab,
   state,
 }: {
   caseId: string;
-  /** Databasen tillader kun kontoret at skrive i case_files (is_office). */
-  canUpload: boolean;
+  /**
+   * Samme deling som RLS pa case_files: billeder er markarbejde og ma
+   * skrives af ethvert medlem, mens Eurofins' dokumenter hoerer til
+   * laboratoriesvaret og dermed til kontoret.
+   */
+  canUploadLab: boolean;
   state: RapportFilerState;
 }) {
   const router = useRouter();
@@ -306,9 +310,10 @@ export function RapportFiler({
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 className="font-semibold">Bilag til rapporten</h2>
         <p className="text-sm text-muted">
-          Plantegningen får sin egen side, og Eurofins&nbsp;dokumenter lægges
-          bagest i den rækkefølge de står her. Uden dem laves rapporten stadig
-          — siderne springes bare over.
+          Forsidebilledet er baggrund på forsiden, plantegningen får sin egen
+          side, og Eurofins&nbsp;dokumenter lægges bagest i den rækkefølge de
+          står her. Uden dem laves rapporten stadig — siderne springes bare
+          over.
         </p>
       </div>
 
@@ -327,10 +332,10 @@ export function RapportFiler({
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <BilledeFelt
           titel="Forsidebillede"
-          hjaelp="Ejendommen set forfra. Står på rapportens side 2."
+          hjaelp="Baggrund på rapportens forside. Tages normalt, når sagen oprettes."
           tom="Intet forsidebillede lagt op"
           billede={state.forsidebillede}
-          canUpload={canUpload}
+          canUpload={true}
           optaget={optaget}
           onVaelg={() => forsideInput.current?.click()}
           onFjern={() => fjernBillede("forsidebillede")}
@@ -341,7 +346,7 @@ export function RapportFiler({
           hjaelp="PNG, JPG eller WEBP. Får sin egen side."
           tom="Ingen plantegning lagt op"
           billede={state.plantegning}
-          canUpload={canUpload}
+          canUpload={true}
           optaget={optaget}
           onVaelg={() => plantegningInput.current?.click()}
           onFjern={() => fjernBillede("plantegning")}
@@ -378,7 +383,7 @@ export function RapportFiler({
                   <span className="tabular shrink-0 text-xs text-muted">
                     {b.sider} side{b.sider === 1 ? "" : "r"}
                   </span>
-                  {canUpload && (
+                  {canUploadLab && (
                     <span className="flex shrink-0 items-center">
                       <Pil
                         retning="op"
@@ -403,7 +408,7 @@ export function RapportFiler({
             </ol>
           )}
 
-          {canUpload && (
+          {canUploadLab && (
             <div className="mt-3">
               <Knap onClick={() => bilagInput.current?.click()} disabled={optaget}>
                 Tilføj bilag
@@ -435,7 +440,7 @@ export function RapportFiler({
         className="hidden"
       />
 
-      {!canUpload && (
+      {!canUploadLab && (
         <p className="mt-3 text-sm text-muted">
           Kun kontoret kan lægge bilag op.
         </p>

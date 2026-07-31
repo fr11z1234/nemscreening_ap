@@ -94,7 +94,19 @@ ikke til at *bygge* PDF'er — så er vi tilbage ved to rapporter der kan sige
 hver sit.
 
 **Papiret er liggende A4.** Stående giver de seksten kolonner 186 mm at dele,
-og så brækker hvert tal i to linjer. Ændr `@page` med omtanke.
+og så brækker hvert tal i to linjer.
+
+**Der må kun være ÉN `@page`-regel**, og dens margin er nul. Sidemarginen
+ligger som `padding: 12mm` inde i hver sektion i stedet. Det lyder omvendt,
+men det er det eneste der giver både en forside der går til kant og et
+analyseskema der passer.
+
+Det er prøvet med navngivne sider — `@page forside` med margin nul og
+`@page bilag` i stående — og så blev **skemaet klippet**: browseren satte
+indholdet op mod det ene sideboks-mål og tegnede det ind i det andet, 297 mm
+mod 273 mm, altså otte procent skåret af i højre side. Det svarede til
+halvanden analysekolonne. Tilføj ikke en navngiven side uden at printe en
+rapport med et fuldt skema bagefter og tælle kolonnerne.
 
 Analyseskemaets streger, kolonnebredder og rækkehøjder ligger i `.skema` i
 `globals.css` — ikke i `ResultatSkema.tsx`. Tabellen er `table-layout: fixed`
@@ -119,19 +131,42 @@ ligger i `screening.case_files` og i bucket'en `screening-rapport`. Ikke i
 frivillige; mangler de, springes siderne over frem for at efterlade et tomt
 ark.
 
-**Side 1 er en forside** i navy med mærkets mint (`.forside` i
-`globals.css`). Den går til papirets kant og har derfor sin egen `@page
-forside` med margin nul — resten af rapporten beholder sine 12 mm. Side 2 er
-oplysningerne: BBR til venstre, firmaet til højre. Firmaets adresse, telefon,
-e-mail og CVR er de samme hver gang og står i `src/lib/rapport/firma.ts`; kun
-navnet på den, der har lavet rapporten, kommer fra den indloggede bruger.
+RLS på `case_files` er **delt efter hvem der ejer materialet**: billeder er
+markarbejde og må skrives af ethvert medlem, mens `eurofins_pdf` og
+`eurofins_side` hører til laboratoriesvaret og kræver `is_office()` — samme
+grænse som `lab_results`. UI'et deler den på samme måde, så det ikke lover
+noget databasen afviser.
 
-**Logoet skal på hver side.** Det ligger i `public/logo/` — se `LAESMIG.md`
+**Side 1 er en forside** med forsidebilledet i fuld flade (`.forside` i
+`globals.css`). Overlayet er to gradienter og ikke en dækkende flade: toppen
+lige nok til at mærket kan ses mod en lys himmel, bunden nok til at
+overskriften kan læses, og midten — huset — rørt så lidt som muligt. Er der
+ikke taget et billede, står navy'en alene. Forsiden går til papirets kant —
+den er den ene sektion uden `padding`, se reglen om `@page` ovenfor.
+
+**Forsidebilledet tages, når sagen oprettes** — samme greb som i
+prøvetagningen, en firkant med live-kamera man trykker på. Det kan ikke
+uploades med det samme, for sagen findes ikke endnu: derfor returnerer
+`createCase` sagens id i stedet for at omdirigere, og browseren lægger
+billedet op og navigerer først bagefter. Går uploaden galt, navigerer vi
+alligevel — sagen ER oprettet, og billedet kan lægges op igen fra
+resultatsiden.
+
+Side 2 er oplysningerne: BBR til venstre, firmaet til højre. Firmaets adresse,
+telefon, e-mail og CVR er de samme hver gang og står i
+`src/lib/rapport/firma.ts`; kun navnet på den, der har lavet rapporten, kommer
+fra den indloggede bruger.
+
+**Logoet skal på hver side.** Det er én fil i `public/logo/` — se `LAESMIG.md`
 dér — og bruges gennem `src/components/Logo.tsx`. Sidehovedet står inde i hver
 sektion og ikke som et `position: fixed`-element: en fastgjort kasse kan ikke
 undtage forsiden og følger ikke med, når bilagssiderne skifter til stående
 papir. Derfor er metodeteksten delt i grupper à en side (`RAPPORT_SIDER`) —
 et afsnit, der selv brækker over to ark, ville efterlade det andet uden mærke.
+
+Eurofins-bilaget er stående sider på et liggende ark. Det giver luft i
+siderne, og det er med vilje: alternativet var en anden sidestørrelse, og den
+kostede kolonner i skemaet.
 
 Der er **én plantegning, men flere dokumenter fra Eurofins** — analyserapport
 og asbestappendiks kommer som hver sin fil. `doc_id` binder et bilags PDF

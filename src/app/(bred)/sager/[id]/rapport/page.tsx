@@ -231,32 +231,48 @@ export default async function RapportPage({
       {/* Side 1: forsiden. Maerkets flader, intet andet end hvad rapporten er
           og hvor den hoerer til. */}
       <section className="forside">
+        {forsideUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={forsideUrl}
+            alt={`Ejendommen på ${sag.address_text ?? sag.case_name}`}
+            className="forside-foto"
+          />
+        )}
+
         <svg
           className="forside-figur"
           viewBox="0 0 297 210"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
-          {/* Vinklerne er logoets: husets tag og halen under det. */}
+          {/* Vinklerne er logoets: husets tag og halen under det. Figuren
+              bliver et haandtryk i hjornet og ikke et taeppe — huset skal
+              kunne ses. */}
           <path
-            d="M137 24 L232 24 L297 89 L297 137 L201 137 L137 73 Z"
-            fill="#ffffff"
-            opacity="0.06"
+            d="M-8 128 L44 128 L106 190 L84 218 L22 156 L-8 156 Z"
+            fill="var(--primary-fuld)"
           />
           <path
-            d="M-8 72 L84 72 L182 170 L136 216 L38 118 L-8 118 Z"
-            fill="var(--primary-fuld)"
+            d="M232 -8 L297 57 L297 96 L212 11 Z"
+            fill="#ffffff"
+            opacity="0.14"
           />
         </svg>
 
-        <Logo hvid className="absolute right-14 top-12 h-11" />
+        <div className="forside-slor" />
+
+        <Logo className="absolute right-12 top-10 h-11" />
 
         <div className="forside-indhold">
-          <h1 className="text-[2.6rem] font-light leading-tight tracking-tight">
+          <h1 className="text-[2.6rem] font-light leading-tight tracking-tight drop-shadow">
             Miljøkortlægningsrapport
           </h1>
-          <p className="mt-2 text-lg text-white/70">
+          <p className="mt-2 text-xl font-medium">
             {sag.address_text ?? sag.case_name}
+          </p>
+          <p className="mt-1 text-sm text-white/70">
+            {FIRMA.navn} <span className="px-1">●</span> {udskrevet}
           </p>
         </div>
       </section>
@@ -265,22 +281,13 @@ export default async function RapportPage({
       <section className="print-side mt-10 print:mt-0">
         {sidehoved}
 
-        <h1 className="text-center text-[2rem] font-bold leading-tight">
+        <h1 className="text-[2rem] font-bold leading-tight">
           {sag.address_text ?? sag.case_name}
         </h1>
 
-        {forsideUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={forsideUrl}
-            alt={`Ejendommen på ${sag.address_text ?? sag.case_name}`}
-            className="mt-5 h-[8.5cm] w-full rounded-lg bg-surface-2 object-cover"
-          />
-        )}
-
-        <div className="mt-5 grid grid-cols-2 gap-5 text-sm">
-          <dl className="rounded-xl bg-surface-2 px-5 py-4">
-            <p className="font-semibold">BBR-oplysninger</p>
+        <div className="mt-8 grid grid-cols-2 gap-8">
+          <dl className="rounded-xl bg-surface-2 px-7 py-6">
+            <p className="text-lg font-semibold">BBR-oplysninger</p>
             <Linje label="Adresse" value={sag.address_text ?? sag.case_name} />
             <Linje label="Ejendomstype" value={ejendomstype} />
             <Linje label="Byggeår" value={sag.built_year} />
@@ -288,11 +295,14 @@ export default async function RapportPage({
               label="Bebygget areal"
               value={sag.area_m2 ? `${sag.area_m2} m²` : null}
             />
+            <Linje label="Ombygningsår" value={sag.rebuilt_year} />
           </dl>
 
-          <dl className="rounded-xl bg-surface-2 px-5 py-4">
-            <p className="font-semibold">Denne rapport er udarbejdet af</p>
-            <div className="mt-3">
+          <dl className="rounded-xl bg-surface-2 px-7 py-6">
+            <p className="text-lg font-semibold">
+              Denne rapport er udarbejdet af
+            </p>
+            <div className="mt-4">
               <p className="font-semibold">{FIRMA.navn}</p>
               {udarbejdetAf && <p>{udarbejdetAf}</p>}
             </div>

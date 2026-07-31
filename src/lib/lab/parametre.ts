@@ -303,3 +303,59 @@ export function thresholdText(
 function da(n: number): string {
   return n.toLocaleString("da-DK", { maximumFractionDigits: 2 });
 }
+
+/**
+ * Graensevaerdisiden i rapporten.
+ *
+ * Raekkefolgen og navnene folger den tabel kunderne har faaet i arevis — ikke
+ * skemaets kolonneraekkefolge. Tallene hentes stadig fra LAB_PARAMETERS via
+ * thresholdText, sa en aendret graense slar igennem begge steder. To
+ * sandheder om hvornar noget er farligt affald ville vaere det dyreste vi
+ * kunne have i rapporten.
+ *
+ * Den gamle tabel deler klorerede paraffiner i kort- og mellemkaedede. Vi
+ * bestiller ingen af delene hver for sig — Eurofins' samlede "Spor af
+ * Chlorparaffiner" daekker begge med samme regel — sa de star som en raekke.
+ */
+export type GraenseRaekke =
+  | { navn: string; key: LabParameterKey }
+  /**
+   * En raekke vi ikke maler.
+   *
+   * Kulbrinter star i Nemscreenings graensetabel og har staet i rapporten i
+   * arevis, men analysen bestilles ikke; se LAESMIG.md. Den star her som ren
+   * oplysning, og derfor er tallene skrevet ud i stedet for hentet.
+   */
+  | { navn: string; tekst: [string, string, string] };
+
+export const GRAENSE_RAEKKER: GraenseRaekke[] = [
+  { navn: "PCB", key: "pcb_total" },
+  { navn: "Klorerede paraffiner", key: "chlor_paraffins" },
+  { navn: "Bly", key: "pb" },
+  { navn: "Cadmium", key: "cd" },
+  { navn: "Chrom", key: "cr" },
+  { navn: "Kobber", key: "cu" },
+  { navn: "Nikkel", key: "ni" },
+  { navn: "Zink", key: "zn" },
+  { navn: "Kviksølv", key: "hg" },
+  { navn: "Asbest", key: "asbestos" },
+  { navn: "PAH (sum)", key: "pah_total" },
+  {
+    navn: "Kulbrinter (sum C6-C35)",
+    tekst: ["< 100 mg/kg", "100–1.000 mg/kg", "> 1.000 mg/kg"],
+  },
+];
+
+/** Graensen med enhed, som den star pa graensevaerdisiden. */
+export function graenseTekst(
+  raekke: GraenseRaekke,
+  level: LabLevel,
+): string {
+  if ("tekst" in raekke) {
+    return raekke.tekst[level === "rent" ? 0 : level === "forurenet" ? 1 : 2];
+  }
+  const parameter = LAB_PARAMETER_BY_KEY.get(raekke.key)!;
+  const tekst = thresholdText(parameter, level);
+  if (!parameter.unit || tekst === "—") return tekst;
+  return `${tekst} ${parameter.unit}`;
+}

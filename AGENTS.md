@@ -81,9 +81,17 @@ Knapper har både `hover:` og `active:`. Tailwinds `hover` sidder bag
 
 ## Rapporten
 
-Printes til PDF fra browseren — der er ikke og skal ikke være et
-PDF-bibliotek. Sideskift ligger i `.print-side` i `globals.css`, og farverne er
-tvunget igennem med `print-color-adjust`, ellers kommer skemaet ud i gråtoner.
+Printes til PDF fra browseren. Rapporten **bygges ikke** af et PDF-bibliotek —
+sideskift ligger i `.print-side` i `globals.css`, og farverne er tvunget
+igennem med `print-color-adjust`, ellers kommer skemaet ud i gråtoner.
+
+`pdfjs-dist` er den eneste undtagelse, og den **læser** kun: Eurofins'
+analyserapport tegnes om til ét billede pr. side ved upload, fordi en browser
+ikke printer indholdet af en indlejret PDF med. Se
+`src/lib/rapport/pdfsider.ts`. Biblioteket hentes med et dynamisk `import()`,
+så det ikke ligger i den bundt marken henter for at tage en prøve. Brug det
+ikke til at *bygge* PDF'er — så er vi tilbage ved to rapporter der kan sige
+hver sit.
 
 **Papiret er liggende A4.** Stående giver de seksten kolonner 186 mm at dele,
 og så brækker hvert tal i to linjer. Ændr `@page` med omtanke.
@@ -94,10 +102,43 @@ med en `colgroup` i procent, så den passer både i skærmens designbredde og i
 papirets bredde. På skærmen skaleres den ned af `TilpasBredde` i stedet for at
 få en vandret rullebjælke; `@media print` sætter den transform ud af kraft.
 
-**Grænseværdirækkerne er ikke farvelagt**, og de er undtaget skemaets
-mindstehøjde på to linjer. Kun prøvens egne felter har farve. Farver man også
-grænserne, står der rødt og gult på hver eneste side i rapporten, og så holder
-farven op med at betyde noget.
+**Grænseværdirækkerne under skemaet er ikke farvelagt**, og de er undtaget
+skemaets mindstehøjde på to linjer. Kun prøvens egne felter har farve. Farver
+man også grænserne, står der rødt og gult på hver eneste side i rapporten, og
+så holder farven op med at betyde noget.
+
+Til gengæld **er** grænseværdisiden farvelagt — den er ét sted i rapporten og
+er netop den side der forklarer hvad grøn, gul og rød betyder. Den bygges af
+`GRAENSE_RAEKKER` i `parametre.ts`, så tallene ikke kan komme til at sige
+noget andet end skemaet. Rækkefølgen dér følger den tabel kunderne kender, og
+ikke skemaets kolonner.
+
+**Rapportens bilag** — forsidebillede, plantegning og Eurofins' PDF'er —
+ligger i `screening.case_files` og i bucket'en `screening-rapport`. Ikke i
+`sample_photos`: den hænger på en prøve og tager kun billeder. Alle bilag er
+frivillige; mangler de, springes siderne over frem for at efterlade et tomt
+ark.
+
+**Side 1 er en forside** i navy med mærkets mint (`.forside` i
+`globals.css`). Den går til papirets kant og har derfor sin egen `@page
+forside` med margin nul — resten af rapporten beholder sine 12 mm. Side 2 er
+oplysningerne: BBR til venstre, firmaet til højre. Firmaets adresse, telefon,
+e-mail og CVR er de samme hver gang og står i `src/lib/rapport/firma.ts`; kun
+navnet på den, der har lavet rapporten, kommer fra den indloggede bruger.
+
+**Logoet skal på hver side.** Det ligger i `public/logo/` — se `LAESMIG.md`
+dér — og bruges gennem `src/components/Logo.tsx`. Sidehovedet står inde i hver
+sektion og ikke som et `position: fixed`-element: en fastgjort kasse kan ikke
+undtage forsiden og følger ikke med, når bilagssiderne skifter til stående
+papir. Derfor er metodeteksten delt i grupper à en side (`RAPPORT_SIDER`) —
+et afsnit, der selv brækker over to ark, ville efterlade det andet uden mærke.
+
+Der er **én plantegning, men flere dokumenter fra Eurofins** — analyserapport
+og asbestappendiks kommer som hver sin fil. `doc_id` binder et bilags PDF
+sammen med dens sider, så ét bilag kan fjernes uden at de andre følger med, og
+`doc_order` er bilagets plads bagest. Hent altid med
+`.order("doc_order").order("sort_order")`: to bilag har begge en side 1, så
+sidetallet alene hverken sorterer eller duer som React-nøgle.
 
 ## Om data
 

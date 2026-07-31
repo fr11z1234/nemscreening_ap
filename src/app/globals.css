@@ -60,6 +60,15 @@
   --primary-soft: rgb(19 131 69 / 0.1);
   --primary-line: rgb(19 131 69 / 0.26);
 
+  /*
+   * Maerkets mint i fuld styrke — den fra logoet.
+   *
+   * Kun til flader der ikke baerer tekst, og lige nu kun rapportens forside.
+   * --primary er morknet for at holde WCAG under hvid skrift; det behover en
+   * figur bag ved ingenting ikke.
+   */
+  --primary-fuld: #2ee06a;
+
   --danger: #c93636;
   --danger-soft: rgb(229 72 72 / 0.1);
   --warning: #b45309;
@@ -341,6 +350,100 @@ h2 {
 }
 
 /*
+ * Rapportens forside.
+ *
+ * Navy i fuld flade med maerkets mint henover. Farverne er de samme som
+ * resten af appen — se :root — men mintet star her i fuld styrke og ikke i
+ * den morknede udgave, der skal baere tekst: pa forsiden er den en flade,
+ * ikke en skrift, sa den behover ikke holde WCAG-kontrast mod hvid.
+ */
+.forside {
+  position: relative;
+  overflow: hidden;
+  background: var(--fg);
+  color: #ffffff;
+  aspect-ratio: 297 / 210;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.forside-figur {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.forside-indhold {
+  position: relative;
+  padding: 3rem 3.5rem;
+}
+
+/*
+ * Sidehovedet gentages pa hver side, som i de rapporter der er sendt ud i
+ * arevis. Det staar inde i hver sektion og ikke som et fastgjort element:
+ * en fastgjort kasse folger papiret, men den kan ikke undtage forsiden, og
+ * den flytter sig ikke med de bilagssider der ligger ned.
+ */
+.sidehoved {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--grid);
+  padding-bottom: 0.6rem;
+}
+
+/*
+ * Graensevaerditabellen pa sin egen side.
+ *
+ * Fire kolonner og tretten raekker — den behover ikke skemaets maskineri, men
+ * den skal have de samme streger, sa de to sider ligner hinanden.
+ */
+.graenser {
+  width: 100%;
+  max-width: 19cm;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  border: 1px solid var(--grid-strong);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.graenser th,
+.graenser td {
+  padding: 0.3rem 0.6rem;
+  border-right: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+}
+
+.graenser th:last-child,
+.graenser td:last-child {
+  border-right: 0;
+}
+
+.graenser tr:last-child>td {
+  border-bottom: 0;
+}
+
+.graenser thead th {
+  background: var(--fg);
+  color: var(--surface);
+  font-weight: 600;
+  border-right-color: var(--fg-2);
+}
+
+/* Stofnavnet er ikke en maling og skal ikke baere en niveaufarve. */
+.graenser tbody td:first-child {
+  font-weight: 500;
+  width: 34%;
+}
+
+/*
  * For bredt indhold skaleres ned frem for at faa en rullebjaelke.
  *
  * Et skema man skal rulle vandret i, er et skema man ikke kan overskue — og
@@ -368,11 +471,25 @@ h2 {
    * papir allerede pa skaermen. Ellers opdager man forst i printdialogen
    * hvor siderne knaekker.
    */
-  .print-side {
+  .print-side,
+  .print-flyd,
+  .print-bilag,
+  .forside {
     background: var(--surface);
     border-radius: 1rem;
     box-shadow: var(--shadow);
     padding: 2rem 2.25rem;
+  }
+
+  /* Forsiden gaar til kant. Polstringen ligger i .forside-indhold. */
+  .forside {
+    padding: 0;
+    background: var(--fg);
+  }
+
+  /* Bilagets sider er billeder af et staaende A4 og skal ses som saadan. */
+  .print-bilag {
+    max-width: 21cm;
   }
 }
 
@@ -428,6 +545,86 @@ h2 {
   }
 
   .print-side:last-child {
+    break-after: auto;
+  }
+
+  /*
+   * Forsiden gaar til papirets kant.
+   *
+   * Egen navngiven side, fordi marginen skal vaere nul netop her — resten af
+   * rapporten skal beholde sine 12 mm. Hojden saettes til hele arket, saa
+   * fladen ikke stopper halvvejs nede.
+   */
+  @page forside {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  .forside {
+    page: forside;
+    break-after: page;
+    break-inside: avoid;
+    aspect-ratio: auto;
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  /*
+   * Metodeafsnittet er laengere end en side og skal have lov at lobe videre.
+   *
+   * .print-side holder en side samlet — rigtigt for en prove med to billeder
+   * og et skema, forkert for fem sider tekst, hvor browseren sa ville
+   * efterlade et halvt tomt ark hver gang.
+   */
+  .print-flyd {
+    break-before: page;
+  }
+
+  /*
+   * Teksten saettes i to spalter.
+   *
+   * Arket ligger ned, fordi analyseskemaet kraever det. En tekstlinje over
+   * hele bredden bliver 120 anslag lang, og oje't finder ikke tilbage til
+   * begyndelsen af naeste linje. To spalter giver samme laengde som i den
+   * staaende rapport teksten er skrevet til.
+   */
+  .print-spalter {
+    column-count: 2;
+    column-gap: 12mm;
+    text-align: justify;
+  }
+
+  /* En overskrift ma ikke staa alene nederst i en spalte. */
+  .print-spalter h3 {
+    break-after: avoid;
+  }
+
+  .print-spalter p {
+    break-inside: avoid;
+  }
+
+  /*
+   * Bilaget fra Eurofins er staaende A4.
+   *
+   * Uden en navngiven side ville hver bilagsside blive lagt ned som resten af
+   * rapporten, og siden ville sta som et smalt frimaerke midt i et bredt ark.
+   * Kan browseren ikke navngivne sider, falder den tilbage til liggende — sa
+   * er bilaget stadig laesbart, bare med luft i siderne.
+   */
+  @page bilag {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  .print-bilag {
+    page: bilag;
+    break-after: page;
+    break-inside: avoid;
+    max-width: none;
+  }
+
+  .print-bilag:last-child {
     break-after: auto;
   }
 

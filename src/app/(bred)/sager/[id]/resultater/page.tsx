@@ -14,11 +14,13 @@ import {
 } from "@/components/lab/ResultatSkema";
 import { TilpasBredde } from "@/components/lab/TilpasBredde";
 import { fortrydSendtTilLab } from "@/lib/cases/status";
+import { RAPPORT_BUCKET } from "@/lib/rapport/filer";
 import { getMember } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { LEVEL_LABEL, type LabLevel } from "@/lib/lab/parametre";
-import type { Case, CaseBuilding, Sample } from "@/lib/types";
+import type { Case, CaseBuilding, CaseFile, Sample } from "@/lib/types";
 import { ResultatUpload } from "./ResultatUpload";
+import { RapportFiler, type RapportFilerState } from "./RapportFiler";
 
 export const metadata = { title: "Resultater · Nemscreening" };
 
@@ -93,6 +95,57 @@ export default async function ResultaterPage({
     estimated_tons: s.estimated_tons,
   }));
 
+  const filerRes = await supabase
+    .from("case_files")
+    .select("*")
+    .eq("case_id", id)
+    .order("doc_order")
+    .order("sort_order")
+    .returns<CaseFile[]>();
+
+  const filer = filerRes.data ?? [];
+  const plantegning = filer.find((f) => f.kind === "plantegning") ?? null;
+  const forsidebillede = filer.find((f) => f.kind === "forsidebillede") ?? null;
+
+  // Et lille eksempel er nok her — rapporten viser dem i fuld stoerrelse.
+  const billedStier = [plantegning, forsidebillede]
+    .filter((f) => f !== null)
+    .map((f) => f.storage_path);
+  const billedUrl = new Map<string, string>();
+  if (billedStier.length) {
+    const { data: signed } = await supabase.storage
+      .from(RAPPORT_BUCKET)
+      .createSignedUrls(billedStier, 60 * 60);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) billedUrl.set(s.path, s.signedUrl);
+    }
+  }
+
+  const rapportFiler: RapportFilerState = {
+    forsidebillede: forsidebillede
+      ? {
+          filnavn: forsidebillede.filename,
+          url: billedUrl.get(forsidebillede.storage_path) ?? null,
+        }
+      : null,
+    plantegning: plantegning
+      ? {
+          filnavn: plantegning.filename,
+          url: billedUrl.get(plantegning.storage_path) ?? null,
+        }
+      : null,
+    bilag: filer
+      .filter((f) => f.kind === "eurofins_pdf")
+      .map((pdf) => ({
+        docId: pdf.doc_id!,
+        filnavn: pdf.filename,
+        plads: pdf.doc_order,
+        sider: filer.filter(
+          (f) => f.kind === "eurofins_side" && f.doc_id === pdf.doc_id,
+        ).length,
+      })),
+  };
+
   const levels = samples.map((s) => levelOfSample(results.get(s.id)));
   const tally = (level: LabLevel) => levels.filter((l) => l === level).length;
   const answered = levels.filter((l) => l !== null).length;
@@ -166,6 +219,12 @@ export default async function ResultaterPage({
             seq: s.seq,
             is_lab_sample: s.is_lab_sample,
           }))}
+        />
+
+        <RapportFiler
+          caseId={id}
+          canUpload={canUpload}
+          state={rapportFiler}
         />
 
         {samples.length === 0 ? (

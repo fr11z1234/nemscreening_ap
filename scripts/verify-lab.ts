@@ -10,6 +10,8 @@
 import {
   classify,
   displayValue,
+  GRAENSE_RAEKKER,
+  graenseTekst,
   LAB_PARAMETER_BY_KEY,
   readValue,
   thresholdText,
@@ -282,7 +284,56 @@ check(
   "en tom kolonne i databasen er ikke analyseret",
 );
 
-// 12. En fil der ikke er en AllResults-fil skal afvises tydeligt.
+// 12. Graensevaerdisiden i rapporten.
+//
+//     Den er kundens facit for hvad farverne betyder, og den ma ikke kunne
+//     komme til at sige noget andet end skemaet. Derfor hentes tallene fra
+//     LAB_PARAMETERS — her kontrolleres at koblingen holder.
+const graenseKeys = GRAENSE_RAEKKER.flatMap((r) => ("key" in r ? [r.key] : []));
+for (const key of LAB_PARAMETER_BY_KEY.keys()) {
+  check(
+    graenseKeys.includes(key),
+    `${key} står i skemaet men mangler på graensevaerdisiden`,
+  );
+}
+check(
+  new Set(graenseKeys).size === graenseKeys.length,
+  "en parameter star to gange pa graensevaerdisiden",
+);
+
+const raekke = (navn: string) => GRAENSE_RAEKKER.find((r) => r.navn === navn)!;
+
+// Enheden skal med — "< 40" alene siger ikke om det er mg/kg eller procent.
+check(
+  graenseTekst(raekke("Bly"), "rent") === "< 40 mg/kg",
+  `blyets rene graense blev "${graenseTekst(raekke("Bly"), "rent")}"`,
+);
+check(
+  graenseTekst(raekke("Bly"), "farligt") === "> 2.500 mg/kg",
+  `blyets rode graense blev "${graenseTekst(raekke("Bly"), "farligt")}"`,
+);
+
+// Asbest og klorerede paraffiner males ikke i mg/kg, sa de far ingen enhed.
+check(
+  graenseTekst(raekke("Asbest"), "farligt") === "Påvist",
+  `asbestens rode graense blev "${graenseTekst(raekke("Asbest"), "farligt")}"`,
+);
+check(
+  graenseTekst(raekke("Asbest"), "forurenet") === "—",
+  "asbest skulle ikke have en gul graense",
+);
+
+// Kulbrinter bestilles ikke, sa raekken er ren oplysning med tallene skrevet
+// ud. Den skal blive ved med at vaere det — ikke stille og roligt blive til
+// en parameter vi lader som om vi maler.
+const kulbrinter = raekke("Kulbrinter (sum C6-C35)");
+check(!("key" in kulbrinter), "kulbrinter blev koblet til en parameter vi ikke maler");
+check(
+  graenseTekst(kulbrinter, "forurenet") === "100–1.000 mg/kg",
+  `kulbrinternes gule graense blev "${graenseTekst(kulbrinter, "forurenet")}"`,
+);
+
+// 13. En fil der ikke er en AllResults-fil skal afvises tydeligt.
 let rejected = false;
 try {
   parseLabFile("navn;vaerdi\nnoget;andet");

@@ -71,6 +71,19 @@ Kolonnen `lab_results.asbestos_dusty` findes stadig i databasen, men bliver
 hverken læst eller skrevet. Skal skelnen ind igen, skal den sættes **før**
 prøven kan få en farve, ikke bagefter.
 
+## Grænseværdisiden i rapporten
+
+Rapporten har en side med hele grænseværditabellen farvelagt — den side der
+forklarer kunden, hvad grøn, gul og rød betyder i analyseskemaet. Den bygges
+af `GRAENSE_RAEKKER`, som **henter tallene fra `LAB_PARAMETERS`**. En ændret
+grænse slår derfor igennem begge steder på én gang. To sandheder om, hvornår
+noget er farligt affald, ville være det dyreste vi kunne have i rapporten.
+
+Rækkefølgen og navnene dér følger den tabel kunderne har fået i årevis
+(`PCB`, `Bly`, …) og ikke skemaets kolonner. `verify:lab` kontrollerer, at
+hver parameter i skemaet også står på siden — en ny parameter kan ikke blive
+glemt.
+
 ## Kulbrinter — bevidst udeladt
 
 Grænsetabellen indeholder **Kulbrinter (sum C6-C35)**:
@@ -79,11 +92,17 @@ Grænsetabellen indeholder **Kulbrinter (sum C6-C35)**:
 | --- | --- | --- |
 | < 100 mg/kg | 100–1.000 mg/kg | > 1.000 mg/kg |
 
-Den er **ikke** implementeret, og det er med vilje. Kulbrinter har stået i
-PDF-rapportens grænsetabel, men har aldrig været bestilt: analysen er ikke i
-`eurofins/template.ts`' kortlægning, og den stod ikke i det regneark systemet
-blev bygget efter. En kolonne der aldrig fyldes ud er værre end ingen kolonne
-— den ser ud som om alt virker.
+Den er **ikke** implementeret som parameter, og det er med vilje. Kulbrinter
+har stået i PDF-rapportens grænsetabel, men har aldrig været bestilt: analysen
+er ikke i `eurofins/template.ts`' kortlægning, og den stod ikke i det regneark
+systemet blev bygget efter. En kolonne der aldrig fyldes ud er værre end ingen
+kolonne — den ser ud som om alt virker.
+
+Den står dog stadig på **grænseværdisiden**, som den altid har gjort, fordi
+siden gengiver Nemscreenings tabel og ikke kun det vi bestiller. Derfor er den
+i `GRAENSE_RAEKKER` den ene række med tallene skrevet ud i stedet for hentet
+fra en parameter — og `verify:lab` holder den sådan. Får materialet aldrig en
+kulbrinte-kolonne i skemaet, kan ingen komme til at tro at den er målt.
 
 Skal den ind en dag, kræver det tre ting:
 

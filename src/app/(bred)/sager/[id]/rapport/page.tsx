@@ -12,9 +12,27 @@ import {
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
 import { TilpasBredde } from "@/components/lab/TilpasBredde";
+import { Graensevaerdier } from "@/components/lab/Graensevaerdier";
+import { Logo } from "@/components/Logo";
+import { getMember } from "@/lib/auth";
+import { FIRMA } from "@/lib/rapport/firma";
+import { RAPPORT_BUCKET } from "@/lib/rapport/filer";
+import {
+  GRAENSE_EFTERSKRIFT,
+  GRAENSE_FARVER,
+  GRAENSE_FARVER_INDLEDNING,
+  GRAENSE_NOTER,
+  RAPPORT_SIDER,
+} from "@/lib/rapport/tekst";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
-import { PERIOD_LABEL, type Case, type CaseBuilding, type Sample } from "@/lib/types";
+import {
+  PERIOD_LABEL,
+  type Case,
+  type CaseBuilding,
+  type CaseFile,
+  type Sample,
+} from "@/lib/types";
 
 export const metadata = { title: "Rapport · Nemscreening" };
 
@@ -128,6 +146,72 @@ export default async function RapportPage({
   }));
   const skemaById = new Map(skemaSamples.map((s) => [s.id, s]));
 
+  // Bilagene: plantegningen og Eurofins' rapport, den sidste som et billede
+  // pr. side. Se lib/rapport/pdfsider.ts for hvorfor det ikke er en PDF her.
+  // Bilagets plads forst, sidetallet inde i bilaget derefter — en sag har
+  // ofte bade en analyserapport og et asbestappendiks.
+  const filerRes = await supabase
+    .from("case_files")
+    .select("*")
+    .eq("case_id", id)
+    .order("doc_order")
+    .order("sort_order")
+    .returns<CaseFile[]>();
+
+  const filer = filerRes.data ?? [];
+  const plantegningFil = filer.find((f) => f.kind === "plantegning") ?? null;
+  const forsideFil = filer.find((f) => f.kind === "forsidebillede") ?? null;
+  const bilagFiler = filer.filter((f) => f.kind === "eurofins_side");
+
+  const bilagStier = [
+    ...(plantegningFil ? [plantegningFil.storage_path] : []),
+    ...(forsideFil ? [forsideFil.storage_path] : []),
+    ...bilagFiler.map((f) => f.storage_path),
+  ];
+  const bilagUrl = new Map<string, string>();
+  if (bilagStier.length) {
+    const { data: signed } = await supabase.storage
+      .from(RAPPORT_BUCKET)
+      .createSignedUrls(bilagStier, 60 * 60 * 2);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) bilagUrl.set(s.path, s.signedUrl);
+    }
+  }
+
+  const plantegningUrl = plantegningFil
+    ? (bilagUrl.get(plantegningFil.storage_path) ?? null)
+    : null;
+  const forsideUrl = forsideFil
+    ? (bilagUrl.get(forsideFil.storage_path) ?? null)
+    : null;
+
+  // Rapporten er "udarbejdet af" den der har den aabne. Firmaets egne
+  // oplysninger er de samme hver gang; kun navnet skifter.
+  const member = await getMember();
+  const udarbejdetAf = member?.profile?.full_name ?? member?.email ?? null;
+
+  // BBR's egen betegnelse for hvad bygningen er. Den forste bygning er
+  // hovedbygningen — carporte og garager star efter den.
+  const ejendomstype = buildings[0]?.usage_text ?? null;
+
+  const udskrevet = formatDate(new Date().toISOString());
+  const sidehoved = (
+    <div className="sidehoved">
+      <div className="text-xs leading-snug">
+        <p className="font-semibold text-muted">Miljøkortlægningsrapport</p>
+        <p className="text-muted">
+          {udskrevet} <span className="px-1">●</span>
+          {sag.address_text ?? sag.case_name}
+        </p>
+      </div>
+      <Logo className="h-7 shrink-0" />
+    </div>
+  );
+  // Noeglen er filens id og ikke sidetallet: to bilag har begge en side 1.
+  const bilagSider = bilagFiler
+    .map((f) => ({ id: f.id, url: bilagUrl.get(f.storage_path) }))
+    .filter((s): s is { id: string; url: string } => !!s.url);
+
   return (
     <main className="flex flex-1 flex-col px-6 pb-16 pt-5 print:px-0 print:pt-0">
       <div className="print-skjul mb-6 flex flex-wrap items-center gap-3">
@@ -144,30 +228,87 @@ export default async function RapportPage({
         </p>
       </div>
 
-      {/* Forside */}
-      <section className="print-side">
-        <header className="flex items-start justify-between gap-6 border-b-2 border-fg pb-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-              Nemscreening ApS
-            </p>
-            <h1 className="mt-2 text-[1.7rem] font-semibold leading-tight">
-              Ressourcekortlægning og miljøscreening
-            </h1>
-            <p className="mt-1 text-lg text-fg-2">{sag.case_name}</p>
-          </div>
-          <p className="shrink-0 pt-1 text-right text-sm text-muted">
-            Udskrevet
-            <br />
-            {formatDate(new Date().toISOString())}
-          </p>
-        </header>
+      {/* Side 1: forsiden. Maerkets flader, intet andet end hvad rapporten er
+          og hvor den hoerer til. */}
+      <section className="forside">
+        <svg
+          className="forside-figur"
+          viewBox="0 0 297 210"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          {/* Vinklerne er logoets: husets tag og halen under det. */}
+          <path
+            d="M137 24 L232 24 L297 89 L297 137 L201 137 L137 73 Z"
+            fill="#ffffff"
+            opacity="0.06"
+          />
+          <path
+            d="M-8 72 L84 72 L182 170 L136 216 L38 118 L-8 118 Z"
+            fill="var(--primary-fuld)"
+          />
+        </svg>
 
-        <dl className="mt-5 grid grid-cols-4 gap-x-8 gap-y-4 rounded-xl bg-surface-2 px-5 py-4 text-sm">
-          <Felt label="Adresse" value={sag.address_text ?? sag.case_name} />
-          <Felt label="Areal" value={sag.area_m2 ? `${sag.area_m2} m²` : null} />
-          <Felt label="Byggeår" value={sag.built_year} />
-          <Felt label="Ombygningsår" value={sag.rebuilt_year} />
+        <Logo hvid className="absolute right-14 top-12 h-11" />
+
+        <div className="forside-indhold">
+          <h1 className="text-[2.6rem] font-light leading-tight tracking-tight">
+            Miljøkortlægningsrapport
+          </h1>
+          <p className="mt-2 text-lg text-white/70">
+            {sag.address_text ?? sag.case_name}
+          </p>
+        </div>
+      </section>
+
+      {/* Side 2: hvad ejendommen er, og hvem der har lavet rapporten. */}
+      <section className="print-side mt-10 print:mt-0">
+        {sidehoved}
+
+        <h1 className="text-center text-[2rem] font-bold leading-tight">
+          {sag.address_text ?? sag.case_name}
+        </h1>
+
+        {forsideUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={forsideUrl}
+            alt={`Ejendommen på ${sag.address_text ?? sag.case_name}`}
+            className="mt-5 h-[8.5cm] w-full rounded-lg bg-surface-2 object-cover"
+          />
+        )}
+
+        <div className="mt-5 grid grid-cols-2 gap-5 text-sm">
+          <dl className="rounded-xl bg-surface-2 px-5 py-4">
+            <p className="font-semibold">BBR-oplysninger</p>
+            <Linje label="Adresse" value={sag.address_text ?? sag.case_name} />
+            <Linje label="Ejendomstype" value={ejendomstype} />
+            <Linje label="Byggeår" value={sag.built_year} />
+            <Linje
+              label="Bebygget areal"
+              value={sag.area_m2 ? `${sag.area_m2} m²` : null}
+            />
+          </dl>
+
+          <dl className="rounded-xl bg-surface-2 px-5 py-4">
+            <p className="font-semibold">Denne rapport er udarbejdet af</p>
+            <div className="mt-3">
+              <p className="font-semibold">{FIRMA.navn}</p>
+              {udarbejdetAf && <p>{udarbejdetAf}</p>}
+            </div>
+            <Linje label="Adresse" value={FIRMA.adresse} />
+            <Linje label="Telefon" value={FIRMA.telefon} />
+            <Linje label="E-mail" value={FIRMA.email} />
+            <Linje label="CVR" value={FIRMA.cvr} />
+          </dl>
+        </div>
+      </section>
+
+      {/* Analyseskemaet: hele sagen pa et bord. */}
+      <section className="print-side mt-10 print:mt-0">
+        {sidehoved}
+
+        <dl className="grid grid-cols-4 gap-x-8 gap-y-4 rounded-xl bg-surface-2 px-5 py-4 text-sm">
           <Felt label="Kunde" value={sag.customer_name} />
           <Felt
             label="Bygninger"
@@ -195,6 +336,7 @@ export default async function RapportPage({
         const skema = skemaById.get(s.id)!;
         return (
           <section key={s.id} className="print-side mt-10 print:mt-0">
+            {sidehoved}
             <header className="flex flex-wrap items-center gap-4 border-b-2 border-fg pb-3">
               <span className="tabular rounded-lg border border-grid-strong px-2.5 py-1 text-lg font-semibold">
                 {s.label}
@@ -271,6 +413,81 @@ export default async function RapportPage({
           </section>
         );
       })}
+
+      {/* Plantegningen viser hvor provenumrene sad. Den er ikke obligatorisk —
+          har kontoret ikke lagt en op, springes siden over frem for at
+          efterlade et tomt ark. */}
+      {plantegningUrl && (
+        <section className="print-side mt-10 print:mt-0">
+          {sidehoved}
+          <Overskrift>Plantegning</Overskrift>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={plantegningUrl}
+            alt="Plantegning med prøvernes placering"
+            className="mt-2 max-h-[15cm] w-full object-contain"
+          />
+        </section>
+      )}
+
+      {/* Graensevaerdier */}
+      <section className="print-side mt-10 print:mt-0">
+        {sidehoved}
+        <Overskrift>Grænseværdier</Overskrift>
+        <div className="mt-2">
+          <Graensevaerdier />
+        </div>
+
+        <div className="mt-4 max-w-[19cm] text-sm leading-relaxed">
+          {GRAENSE_NOTER.map((note) => (
+            <p key={note} className="mt-2 first:mt-0">
+              {note}
+            </p>
+          ))}
+          <p className="mt-2">{GRAENSE_FARVER_INDLEDNING}</p>
+          <ul className="mt-1 list-disc pl-5">
+            {GRAENSE_FARVER.map((linje) => (
+              <li key={linje}>{linje}</li>
+            ))}
+          </ul>
+          <p className="mt-2">{GRAENSE_EFTERSKRIFT}</p>
+        </div>
+      </section>
+
+      {/* Metode og ansvar, en gruppe pr. side sa hver side baerer maerket. */}
+      {RAPPORT_SIDER.map((gruppe, nr) => (
+        <section key={nr} className="print-side mt-10 print:mt-0">
+          {sidehoved}
+          {nr === 0 && <Overskrift>Om undersøgelsen</Overskrift>}
+          <div className="print-spalter mt-2 text-sm leading-relaxed">
+            {gruppe.map((afsnit) => (
+              <div key={afsnit.overskrift} className="mt-4 first:mt-0">
+                <h3 className="font-semibold">{afsnit.overskrift}</h3>
+                {afsnit.brodtekst.map((tekst, i) => (
+                  <p key={i} className="mt-1.5">
+                    {tekst}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {/* Eurofins' egne dokumenter, en side ad gangen og i den raekkefolge
+          kontoret har sat dem. */}
+      {bilagSider.map((side, i) => (
+        <section key={side.id} className="print-bilag mt-10 print:mt-0">
+          {sidehoved}
+          {i === 0 && <Overskrift>Bilag fra Eurofins</Overskrift>}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={side.url}
+            alt={`Bilag fra Eurofins, side ${i + 1} af ${bilagSider.length}`}
+            className="mt-2 w-full object-contain"
+          />
+        </section>
+      ))}
     </main>
   );
 }
@@ -296,6 +513,24 @@ function Felt({
     <div>
       <dt className="label-xs">{label}</dt>
       <dd className="mt-0.5">{value === null || value === undefined || value === "" ? "—" : value}</dd>
+    </div>
+  );
+}
+
+/** Etiket over vaerdi, som oplysningsboksene pa side 2 er sat op. */
+function Linje({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
+  return (
+    <div className="mt-3">
+      <dt className="font-semibold">{label}:</dt>
+      <dd>
+        {value === null || value === undefined || value === "" ? "—" : value}
+      </dd>
     </div>
   );
 }

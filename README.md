@@ -25,6 +25,12 @@ Opret sag ──► Hent bygninger fra BBR ──► Prøvetagning i marken
 Første halvdel foregår på en telefon, ofte uden dækning. Anden halvdel
 foregår på kontorets pc. De to har hvert sit layout — se nedenfor.
 
+Ud over analysesvaret lægger kontoret bilag på sagen: et forsidebillede af
+ejendommen, en plantegning, og de PDF'er Eurofins sender med —
+analyserapporten og typisk et asbestappendiks. Alle er frivillige og havner i
+den færdige rapport: forsidebilledet på side 2, plantegningen på sin egen
+side, Eurofins-dokumenterne bagest i den rækkefølge kontoret sætter dem.
+
 ## Kom i gang
 
 ```bash
@@ -66,6 +72,7 @@ farve. **Kør dem efter enhver ændring i `src/lib/eurofins/` eller
 | `src/lib/offline/` | IndexedDB-kø og synkronisering mod Supabase. |
 | `src/lib/eurofins/` | Eksport til laboratoriet. Se `skabelon/LAESMIG.md`. |
 | `src/lib/lab/` | Indlæsning af svar og grænseværdier. Se `LAESMIG.md`. |
+| `src/lib/rapport/` | Rapportens bilag og faste tekst. |
 | `src/lib/bbr/` | Opslag i BBR via Datafordelerens GraphQL. |
 | `scripts/` | Verifikation. Køres med `npm run verify:*`. |
 
@@ -88,6 +95,7 @@ med `db: { schema: "screening" }`, så `.from("samples")` rammer
 | `sample_photos` | Fotos. Filerne ligger i storage-bucket'en `screening-photos`, som er privat. |
 | `exports` | Log over genererede Eurofins-filer. |
 | `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |
+| `case_files` | Rapportens bilag: forsidebillede, plantegning og et vilkårligt antal Eurofins-PDF'er. Filerne ligger i bucket'en `screening-rapport`, som er privat. |
 | `app_users` | Medlemskab og rolle: `screener`, `office`, `admin`. |
 
 RLS er slået til overalt. Læsning kræver `screening.is_member()`. Skrivning

@@ -105,6 +105,45 @@ export type SamplePhoto = {
   sort_order: number;
 };
 
+/**
+ * Rapportens bilag.
+ *
+ * `eurofins_pdf` er filen som den kom fra laboratoriet. `eurofins_side` er den
+ * samme fil tegnet om til et billede pr. side, fordi rapporten printes fra
+ * browseren og en browser ikke printer indholdet af en indlejret PDF med.
+ */
+export type CaseFileKind =
+  | "plantegning"
+  /** Billedet af ejendommen pa rapportens side 2. */
+  | "forsidebillede"
+  | "eurofins_pdf"
+  | "eurofins_side";
+
+export type CaseFile = {
+  id: string;
+  case_id: string;
+  kind: CaseFileKind;
+  storage_path: string;
+  filename: string | null;
+  mime: string | null;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  /**
+   * Binder et bilags PDF sammen med dens sider.
+   *
+   * En sag har ofte flere dokumenter fra Eurofins — analyserapporten og et
+   * asbestappendiks kommer hver for sig — og et af dem skal kunne fjernes
+   * uden at de andre folger med. Null for plantegningen.
+   */
+  doc_id: string | null;
+  /** Bilagets plads bagest i rapporten. Nul for plantegningen. */
+  doc_order: number;
+  /** Sidetallet inde i det enkelte bilag. Nul for de hele filer. */
+  sort_order: number;
+  created_at: string;
+};
+
 export type LookupItem = {
   id: string;
   name: string;

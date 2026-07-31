@@ -3,7 +3,6 @@ import {
   displayValue,
   LAB_PARAMETERS,
   LEVEL_LABEL,
-  manglerStovvurdering,
   readValue,
   thresholdText,
   worstLevel,
@@ -31,17 +30,8 @@ export type SkemaSample = {
   estimated_tons: number | null;
 };
 
-/**
- * Resultatraekken som den ligger i databasen: en tekst pr. parameter, plus
- * det ene skon labsvaret ikke indeholder — om asbesten stover.
- */
-export type SkemaResult = Partial<Record<LabParameterKey, string | null>> & {
-  asbestos_dusty?: boolean | null;
-};
-
-const skonOf = (result: SkemaResult | undefined) => ({
-  stovende: result?.asbestos_dusty ?? null,
-});
+/** Resultatraekken som den ligger i databasen: en tekst pr. parameter. */
+export type SkemaResult = Partial<Record<LabParameterKey, string | null>>;
 
 /** Tailwind skal kunne se klassenavnene, sa de star ordret. */
 const LEVEL_CLASS: Record<LabLevel, string> = {
@@ -52,19 +42,8 @@ const LEVEL_CLASS: Record<LabLevel, string> = {
 
 export function levelOfSample(result: SkemaResult | undefined): LabLevel | null {
   if (!result) return null;
-  const skon = skonOf(result);
   return worstLevel(
-    LAB_PARAMETERS.map((p) =>
-      classify(p, readValue(result[p.key] ?? null), skon),
-    ),
-  );
-}
-
-/** Om proven venter pa at nogen tager stilling til asbestens tilstand. */
-export function venterPaStovvurdering(result: SkemaResult | undefined): boolean {
-  return manglerStovvurdering(
-    readValue(result?.asbestos ?? null),
-    result?.asbestos_dusty,
+    LAB_PARAMETERS.map((p) => classify(p, readValue(result[p.key] ?? null))),
   );
 }
 
@@ -174,26 +153,15 @@ export function ResultatSkema({
 
                 {LAB_PARAMETERS.map((p) => {
                   const value = readValue(result?.[p.key] ?? null);
-                  const level = classify(p, value, skonOf(result));
-                  const uafklaret =
-                    p.key === "asbestos" && venterPaStovvurdering(result);
+                  const level = classify(p, value);
                   return (
                     <td
                       key={p.key}
-                      title={
-                        uafklaret
-                          ? "Asbest er påvist. Angiv om den støver — støvende asbest er farligt affald."
-                          : undefined
-                      }
                       className={`tabular text-right ${
                         level ? LEVEL_CLASS[level] : "text-muted"
                       }`}
                     >
                       {displayValue(value)}
-                      {/* Et pavist asbestsvar er ikke faerdigt for nogen har
-                          sagt om det stover. Stjernen siger at farven kan
-                          skifte. */}
-                      {uafklaret && <span className="font-bold"> *</span>}
                     </td>
                   );
                 })}
@@ -202,18 +170,23 @@ export function ResultatSkema({
           })}
         </tbody>
 
+        {/* Graenserne er en forklaring, ikke en maaling, og de star pa hver
+            eneste side i rapporten. Farvede man dem, ville hver side have
+            rodt og gult pa sig, og farven i provens egne felter ville holde
+            op med at betyde noget. Prikken holder koblingen mellem niveau og
+            farve — den fylder ingenting. Hojden ligger i `.skema tfoot`. */}
         {showThresholds && (
           <tfoot>
             {(["rent", "forurenet", "farligt"] as LabLevel[]).map((level) => (
               <tr key={level}>
-                <td className="skel font-medium" colSpan={5}>
+                <td className="skel font-medium text-fg-2" colSpan={5}>
+                  <span
+                    className={`mr-1.5 inline-block h-[0.6em] w-[0.6em] rounded-full align-middle ${LEVEL_CLASS[level]}`}
+                  />
                   {LEVEL_LABEL[level]}
                 </td>
                 {LAB_PARAMETERS.map((p) => (
-                  <td
-                    key={p.key}
-                    className={`tabular text-right ${LEVEL_CLASS[level]}`}
-                  >
+                  <td key={p.key} className="tabular text-right text-muted">
                     {thresholdText(p, level)}
                   </td>
                 ))}
@@ -227,16 +200,13 @@ export function ResultatSkema({
 }
 
 /** Forklaringen der altid har staet under skemaet. */
-export function SkemaForklaring({ visStjerne = false }: { visStjerne?: boolean }) {
+export function SkemaForklaring() {
   return (
     <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
       <Forklaring term="I.a." desc="Ikke analyseret" />
       <Forklaring term="I.P." desc="Ikke påvist" />
       <Forklaring term="<" desc="Under detektionsgrænsen" />
       <Forklaring term="Enhed" desc="mg/kg, med mindre andet er angivet" />
-      {visStjerne && (
-        <Forklaring term="*" desc="Asbestens tilstand mangler at blive vurderet" />
-      )}
     </dl>
   );
 }

@@ -293,11 +293,27 @@ h2 {
   border-bottom: 2px solid var(--grid-strong);
 }
 
-/* Graensevaerdierne er en forklaring, ikke maalinger. De skilles fra af en
-   kraftig streg — ikke af en mindre skrift, for sa ville netop de raekker
-   blive lavere end resten. */
+/*
+ * Graensevaerdierne er en forklaring, ikke maalinger.
+ *
+ * De skilles fra af en kraftig streg, og de fylder sa lidt som teksten
+ * tillader: i tre ufarvede raekker er der ikke noget at folge lodret, og sa
+ * skal de heller ikke tage plads fra provens billeder pa en rapportside.
+ * Derfor er de undtaget mindstehojden pa to linjer laengere nede.
+ */
 .skema tfoot tr:first-child>td {
   border-top: 2px solid var(--grid-strong);
+}
+
+.skema tfoot tr {
+  height: auto;
+}
+
+.skema tfoot td {
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 0.8em;
+  line-height: 1.5;
 }
 
 .skema tbody td {
@@ -305,7 +321,8 @@ h2 {
 }
 
 /*
- * Hver raekke er mindst to linjer hoj — ogsa hovedet og graenserne.
+ * Hver raekke er mindst to linjer hoj — ogsa hovedet. Graenseraekkerne er
+ * undtaget ovenfor; de er en forklaring og ikke noget der laeses lodret.
  *
  * Ellers bestemmer materialets navn raekkehojden, og skemaet bliver en trappe
  * hvor to prover ved siden af hinanden ikke kan sammenlignes pa et blik. Det

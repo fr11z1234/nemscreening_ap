@@ -9,7 +9,7 @@ import {
 } from "@/lib/eurofins/generate";
 import { EUROFINS_ANALYSES } from "@/lib/eurofins/template";
 import { ANALYSIS_FIELDS, type Case, type Sample } from "@/lib/types";
-import { setCaseStatus } from "./actions";
+import { fortrydSendtTilLab, markerSendtTilLab } from "@/lib/cases/status";
 
 export const metadata = { title: "Eurofins-fil · Nemscreening" };
 
@@ -166,17 +166,37 @@ export default async function ExportPage({
             </a>
           )}
 
-          {sag.status !== "sendt_til_lab" && sag.status !== "afsluttet" && (
-            <form
-              action={async () => {
-                "use server";
-                await setCaseStatus(id, "sendt_til_lab");
-              }}
-            >
-              <button className="tap w-full rounded-xl border border-border-strong hover:bg-surface-2 px-4">
-                Markér som sendt til lab
-              </button>
-            </form>
+          {/* Markeringen er ikke et punktum, men et skift af arbejdssted, og
+              den kan vaere trykket i utide. Sa laenge sagen ikke er afsluttet
+              kan den rulles tilbage. */}
+          {sag.status === "sendt_til_lab" ? (
+            <div className="card p-4">
+              <p className="font-medium">Markeret som sendt til lab</p>
+              <p className="mt-0.5 text-sm text-muted">
+                Næste skridt er svarfilen fra Eurofins.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/sager/${id}/resultater`}
+                  className="tap flex flex-1 items-center justify-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
+                >
+                  Indlæs svar
+                </Link>
+                <form action={fortrydSendtTilLab.bind(null, id)}>
+                  <button className="tap px-3 text-sm text-muted hover:text-fg">
+                    Fortryd markering
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            sag.status !== "afsluttet" && (
+              <form action={markerSendtTilLab.bind(null, id)}>
+                <button className="tap w-full rounded-xl border border-border-strong hover:bg-surface-2 px-4">
+                  Markér som sendt til lab
+                </button>
+              </form>
+            )
           )}
         </div>
 

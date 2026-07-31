@@ -11,8 +11,8 @@ import {
   classify,
   displayValue,
   LAB_PARAMETER_BY_KEY,
-  manglerStovvurdering,
   readValue,
+  thresholdText,
   worstLevel,
   type LabLevel,
   type LabParameterKey,
@@ -212,44 +212,51 @@ check(
   "UTF-8 blev ikke afkodet",
 );
 
-// 10. Asbestens tilstand. Labsvaret siger kun om asbest er pavist; om den
-//     stover afgor forskellen pa forurenet og farligt, og den saettes i
-//     handen. Uden en vurdering ma niveauet ikke gaette.
+// 10. Asbest er rod eller ingenting. Der er ikke et gult mellemniveau: er
+//     asbest pavist, er materialet farligt affald.
 const asbest = LAB_PARAMETER_BY_KEY.get("asbestos")!;
 const pavist = readValue("Påvist");
 const ikkePavist = readValue("Ikke påvist");
 
-check(classify(asbest, pavist) === "forurenet", "påvist asbest uden vurdering skulle vaere forurenet");
+check(classify(asbest, pavist) === "farligt", "påvist asbest skulle vaere farligt affald");
+check(classify(asbest, ikkePavist) === "rent", "ikke påvist asbest skulle vaere rent");
 check(
-  classify(asbest, pavist, { stovende: null }) === "forurenet",
-  "påvist asbest, tilstand ukendt, skulle vaere forurenet",
-);
-check(
-  classify(asbest, pavist, { stovende: false }) === "forurenet",
-  "ikke-stovende asbest skulle vaere forurenet",
-);
-check(
-  classify(asbest, pavist, { stovende: true }) === "farligt",
-  "stovende asbest skulle vaere farligt affald",
-);
-check(
-  classify(asbest, ikkePavist, { stovende: true }) === "rent",
-  "stov ma ikke lofte en prove hvor der slet ikke er asbest",
-);
-check(
-  manglerStovvurdering(pavist, null) && !manglerStovvurdering(pavist, false),
-  "manglende stovvurdering blev ikke fanget",
-);
-check(
-  !manglerStovvurdering(ikkePavist, null),
-  "en prove uden asbest skal ikke bede om en stovvurdering",
+  classify(asbest, readValue("")) === null,
+  "en asbestanalyse der aldrig blev bestilt har intet niveau",
 );
 
-// Stovet ma kun rore asbest. Klorerede paraffiner kan aldrig blive farlige.
+// Graenseraekkerne nederst i skemaet folger den samme regel: asbest star
+// under farligt affald, og den gule raekke har ingenting at sige om den.
+check(
+  thresholdText(asbest, "rent") === "Ikke påvist",
+  `asbestens rene graense blev "${thresholdText(asbest, "rent")}"`,
+);
+check(
+  thresholdText(asbest, "forurenet") === "—",
+  `asbestens gule graense blev "${thresholdText(asbest, "forurenet")}"`,
+);
+check(
+  thresholdText(asbest, "farligt") === "Påvist",
+  `asbestens rode graense blev "${thresholdText(asbest, "farligt")}"`,
+);
+
+// Klorerede paraffiner har ingen rod kolonne i graensetabellen: pavist er og
+// bliver forurenet.
 const chlor = LAB_PARAMETER_BY_KEY.get("chlor_paraffins")!;
 check(
-  classify(chlor, pavist, { stovende: true }) === "forurenet",
-  "klorerede paraffiner skulle blive pa forurenet uanset stov",
+  classify(chlor, pavist) === "forurenet",
+  "klorerede paraffiner skulle blive pa forurenet",
+);
+check(
+  thresholdText(chlor, "farligt") === "—",
+  "klorerede paraffiner skulle ikke have en rod graense",
+);
+
+// En prove hvor asbesten er den eneste dyre maling skal traekke hele proven
+// med op — det er den samlede farve rapporten viser pa provens side.
+check(
+  worstLevel([classify(asbest, pavist), "rent", null]) === "farligt",
+  "en prove med påvist asbest skulle vaere farligt affald",
 );
 
 // 11. Turen gennem databasen. Vi gemmer teksten, ikke tallet, sa den skal

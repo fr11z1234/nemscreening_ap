@@ -57,16 +57,19 @@ gamle regneark:** PCB gik fra 2.500 til 50 mg/kg, og nikkel fra 2.500 til
 1.000 mg/kg. Rapporter farvelagt efter det gamle ark kan altså have været for
 milde på netop de to.
 
-## Asbestens tilstand
+## Asbest
 
-Grænsetabellen skelner mellem **påvist, ikke støvende** (forurenet) og
-**påvist, støvende** (farligt affald). Eurofins oplyser kun *om* asbest er
-påvist — resten er en menneskelig vurdering.
+**Påvist asbest er farligt affald.** Ingen mellemregning, intet gult niveau.
 
-Den sættes derfor i hånden på resultatsiden og gemmes i
-`lab_results.asbestos_dusty`. Indtil nogen tager stilling, står prøven som
-forurenet og er markeret med `*` i skemaet. Vi gætter ikke: forskellen afgør,
-hvordan affaldet håndteres på pladsen.
+Grænsetabellen skelner mellem *påvist, ikke støvende* (forurenet) og *påvist,
+støvende* (farligt affald), og appen bad en overgang om at få den forskel sat
+i hånden på resultatsiden. Det virkede ikke i praksis: Eurofins oplyser kun
+*om* asbest er påvist, og en vurdering ingen når at sætte, lader prøven stå
+gul — netop på det stof hvor en for mild farve er dyrest.
+
+Kolonnen `lab_results.asbestos_dusty` findes stadig i databasen, men bliver
+hverken læst eller skrevet. Skal skelnen ind igen, skal den sættes **før**
+prøven kan få en farve, ikke bagefter.
 
 ## Kulbrinter — bevidst udeladt
 
@@ -102,5 +105,5 @@ npm run verify:lab
 ```
 
 Dækker kolonnematch, de dublerede kolonner, `#` mod tom celle, begge
-prøvemærkeformater, Windows-1252, grænserne på kanten, støv-eskaleringen og
+prøvemærkeformater, Windows-1252, grænserne på kanten, asbestens niveau og
 turen gennem databasen og tilbage.

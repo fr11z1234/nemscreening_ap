@@ -64,9 +64,9 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 - En prøve kræver **lokalitet og mindst ét billede**. Materiale og prøveart er
   frivillige — en tom prøve er tilladt og kommer ikke med til laboratoriet.
 - **Højst to billeder pr. prøve.**
-- **Asbestens tilstand sættes i hånden** på resultatsiden. Laboratoriet siger
-  kun *om* asbest er påvist; om den støver afgør forurenet mod farligt, og det
-  må ikke gættes.
+- **Påvist asbest er farligt affald.** Rød, hver gang. Der er intet gult
+  mellemniveau og ingen manuel vurdering af om den støver — den vurdering
+  fandtes, og den blev ikke sat.
 
 ## Udseende
 
@@ -93,6 +93,11 @@ Analyseskemaets streger, kolonnebredder og rækkehøjder ligger i `.skema` i
 med en `colgroup` i procent, så den passer både i skærmens designbredde og i
 papirets bredde. På skærmen skaleres den ned af `TilpasBredde` i stedet for at
 få en vandret rullebjælke; `@media print` sætter den transform ud af kraft.
+
+**Grænseværdirækkerne er ikke farvelagt**, og de er undtaget skemaets
+mindstehøjde på to linjer. Kun prøvens egne felter har farve. Farver man også
+grænserne, står der rødt og gult på hver eneste side i rapporten, og så holder
+farven op med at betyde noget.
 
 ## Om data
 

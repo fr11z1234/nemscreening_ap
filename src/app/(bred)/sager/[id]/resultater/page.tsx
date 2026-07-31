@@ -9,13 +9,11 @@ import {
   SkemaForklaring,
   SKEMA_BREDDE,
   levelOfSample,
-  venterPaStovvurdering,
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
 import { TilpasBredde } from "@/components/lab/TilpasBredde";
-import { readValue } from "@/lib/lab/parametre";
-import { Stovvurdering, type StovProve } from "./Stovvurdering";
+import { fortrydSendtTilLab } from "@/lib/cases/status";
 import { getMember } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { LEVEL_LABEL, type LabLevel } from "@/lib/lab/parametre";
@@ -27,7 +25,6 @@ export const metadata = { title: "Resultater · Nemscreening" };
 type LabResultRow = SkemaResult & {
   sample_id: string;
   received_at: string | null;
-  asbestos_dusty: boolean | null;
 };
 
 export default async function ResultaterPage({
@@ -100,21 +97,6 @@ export default async function ResultaterPage({
   const tally = (level: LabLevel) => levels.filter((l) => l === level).length;
   const answered = levels.filter((l) => l !== null).length;
   const labSamples = samples.filter((s) => s.is_lab_sample);
-  const manglerStov = samples.filter((s) =>
-    venterPaStovvurdering(results.get(s.id)),
-  ).length;
-
-  // Kun prover hvor asbest faktisk er pavist skal vurderes.
-  const asbestProver: StovProve[] = samples
-    .filter(
-      (s) => readValue(results.get(s.id)?.asbestos ?? null).state === "pavist",
-    )
-    .map((s) => ({
-      sampleId: s.id,
-      label: s.label,
-      material: s.material,
-      stovende: (results.get(s.id) as LabResultRow | undefined)?.asbestos_dusty ?? null,
-    }));
 
   return (
     <>
@@ -140,6 +122,20 @@ export default async function ResultaterPage({
             )}
           </div>
         </div>
+
+        {/* Man kommer hertil direkte fra markeringen "sendt til lab", og en
+            markering sat ved en fejl skal kunne rulles tilbage det sted den
+            forte hen. */}
+        {sag.status === "sendt_til_lab" && (
+          <div className="-mt-3 flex flex-wrap items-center gap-1 text-sm text-muted">
+            <span>Sagen er markeret som sendt til laboratoriet.</span>
+            <form action={fortrydSendtTilLab.bind(null, id)}>
+              <button className="tap px-2 font-medium text-primary hover:underline">
+                Fortryd markeringen
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Tallene forst: hvor mange svar er der, og hvor slemt star det.
             Det er dem kontoret skal bruge for at vide om sagen kan lukkes. */}
@@ -190,12 +186,10 @@ export default async function ResultaterPage({
               <TilpasBredde bredde={SKEMA_BREDDE}>
                 <ResultatSkema samples={skemaSamples} results={results} />
               </TilpasBredde>
-              <SkemaForklaring visStjerne={manglerStov > 0} />
+              <SkemaForklaring />
             </div>
           </section>
         )}
-
-        <Stovvurdering prover={asbestProver} canEdit={canUpload} />
 
         {answered > 0 && (
           <section>

@@ -23,7 +23,11 @@ function toRow(s: PendingSample) {
     seq: s.seq,
     material: s.material,
     sample_type: s.sample_type,
-    building_id: s.building_id,
+    building_ids: s.building_ids,
+    // Kolonnen har en fremmednogle og bliver ryddet af databasen, nar en
+    // bygning forsvinder. Den skrives med her, sa det der laeser samples
+    // udenom appen — og en fremtidig eksport — stadig kan finde lokaliteten.
+    building_id: s.building_ids[0] ?? null,
     location_note: s.location_note,
     estimated_tons: s.estimated_tons,
     period: s.period,

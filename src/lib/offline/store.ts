@@ -21,7 +21,8 @@ export type PendingSample = {
   seq: number;
   material: string | null;
   sample_type: string | null;
-  building_id: string | null;
+  /** Bygningerne proven er taget pa. Se `Sample.building_ids`. */
+  building_ids: string[];
   location_note: string | null;
   estimated_tons: number | null;
   period: BuildingPeriod | null;
@@ -54,9 +55,23 @@ export async function dropPendingSample(id: string) {
   await del(id, sampleStore);
 }
 
+/**
+ * Raekker gemt for en prove kunne daekke flere bygninger, baerer stadig det
+ * gamle enkelte building_id.
+ *
+ * De ligger i koen pa de telefoner der var uden daekning da appen blev
+ * opdateret. Uden det her tabte de lokaliteten pa vej op.
+ */
+function normaliser(row: PendingSample & { building_id?: string | null }) {
+  if (row.building_ids) return row;
+  return { ...row, building_ids: row.building_id ? [row.building_id] : [] };
+}
+
 export async function allPendingSamples(): Promise<PendingSample[]> {
   const rows = await entries<string, PendingSample>(sampleStore);
-  return rows.map(([, v]) => v).sort((a, b) => a.touchedAt - b.touchedAt);
+  return rows
+    .map(([, v]) => normaliser(v))
+    .sort((a, b) => a.touchedAt - b.touchedAt);
 }
 
 export async function enqueuePhoto(p: PendingPhoto) {

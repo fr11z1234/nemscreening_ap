@@ -82,6 +82,10 @@ export default async function RapportPage({
   const samples = samplesRes.data ?? [];
   const buildings = buildingsRes.data ?? [];
   const buildingLabel = new Map(buildings.map((b) => [b.id, b.label]));
+  // En prove kan daekke flere bygninger — samme facademaling hele vejen rundt.
+  const lokalitet = (s: Sample) =>
+    s.building_ids.map((b) => buildingLabel.get(b)).filter(Boolean).join(", ") ||
+    null;
 
   const [resultsRes, photoRows] = await Promise.all([
     samples.length
@@ -139,9 +143,7 @@ export default async function RapportPage({
     label: s.label,
     material: s.material,
     sample_type: s.sample_type,
-    building_label: s.building_id
-      ? (buildingLabel.get(s.building_id) ?? null)
-      : null,
+    building_label: lokalitet(s),
     estimated_tons: s.estimated_tons,
   }));
   const skemaById = new Map(skemaSamples.map((s) => [s.id, s]));
@@ -374,14 +376,7 @@ export default async function RapportPage({
                 tager, gar til billederne, og det er billederne siden findes
                 for. */}
             <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 rounded-xl bg-surface-2 px-5 py-2 text-xs">
-              <Inline
-                label="Lokalitet"
-                value={
-                  s.building_id
-                    ? (buildingLabel.get(s.building_id) ?? null)
-                    : null
-                }
-              />
+              <Inline label="Lokalitet" value={lokalitet(s)} />
               <Inline
                 label="Periode"
                 value={s.period ? PERIOD_LABEL[s.period] : null}

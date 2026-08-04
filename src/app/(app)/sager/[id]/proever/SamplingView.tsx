@@ -59,9 +59,14 @@ const EXCLUDED_LABELS = (() => {
  * En ny raekke starter blank. Kun bygningen folger med.
  *
  * Bygningen er den eneste oplysning der er givet af hvor screeneren fysisk
- * star, og den kan skiftes i dropdown'en som alt andet. Alt ovrigt —
- * materiale, proveart, maengde og ikke mindst analyserne — skal vaelges
- * bevidst for hver prove.
+ * star, og den kan skiftes med et tryk som alt andet. Alt ovrigt — materiale,
+ * proveart, maengde og ikke mindst analyserne — skal vaelges bevidst for hver
+ * prove.
+ *
+ * Og kun den forste bygning folger med. En prove der daekker alle tre
+ * bygninger er undtagelsen — typisk en enkelt facademaling — og naeste prove
+ * star igen et bestemt sted. Arvede den hele listen, skulle screeneren fjerne
+ * to bygninger i hver eneste prove resten af dagen.
  */
 function nextDraft(caseId: string, seq: number, userId: string, from?: Draft): Draft {
   return {
@@ -70,7 +75,7 @@ function nextDraft(caseId: string, seq: number, userId: string, from?: Draft): D
     seq,
     material: null,
     sample_type: null,
-    building_id: from?.building_id ?? null,
+    building_ids: from?.building_ids.slice(0, 1) ?? [],
     period: null,
     location_note: null,
     estimated_tons: null,
@@ -83,14 +88,18 @@ function nextDraft(caseId: string, seq: number, userId: string, from?: Draft): D
   };
 }
 
-function toDraft(s: Sample, userId: string): Draft {
+function toDraft(s: Sample, userId: string, kendteBygninger: Set<string>): Draft {
   return {
     id: s.id,
     case_id: s.case_id,
     seq: s.seq,
     material: s.material,
     sample_type: s.sample_type,
-    building_id: s.building_id,
+    // Bygninger der ikke laengere findes pa sagen sorteres fra. Kontoret kan
+    // have hentet BBR igen siden proven blev taget, og sa er de gamle
+    // bygninger vaek — en id der peger i tomrummet ville ryge med op i
+    // building_id og faa synkroniseringen til at fejle pa fremmednoglen.
+    building_ids: (s.building_ids ?? []).filter((id) => kendteBygninger.has(id)),
     location_note: s.location_note,
     estimated_tons: s.estimated_tons,
     period: s.period,
@@ -105,6 +114,29 @@ function toDraft(s: Sample, userId: string): Draft {
     // knappen og det gemte ikke siger hver sit.
     ...analysesForPeriod(s.period),
   };
+}
+
+/**
+ * Indekset pa den prove der sidst blev rort — nul hvis der ingen er.
+ *
+ * `updated_at` og ikke det hojeste nummer: er der bladret tilbage til P2 for
+ * at rette maengden, er det P2 der var i gang.
+ *
+ * Star flere med samme tid, vinder den sidste. En hel sag kan fa samme
+ * tidsstempel pa en gang — det sker nar en bygning slettes og databasen rydder
+ * den ud af alle prover — og sa er den sidste prove det rigtige gaet.
+ */
+function senestRoerte(samples: Sample[]): number {
+  let senest = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if (
+      Date.parse(samples[i].updated_at) >=
+      Date.parse(samples[senest].updated_at)
+    ) {
+      senest = i;
+    }
+  }
+  return senest;
 }
 
 export function SamplingView({
@@ -135,19 +167,29 @@ export function SamplingView({
 
   // Alle raekker i sagen, inklusive en tom i enden der venter pa at blive udfyldt.
   const [rows, setRows] = useState<Draft[]>(() => {
-    const existing = initialSamples.map((s) => toDraft(s, userId));
+    const kendte = new Set(buildings.map((b) => b.id));
+    const existing = initialSamples.map((s) => toDraft(s, userId, kendte));
     const last = existing[existing.length - 1];
     const seq = Math.max(0, ...existing.map((d) => d.seq)) + 1;
     return [...existing, nextDraft(caseId, seq, userId, last)];
   });
 
+  /**
+   * Hvor siden abner.
+   *
+   * Med et seq i adressen kommer man fra provelisten og skal til praecis den
+   * prove. Uden kommer man fra "Fortsaet provetagning" pa sagsoverblikket, og
+   * sa skal man tilbage til den prove man sidst var i gang med. En ny, blank
+   * prove er altid et tryk vaek pa "Naeste prove" — den halvfaerdige man gik
+   * fra for at tjekke noget, var den ikke.
+   */
   const startIndex =
     initialSeq != null
       ? Math.max(
           0,
           initialSamples.findIndex((s) => s.seq === initialSeq),
         )
-      : initialSamples.length;
+      : senestRoerte(initialSamples);
 
   const [index, setIndex] = useState(startIndex);
 
@@ -378,6 +420,20 @@ export function SamplingView({
   }
 
   /**
+   * Slar en bygning til eller fra pa proven.
+   *
+   * Raekkefolgen bevares, sa den forst valgte bliver staaende forrest — det er
+   * den der folger med til naeste prove.
+   */
+  function toggleBuilding(id: string) {
+    update({
+      building_ids: draft.building_ids.includes(id)
+        ? draft.building_ids.filter((b) => b !== id)
+        : [...draft.building_ids, id],
+    });
+  }
+
+  /**
    * Hvad der forsvinder med proven, skrevet ud et lag ad gangen.
    *
    * Kommentaren og analyserne er felter pa raekken og ikke egne tabeller, men
@@ -513,7 +569,7 @@ export function SamplingView({
    */
   async function commit(require: boolean): Promise<boolean> {
     if (require) {
-      if (buildings.length > 0 && !draft.building_id) {
+      if (buildings.length > 0 && draft.building_ids.length === 0) {
         setNotice("Vælg en lokalitet, før du går videre.");
         return false;
       }
@@ -759,17 +815,33 @@ export function SamplingView({
           onChange={(v) => update({ sample_type: v })}
         />
 
+        {/* Bygningerne er fa og har korte navne, sa de ligger fremme som
+            knapper frem for i en vaelger: flere skal kunne saettes til med to
+            tryk, ikke gennem et panel der abnes og lukkes for hver. */}
         {buildings.length > 0 && (
-          <PickerField
-            label="Lokalitet"
-            value={buildings.find((b) => b.id === draft.building_id)?.label ?? null}
-            items={buildings.map((b) => b.label)}
-            onChange={(v) =>
-              update({
-                building_id: buildings.find((b) => b.label === v)?.id ?? null,
-              })
-            }
-          />
+          <div className="flex flex-col gap-1.5">
+            <span className="label-xs">Lokalitet</span>
+            <div className="flex flex-wrap gap-2">
+              {buildings.map((b) => {
+                const valgt = draft.building_ids.includes(b.id);
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => toggleBuilding(b.id)}
+                    aria-pressed={valgt}
+                    className={`tap rounded-xl px-3.5 transition-colors ${
+                      valgt
+                        ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                        : "bg-surface shadow-card hover:bg-surface-2"
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         <div className="flex flex-col gap-1.5">

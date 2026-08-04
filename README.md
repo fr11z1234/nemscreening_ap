@@ -93,7 +93,7 @@ med `db: { schema: "screening" }`, så `.from("samples")` rammer
 | --- | --- |
 | `cases` | Sagen. `status` styrer hvad appen viser. |
 | `case_buildings` | Bygninger, typisk hentet fra BBR. |
-| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. |
+| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. `building_ids` er bygningerne prøven dækker; `building_id` er den første af dem. |
 | `sample_photos` | Fotos. Filerne ligger i storage-bucket'en `screening-photos`, som er privat. |
 | `exports` | Log over genererede Eurofins-filer. |
 | `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |

@@ -76,6 +76,18 @@ export type Sample = {
   seq: number;
   material: string | null;
   sample_type: string | null;
+  /**
+   * Bygningerne proven er taget pa, i den raekkefolge de blev valgt.
+   *
+   * Samme materiale sidder tit pa flere bygninger — en hvid facademaling gar
+   * hele vejen rundt — og der er ingen grund til at bestille den samme analyse
+   * tre gange. Lokaliteten er intern information og styrer intet i eksporten.
+   */
+  building_ids: string[];
+  /**
+   * Den forste af `building_ids`, vedligeholdt for det der laeser databasen
+   * udenom appen. Appen selv laeser altid listen.
+   */
   building_id: string | null;
   location_note: string | null;
   estimated_tons: number | null;

@@ -66,6 +66,10 @@ export default async function ResultaterPage({
   const buildingLabel = new Map(
     (buildingsRes.data ?? []).map((b: CaseBuilding) => [b.id, b.label]),
   );
+  // En prove kan daekke flere bygninger — samme facademaling hele vejen rundt.
+  const lokalitet = (s: Sample) =>
+    s.building_ids.map((b) => buildingLabel.get(b)).filter(Boolean).join(", ") ||
+    null;
 
   const resultsRes = samples.length
     ? await supabase
@@ -89,9 +93,7 @@ export default async function ResultaterPage({
     label: s.label,
     material: s.material,
     sample_type: s.sample_type,
-    building_label: s.building_id
-      ? (buildingLabel.get(s.building_id) ?? null)
-      : null,
+    building_label: lokalitet(s),
     estimated_tons: s.estimated_tons,
   }));
 

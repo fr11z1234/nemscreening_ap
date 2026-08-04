@@ -66,6 +66,11 @@ export default async function CasePage({
     member?.profile?.role === "office" || member?.profile?.role === "admin";
 
   const buildingLabel = new Map(buildings.map((b) => [b.id, b.label]));
+  // En prove kan daekke flere bygninger. Bygninger der ikke findes laengere
+  // falder fra — kontoret kan have hentet BBR igen siden proven blev taget.
+  const lokalitet = (s: SampleRow) =>
+    s.building_ids.map((b) => buildingLabel.get(b)).filter(Boolean).join(", ") ||
+    null;
   const photosOf = (s: SampleRow) => s.sample_photos?.[0]?.count ?? 0;
   const withoutPhotos = samples.filter((s) => photosOf(s) === 0).length;
 
@@ -174,7 +179,7 @@ export default async function CasePage({
                       <p className="mt-1 truncate text-[13px] text-muted">
                         {[
                           s.sample_type,
-                          s.building_id ? buildingLabel.get(s.building_id) : null,
+                          lokalitet(s),
                           s.period ? PERIOD_LABEL[s.period] : null,
                           s.estimated_tons != null
                             ? `${formatDecimal(s.estimated_tons)} ton`

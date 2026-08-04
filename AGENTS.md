@@ -64,9 +64,37 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 - En prøve kræver **lokalitet og mindst ét billede**. Materiale og prøveart er
   frivillige — en tom prøve er tilladt og kommer ikke med til laboratoriet.
 - **Højst to billeder pr. prøve.**
+- **Prøvetagningen åbner der hvor man slap.** Uden `?seq=` i adressen er man
+  kommet fra "Fortsæt prøvetagning", og så skal man tilbage til den senest
+  rørte prøve — ikke til en ny, blank. En ny er et tryk væk; den halvfærdige
+  man forlod er ikke.
 - **Påvist asbest er farligt affald.** Rød, hver gang. Der er intet gult
   mellemniveau og ingen manuel vurdering af om den støver — den vurdering
   fandtes, og den blev ikke sat.
+
+## Lokalitet
+
+**En prøve kan dække flere bygninger.** Den hvide facademaling går hele vejen
+rundt, og der er ingen grund til at bestille den samme analyse tre gange.
+Bygningerne står i `samples.building_ids` i den rækkefølge de blev valgt.
+
+**Men kun den første følger med til næste prøve.** Flere bygninger er
+undtagelsen og gælder som regel én prøve. Arvede næste prøve hele listen,
+skulle screeneren fjerne to bygninger igen og igen resten af dagen.
+
+**`building_id` er afledt** af `building_ids[0]` og skrives kun med, fordi den
+har fremmednøglen og fordi noget uden for appen kan læse den. Appen selv læser
+altid listen. Læg aldrig en beslutning i den kolonne.
+
+**Listen har ingen fremmednøgle.** En trigger på `case_buildings`
+(`fjern_slettet_bygning`) fjerner id'et fra alle prøver, når en bygning
+slettes — og `saveBuildings` sletter dem alle sammen, hver gang BBR hentes
+igen. Uden den ville `building_ids[0]` kunne pege på en bygning der ikke
+findes, og synkroniseringen ville fejle på fremmednøglen resten af dagen.
+Prøvetagningen sorterer derudover ukendte id'er fra, når den indlæser.
+
+Lokaliteten er **intern information**. Den står i rapporten og på sagen, men
+styrer intet i eksporten til laboratoriet.
 
 ## Sletning
 

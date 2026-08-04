@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SletSagKnap } from "@/components/SletSagKnap";
+import { getMember } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import type { Case, CaseStatus } from "@/lib/types";
 
@@ -28,6 +30,13 @@ export default async function SagerPage({
   const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
 
   const supabase = await createClient();
+
+  // Samme graense som RLS handhaever pa cases: kun kontoret sletter en sag.
+  // Uden tjekket ville screeneren fa en knap der altid svarede nej.
+  const member = await getMember();
+  const maaSlette =
+    member?.profile?.role === "office" || member?.profile?.role === "admin";
+
   let query = supabase
     .from("cases")
     .select("*, samples(count)")
@@ -110,10 +119,15 @@ export default async function SagerPage({
             {cases.map((c) => {
               const count = c.samples?.[0]?.count ?? 0;
               return (
-                <li key={c.id}>
+                // Sletteknappen ligger ved siden af linket og ikke inde i det:
+                // en knap inden i et link er hverken gyldigt markup eller til
+                // at ramme uden ogsa at abne sagen. Til gengaeld skal linket
+                // holde sig fra hojrekanten — ellers ville et tryk pa
+                // statusmaerket lande pa en knap der sletter sagen.
+                <li key={c.id} className="relative">
                   <Link
                     href={`/sager/${c.id}`}
-                    className="card block p-3.5 transition-shadow hover:shadow-raised active:shadow-raised"
+                    className="card block p-3.5 pr-16 transition-shadow hover:shadow-raised active:shadow-raised"
                   >
                     <div className="flex items-start gap-3">
                       <span className="font-medium leading-snug">
@@ -133,6 +147,16 @@ export default async function SagerPage({
                       {formatDate(c.created_at)}
                     </div>
                   </Link>
+
+                  {maaSlette && (
+                    <SletSagKnap
+                      caseId={c.id}
+                      gaaTilListen={false}
+                      className="tap absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-xl px-2 text-[13px] text-muted hover:bg-danger-soft hover:text-danger active:bg-danger-soft active:text-danger disabled:opacity-50"
+                    >
+                      Slet
+                    </SletSagKnap>
+                  )}
                 </li>
               );
             })}

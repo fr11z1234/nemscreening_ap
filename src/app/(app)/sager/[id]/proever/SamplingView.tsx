@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCamera } from "@/lib/camera/useCamera";
 import { compressImageFile } from "@/lib/camera/compress";
 import { PickerField } from "@/components/PickerField";
+import { SletDialog, type SletLag } from "@/components/SletDialog";
 import { flush, PHOTO_BUCKET } from "@/lib/offline/sync";
 import {
   dropSampleEverywhere,
@@ -114,6 +115,7 @@ export function SamplingView({
   sampleTypes,
   initialSamples,
   initialPhotos,
+  samplesWithResults,
   initialSeq,
 }: {
   caseId: string;
@@ -123,6 +125,8 @@ export function SamplingView({
   sampleTypes: string[];
   initialSamples: Sample[];
   initialPhotos: InitialPhoto[];
+  /** Prover der har et svar fra laboratoriet. Det folger med, hvis de slettes. */
+  samplesWithResults: string[];
   /** Aabner direkte pa en bestemt prove, nar man kommer fra sagsoverblikket. */
   initialSeq?: number;
 }) {
@@ -179,6 +183,7 @@ export function SamplingView({
   const [stalled, setStalled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sletter, setSletter] = useState(false);
 
   const {
     videoRef,
@@ -197,6 +202,7 @@ export function SamplingView({
   const isLabSample = ANALYSIS_FIELDS.some((a) => draft[a.key]);
   const label = labelFor(draft);
   const isLastRow = index === rows.length - 1;
+  const harSvar = samplesWithResults.includes(draft.id);
 
   const recentMaterials = useMemo(
     () =>
@@ -372,21 +378,59 @@ export function SamplingView({
   }
 
   /**
+   * Hvad der forsvinder med proven, skrevet ud et lag ad gangen.
+   *
+   * Kommentaren og analyserne er felter pa raekken og ikke egne tabeller, men
+   * de er arbejde nogen har lagt, og de er vaek bagefter. Sa staar de der.
+   */
+  function sletLag(): SletLag[] {
+    const lag: SletLag[] = [
+      {
+        id: "proeve",
+        tekst: `Prøve ${label} — ${draft.material ?? "uden materiale"}${
+          draft.sample_type ? `, ${draft.sample_type}` : ""
+        }`,
+      },
+    ];
+
+    if (thumbs.length > 0) {
+      lag.push({
+        id: "billeder",
+        tekst: `${thumbs.length} billede${thumbs.length === 1 ? "" : "r"} af prøven`,
+      });
+    }
+
+    const valgte = ANALYSIS_FIELDS.filter((a) => draft[a.key]);
+    if (valgte.length > 0) {
+      lag.push({
+        id: "analyser",
+        tekst: `De valgte analyser: ${valgte.map((a) => a.label).join(", ")}`,
+      });
+    }
+
+    if (draft.comment?.trim()) {
+      lag.push({ id: "kommentar", tekst: "Kommentaren til prøven" });
+    }
+
+    if (harSvar) {
+      lag.push({ id: "svar", tekst: "Svaret fra laboratoriet på prøven" });
+    }
+
+    return lag;
+  }
+
+  /**
    * Sletter den aktuelle prove med billeder og det hele.
    *
    * Det lokale slettes forst. Ellers kunne en synk der allerede er i gang na
    * at skrive raekken op igen, eller et foto uden prove blive liggende i koen
    * og fejle pa fremmednoglen resten af dagen.
+   *
+   * Daekningen ma ikke kunne spaerre vejen: proven forsvinder pa telefonen
+   * uanset hvad. Naede raekken i Supabase ikke med, siges det — den kommer
+   * tilbage naeste gang siden hentes.
    */
-  async function deleteSample() {
-    if (
-      !window.confirm(
-        `Slet prøve ${draft.seq}? Billeder og analyser følger med, og det kan ikke fortrydes.`,
-      )
-    ) {
-      return;
-    }
-
+  async function sletProeve(): Promise<string | null> {
     setBusy(true);
     try {
       if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -400,8 +444,12 @@ export function SamplingView({
         .eq("sample_id", draft.id)
         .returns<{ storage_path: string }[]>();
 
-      await supabase.from("samples").delete().eq("id", draft.id);
-      if (stored?.length) {
+      const { error } = await supabase
+        .from("samples")
+        .delete()
+        .eq("id", draft.id);
+
+      if (!error && stored?.length) {
         await supabase.storage
           .from(PHOTO_BUCKET)
           .remove(stored.map((r) => r.storage_path));
@@ -436,9 +484,15 @@ export function SamplingView({
       setRows(remaining);
       setIndex(target);
       setTonsText(formatDecimal(remaining[target]?.estimated_tons ?? null));
-      setNotice(null);
+      setSletter(false);
+      setNotice(
+        error
+          ? "Prøven er væk på telefonen, men kunne ikke slettes i skyen. Prøv igen, når der er forbindelse."
+          : null,
+      );
       await refreshPending();
       router.refresh();
+      return null;
     } finally {
       setBusy(false);
     }
@@ -806,7 +860,7 @@ export function SamplingView({
         {started(draft) && (
           <button
             type="button"
-            onClick={deleteSample}
+            onClick={() => setSletter(true)}
             disabled={busy}
             className="tap -mx-1 self-start px-1 text-left text-sm font-medium text-danger hover:underline disabled:opacity-50"
           >
@@ -881,6 +935,17 @@ export function SamplingView({
           </button>
         </div>
       </div>
+
+      {sletter && (
+        <SletDialog
+          titel={`Slet prøve ${draft.seq}?`}
+          indledning="Alt på prøven forsvinder med den, og det kan ikke fortrydes. Posen i bilen beholder sit nummer — næste prøve får det næste."
+          lag={sletLag()}
+          sletTekst="Slet prøven"
+          onSlet={sletProeve}
+          onLuk={() => setSletter(false)}
+        />
+      )}
     </div>
   );
 }

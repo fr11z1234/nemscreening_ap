@@ -68,6 +68,45 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
   mellemniveau og ingen manuel vurdering af om den støver — den vurdering
   fandtes, og den blev ikke sat.
 
+## Sletning
+
+**Der slettes ét lag ad gangen, med flueben ved hvert.** `SletDialog` tager en
+liste over hvad der forsvinder, og "Slet" åbner sig først når de alle er sat.
+Et enkelt "er du sikker?" bliver trykket væk uden at blive læst, og det der
+forsvinder er altid mere end det man trykkede på. Tomme lag springes over — et
+flueben ved "0 billeder" lærer kun folk at sætte flueben uden at læse.
+
+**Databasen rydder selv op.** Fremmednøglerne fra `cases` til
+`case_buildings`, `samples`, `case_files` og `exports` står på CASCADE, og
+`samples` tager `sample_photos` og `lab_results` med. Det er én sletning, ikke
+syv der hver kan fejle halvvejs. Slet ikke børnene i hånden først.
+
+**Men storage kender databasen ikke.** Billederne i `screening-photos` og
+bilagene i `screening-rapport` bliver liggende, når rækkerne er væk. Stierne
+skal derfor læses ud **før** sletningen — bagefter er der ikke noget tilbage
+at spore dem med — og fjernes bagefter, aldrig omvendt: en rapport der peger
+på et billede der ikke findes, er værre end en forladt fil i en bucket. Hent
+dem i sider: PostgREST sender højst 1000 rækker, og en sag med tusind prøver
+har to tusind billeder.
+
+**RLS afviser ved at slette nul rækker, ikke ved at give en fejl.** Sæt
+`.select("id")` på enhver sletning og tjek at der kom noget tilbage. Uden den
+får brugeren at vide at sagen er slettet, og ser den ligge der igen ved næste
+opdatering.
+
+**Kun `office` og `admin` må slette en sag** (`cases_delete` kræver
+`is_office()`) — samme grænse som `lab_results`. Prøver må derimod slettes af
+ethvert medlem. UI'et deler den på samme måde: knappen vises ikke for den der
+alligevel ville få nej.
+
+**Prøvesletningen er offline først** som resten af prøvetagningen. Det lokale
+i IndexedDB ryddes først; ellers kan en synk der er i gang nå at skrive rækken
+op igen, eller et foto uden prøve blive liggende i køen og fejle på
+fremmednøglen resten af dagen. Netværket må ikke kunne spærre vejen — men nåede
+rækken ikke til Supabase, skal det siges, ikke ties ihjel.
+
+Og husk at **numre ikke genbruges**: se domænereglerne ovenfor.
+
 ## Udseende
 
 Appen er **lys, altid** — den følger ikke styresystemet. Paletten er

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SletSagKnap } from "@/components/SletSagKnap";
+import { getMember } from "@/lib/auth";
 import { formatDate, formatDecimal } from "@/lib/format";
 import {
   ANALYSIS_FIELDS,
@@ -49,6 +51,20 @@ export default async function CasePage({
   const buildings = buildingsRes.data ?? [];
   const samples = samplesRes.data ?? [];
   const labCount = samples.filter((s) => s.is_lab_sample).length;
+
+  // Antallet af analyser er ikke antallet af prover: en prove kan baere alle
+  // fire. Det er analyserne laboratoriet tager sig betalt for, og de kunne
+  // ikke laeses nogen steder for.
+  const analysisCount = samples.reduce(
+    (sum, s) => sum + ANALYSIS_FIELDS.filter((a) => s[a.key]).length,
+    0,
+  );
+
+  // Samme graense som RLS handhaever pa cases: kun kontoret sletter en sag.
+  const member = await getMember();
+  const maaSlette =
+    member?.profile?.role === "office" || member?.profile?.role === "admin";
+
   const buildingLabel = new Map(buildings.map((b) => [b.id, b.label]));
   const photosOf = (s: SampleRow) => s.sample_photos?.[0]?.count ?? 0;
   const withoutPhotos = samples.filter((s) => photosOf(s) === 0).length;
@@ -110,12 +126,15 @@ export default async function CasePage({
         </section>
 
         <section className="mt-8 px-4">
-          <div className="flex items-baseline justify-between">
-            <h2 className="label-xs uppercase tracking-wide">Prøver</h2>
-            <span className="tabular text-xs text-muted">
-              {samples.length} registreret
-              {labCount > 0 && ` · ${labCount} til lab`}
-            </span>
+          <h2 className="label-xs uppercase tracking-wide">Prøver</h2>
+
+          {/* Tre tal frem for en linje smaat over listen. De to forste stod
+              der for; det tredje er antallet af analyser, som er det
+              laboratoriet regner efter. */}
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <Tal label="Antal prøver" value={samples.length} />
+            <Tal label="Til lab" value={labCount} />
+            <Tal label="Antal analyser" value={analysisCount} />
           </div>
 
           {samples.length === 0 ? (
@@ -204,6 +223,22 @@ export default async function CasePage({
             </Link>
           )}
         </section>
+
+        {/* Sletning ligger nederst og uden flade, som i provetagningen: den
+            skal kunne findes, men aldrig rammes pa vej ned gennem siden. */}
+        <section className="mt-10 px-4">
+          {maaSlette ? (
+            <SletSagKnap
+              caseId={id}
+              gaaTilListen
+              className="tap -mx-1 px-1 text-left text-sm font-medium text-danger hover:underline disabled:opacity-50"
+            >
+              Slet sagen
+            </SletSagKnap>
+          ) : (
+            <p className="text-sm text-muted">Kun kontoret kan slette en sag.</p>
+          )}
+        </section>
       </main>
 
       {/* Primaerhandlingen bliver i tommelfingerens raekkevidde, ogsa nar
@@ -250,6 +285,22 @@ export default async function CasePage({
         </div>
       </div>
     </>
+  );
+}
+
+/** Et talt antal pa sit eget kort. Nul er et svar og skrives som et tal. */
+function Tal({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="card px-3 py-2.5">
+      <div className="label-xs">{label}</div>
+      <div
+        className={`tabular mt-0.5 text-xl font-semibold ${
+          value === 0 ? "text-muted" : ""
+        }`}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 

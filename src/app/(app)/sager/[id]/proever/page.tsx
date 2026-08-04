@@ -91,6 +91,14 @@ export default async function SamplingPage({
     }
   }
 
+  // Et svar fra laboratoriet folger proven ned, hvis den slettes. Det skal
+  // staa i bekraeftelsen, sa ingen fjerner et analysesvar uden at se det.
+  const { data: svarRows } = await supabase
+    .from("lab_results")
+    .select("sample_id, samples!inner(case_id)")
+    .eq("samples.case_id", id)
+    .returns<{ sample_id: string }[]>();
+
   // Forste prove pa sagen betyder at screeningen er i gang.
   if (sag.status === "oprettet") {
     await supabase
@@ -108,6 +116,7 @@ export default async function SamplingPage({
       sampleTypes={(typesRes.data ?? []).map((t) => t.name)}
       initialSamples={samples}
       initialPhotos={initialPhotos}
+      samplesWithResults={(svarRows ?? []).map((r) => r.sample_id)}
       initialSeq={seq ? Number(seq) : undefined}
     />
   );

@@ -71,6 +71,7 @@ farve. **Kør dem efter enhver ændring i `src/lib/eurofins/` eller
 | `src/app/(bred)/` | Kontoret. Bredt bord til resultatskema og rapport. |
 | `src/app/(app)/sager/[id]/proever/` | Prøvetagning: kamera, formular, offline-kø. |
 | `src/lib/offline/` | IndexedDB-kø og synkronisering mod Supabase. |
+| `src/lib/cases/` | Sagens status, og sletning af en sag med alt under den. |
 | `src/lib/eurofins/` | Eksport til laboratoriet. Se `skabelon/LAESMIG.md`. |
 | `src/lib/lab/` | Indlæsning af svar og grænseværdier. Se `LAESMIG.md`. |
 | `src/lib/rapport/` | Rapportens bilag og faste tekst. |

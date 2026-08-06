@@ -217,7 +217,9 @@ export default async function ExportPage({
           Filen er Eurofins&nbsp;egen Excel-skabelon med prøverne skrevet ind.
           Upload den som den er — lad være med at åbne og gemme den først. Den
           har skjulte ark, og det er dem, Eurofins bruger til at genkende
-          kunde, kontrakt og ordreskabelon. Filnavnet må du gerne ændre.
+          kunde, kontrakt og ordreskabelon. Lad også filnavnet stå: Eurofins
+          har afvist en fil på navnet alene, og det her er sat sammen så den
+          går igennem.
         </p>
       </main>
     </>

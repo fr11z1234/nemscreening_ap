@@ -30,10 +30,18 @@ Seks ark, hvoraf fem er skjulte:
 | `B5`  | `3U1L4QONS7\|EUAA59` | analysepakken bag ordreskabelonen            |
 | `B6`  | `da`                | sprog                                        |
 
-Eurofins døber selv skabelonen `B1-B4-B2-dato`. Det er testet mod deres
-import: **navnet betyder ingenting** — filen går igennem uanset hvad den
-hedder, fordi nøglerne står i arket. Derfor får downloaden sagsnavnet, så to
-sager hentet samme dag ikke lander som "(1)" og "(2)" hos screeneren.
+Eurofins døber selv skabelonen `B1-B4-B2-dato`. Ordren genkendes på nøglerne i
+arket og ikke på navnet, så downloaden får sagsnavnet: to sager hentet samme
+dag skal ikke lande som "(1)" og "(2)" hos screeneren.
+
+**Men navnet er ikke ligegyldigt.** Her stod der før, at filen gik igennem
+uanset hvad den hed. Det holdt ikke: importen afviste
+`Stationsvænget 11, 6840 Oksbøl - Eurofins (3).xlsx` med *"Storage Status of
+the required document is invalid"* og tog den samme fil — byte for byte den
+samme — under et rent ASCII-navn. Derfor bygger `eurofinsFilename` i
+`../generate.ts` navnet af `A-Z a-z 0-9 . _ -` og intet andet: æ, ø og å
+skrives om, mellemrum bliver til `_`, og et tidsstempel bagpå gør hver
+hentning unik, så browseren ikke selv sætter en `(1)` på.
 
 Ud over arkene indeholder filen fire navngivne områder
 (`SampleDetailsRange`, `ProductList`, `Matrix`, `BooleanList`), SHA-512-
@@ -44,8 +52,8 @@ og `1` — aldrig `0.0`.
 ## Sådan skifter du skabelonen ud
 
 1. Hent en ny skabelon i Eurofins' ordreportal.
-2. Læg den her som `ordreskabelon.xlsx` (behold navnet — appen genererer
-   selv download-navnet ud fra `Order_Metadata`).
+2. Læg den her som `ordreskabelon.xlsx` (behold navnet — appen bygger selv
+   download-navnet ud fra sagsnavnet).
 3. Kør `npm run verify:eurofins`.
 
 Verifikationen fejler med det samme, hvis analysekolonnerne i række 2 ikke

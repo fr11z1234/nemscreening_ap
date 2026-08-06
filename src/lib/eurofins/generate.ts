@@ -140,20 +140,51 @@ export function generateEurofinsXlsx(opts: {
 }
 
 /**
- * Filnavn der kan overleve en Windows-download.
+ * Filnavn der kan overleve bade en Windows-download og Eurofins' import.
  *
- * Eurofins doeber selv skabelonen efter kunde, ordreskabelon, kontrakt og
- * dato — men de noegler star ogsa i det skjulte Order_Metadata, og det er
- * dem importen bruger. Navnet er testet: filen gar igennem uanset hvad den
- * hedder. Sa den far sagsnavnet, sa to sager hentet samme dag ikke lander
- * som "(1)" og "(2)" i screenerens downloadmappe.
+ * Ordrenoglerne star i det skjulte Order_Metadata, ikke i navnet, sa filen
+ * far sagsnavnet: to sager hentet samme dag skal ikke lande som "(1)" og
+ * "(2)" i screenerens downloadmappe.
+ *
+ * Men navnet er ikke ligegyldigt. Eurofins afviste
+ * "Stationsvænget 11, 6840 Oksbøl - Eurofins (3).xlsx" med "Storage Status
+ * of the required document is invalid" og tog den samme fil — byte for byte
+ * den samme — under et rent ASCII-navn. Derfor omskrives ae, oe og aa, og
+ * alt uden for ASCII falder fra.
+ *
+ * Komma og parenteser ryger med. De stod i det navn der blev afvist, og vi
+ * kunne ikke skille dem fra bogstaverne uden endnu en runde uploads —
+ * og et navn uden komma koster ingenting. Mellemrum bliver til _ af samme
+ * grund: det er det tegn der oftest bliver kodet om undervejs.
+ *
+ * Til sidst et tidsstempel, sa to hentninger af samme sag aldrig far samme
+ * navn. Ellers doeber browseren nummer to "... (1).xlsx" — og parentesen er
+ * praecis det der stod i navnet Eurofins afviste. Millisekunder og ikke
+ * sekunder: to klik i traek ligger inden for det samme sekund.
  */
-export function eurofinsFilename(caseName: string): string {
+export function eurofinsFilename(
+  caseName: string,
+  tidspunkt = Date.now(),
+): string {
+  const ascii = caseName
+    .normalize("NFC")
+    .replace(/æ/g, "ae")
+    .replace(/Æ/g, "Ae")
+    .replace(/ø/g, "oe")
+    .replace(/Ø/g, "Oe")
+    .replace(/å/g, "aa")
+    .replace(/Å/g, "Aa")
+    // Resten af accenterne: e-accent bliver til e frem for at falde helt bort.
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+
   const safe =
-    caseName
-      .trim()
-      .replace(/[\\/:*?"<>|]/g, "")
-      .replace(/\s+/g, " ")
-      .slice(0, 80) || "sag";
-  return `${safe} - Eurofins.xlsx`;
+    ascii
+      .replace(/[^A-Za-z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 80)
+      .replace(/_$/, "") || "sag";
+
+  return `${safe}_Eurofins_t${tidspunkt}.xlsx`;
 }

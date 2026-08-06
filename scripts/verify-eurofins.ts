@@ -226,14 +226,34 @@ check(
   `forventede 7 nye strenge (6 maerkninger + sagsnavn), fik ${strings.length - stringsBefore.length}`,
 );
 
-// 10. Filnavnet er sagens, sa to sager samme dag ikke kolliderer.
+// 10. Filnavnet er sagens — men rent ASCII, uden mellemrum og med et
+//     tidsstempel. Eurofins afviste et navn med ae, oe og en parentes i.
 check(
-  filename === "Nørrebrogade 12, 2200 København N - Eurofins.xlsx",
-  `filnavnet blev ${filename}`,
+  eurofinsFilename("Nørrebrogade 12, 2200 København N", 1750000000000) ===
+    "Noerrebrogade_12_2200_Koebenhavn_N_Eurofins_t1750000000000.xlsx",
+  `filnavnet blev ${eurofinsFilename("Nørrebrogade 12, 2200 København N", 1750000000000)}`,
 );
 check(
-  eurofinsFilename('Testvej 1: "A/B"') === "Testvej 1 AB - Eurofins.xlsx",
+  eurofinsFilename('Testvej 1: "A/B"', 1) === "Testvej_1_A_B_Eurofins_t1.xlsx",
   "tegn Windows ikke tillader i filnavne blev ikke fjernet",
+);
+check(
+  /^[A-Za-z0-9._-]+_t\d+\.xlsx$/.test(filename),
+  `filnavnet er ikke rent ASCII uden mellemrum: ${filename}`,
+);
+// To hentninger af samme sag ma ikke give samme navn — sa doeber browseren
+// nummer to "(1)", og det var netop en parentes Eurofins afviste.
+check(
+  eurofinsFilename(caseName, 1) !== eurofinsFilename(caseName, 2),
+  "to hentninger af samme sag fik samme filnavn",
+);
+check(
+  eurofinsFilename("Æblevej 3, Ærø", 1) === "Aeblevej_3_Aeroe_Eurofins_t1.xlsx",
+  "store AE og OE blev ikke skrevet om",
+);
+check(
+  eurofinsFilename("   ", 1) === "sag_Eurofins_t1.xlsx",
+  "et tomt sagsnavn gav ikke et brugbart filnavn",
 );
 
 // 11. Valideringen fanger de sager der ikke kan eksporteres.

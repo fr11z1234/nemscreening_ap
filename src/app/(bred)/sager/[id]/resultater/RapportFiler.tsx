@@ -194,6 +194,11 @@ export function RapportFiler({
           filename: fil.name,
           mime: "application/pdf",
           bytes: fil.size,
+          // Hele filen har intet sidetal, men nul skal staa her. PostgREST
+          // laegger kolonnerne sammen for hele arrayet: naar siderne nedenfor
+          // saetter sort_order, kommer den med i INSERT'en for alle raekker,
+          // og den der mangler den far NULL — ikke kolonnens standardvaerdi.
+          sort_order: 0,
         },
         ...sider.map((s, i) => ({
           case_id: caseId,

@@ -7,7 +7,7 @@ import {
   LevelBadge,
   ResultatSkema,
   SkemaForklaring,
-  SKEMA_BREDDE,
+  SKEMA_BREDDE_SKAERM,
   levelOfSample,
   type SkemaResult,
   type SkemaSample,
@@ -244,7 +244,7 @@ export default async function ResultaterPage({
             </div>
 
             <div className="mt-4">
-              <TilpasBredde bredde={SKEMA_BREDDE}>
+              <TilpasBredde bredde={SKEMA_BREDDE_SKAERM}>
                 <ResultatSkema samples={skemaSamples} results={results} />
               </TilpasBredde>
               <SkemaForklaring />

@@ -80,12 +80,26 @@ export function LevelBadge({
 /**
  * Skemaets designbredde i px.
  *
- * Bredden er sat efter den laengste kolonneoverskrift, "Chlorerede
- * paraffiner": under den her braekker ordet midt over. Er der mindre plads pa
- * skaermen, skaleres hele skemaet ned — se TilpasBredde — frem for at
- * kolonnerne klemmes hver for sig.
+ * Den var sat efter den laengste kolonneoverskrift, "Chlorerede paraffiner",
+ * dengang overskrifterne laa ned. Rejst op fylder de ingen bredde, og saa er
+ * det papiret der bestemmer: arket giver skemaet 186 mm, og skriften skal
+ * staa lige saa stort pa skaermen som den kommer ud af printeren. 13 px paa
+ * skaermen skaleret ned i en 21 cm bred side rammer papirets 10 px ved
+ * omkring 915 — se TilpasBredde.
+ *
+ * Er skaermen smallere, skaleres hele skemaet ned frem for at kolonnerne
+ * klemmes hver for sig.
  */
-export const SKEMA_BREDDE = 1480;
+export const SKEMA_BREDDE = 915;
+
+/**
+ * Designbredden pa kontorets resultatside.
+ *
+ * Den side skal ikke ligne papir — den skal bruges. Skemaet far hele bordet,
+ * og skriften bliver derefter. Rapporten er bundet til arkets 186 mm; det er
+ * denne her ikke.
+ */
+export const SKEMA_BREDDE_SKAERM = 1480;
 
 /**
  * Kolonnebredder i procent af skemaet.
@@ -124,9 +138,12 @@ export function ResultatSkema({
             <th>Materiale</th>
             <th>Prøveart</th>
             <th>Lokalitet</th>
-            <th className="skel text-right">Est. ton</th>
+            {/* Ingen text-align her: hovedet staar op, og hvor teksten
+                begynder styres af `.skema thead th` — en vandret klasse ville
+                betyde noget andet end den ser ud til. */}
+            <th className="skel">Est. ton</th>
             {LAB_PARAMETERS.map((p) => (
-              <th key={p.key} className="text-right">
+              <th key={p.key}>
                 {p.label}
                 {p.unit && (
                   <span className="block font-normal text-muted">{p.unit}</span>

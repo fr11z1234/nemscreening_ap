@@ -225,7 +225,7 @@ export default async function RapportPage({
         </Link>
         <PrintKnap />
         <p className="text-sm text-muted">
-          Vælg «Gem som PDF» i printdialogen. Siden er sat til liggende A4 — slå
+          Vælg «Gem som PDF» i printdialogen. Siden er sat til stående A4 — slå
           browserens sidehoved og -fod fra, så adressen ikke står på rapporten.
         </p>
       </div>
@@ -242,9 +242,13 @@ export default async function RapportPage({
           />
         )}
 
+        {/* Maalene er arkets, i millimeter. Da det laa ned stod her 297 x 210,
+            og med `slice` ville de to figurer nu blive skaaret bort i siderne
+            — netop de hjorner de er sat til at holde. Selve formerne er de
+            samme; de er flyttet med hjornet. */}
         <svg
           className="forside-figur"
-          viewBox="0 0 297 210"
+          viewBox="0 0 210 297"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
@@ -252,11 +256,11 @@ export default async function RapportPage({
               bliver et haandtryk i hjornet og ikke et taeppe — huset skal
               kunne ses. */}
           <path
-            d="M-8 128 L44 128 L106 190 L84 218 L22 156 L-8 156 Z"
+            d="M-8 215 L44 215 L106 277 L84 305 L22 243 L-8 243 Z"
             fill="var(--primary-fuld)"
           />
           <path
-            d="M232 -8 L297 57 L297 96 L212 11 Z"
+            d="M145 -8 L210 57 L210 96 L125 11 Z"
             fill="#ffffff"
             opacity="0.14"
           />
@@ -401,18 +405,21 @@ export default async function RapportPage({
                 Hojden er sat efter arket og ikke efter billedet: en prove
                 skal kunne vaere pa en side, ogsa forklaringen under skemaet.
 
-                Regnestykket bag de 8,5 cm: arket er 210 mm hojt, polstringen
-                tager 24, sa der er 186 at dele. Alt det andet pa siden —
-                sidehoved, provehoved, oplysninger, overskrift, skema og
-                forklaring — fylder omkring 91 mm, og luften herover tre. Der
-                er altsa plads til 92 mm billede.
+                Regnestykket bag de 13 cm: arket staar op og er 297 mm hojt,
+                polstringen tager 24, sa der er 273 at dele. Alt det andet pa
+                siden — sidehoved, provehoved, oplysninger, overskrift, skema
+                med sit rejste hoved, og forklaringen — fylder omkring 103 mm.
+                Der er altsa plads til 170 mm billede, og der staar 130.
 
-                De sidste syv er slup, og de er der af en grund: braekker et
+                De fyrre er slup, og de er der af en grund: braekker et
                 materialenavn om pa to linjer, eller lober oplysningerne over
-                pa to, koster det seks millimeter af det samme budget. Slupet
-                raekker til praecis et af de brud. Sker begge to, ryger skemaet
-                ned pa naeste side — og sa er hele pointen med en prove pa en
-                side vaek. */}
+                pa to, koster det seks millimeter af det samme budget. Ryger
+                skemaet ned pa naeste side, er hele pointen med en prove pa en
+                side vaek.
+
+                Bredden er 89 mm mod 128 dengang arket laa ned, men billederne
+                er taget staaende med en telefon, og der er det hojden der
+                afgor hvor stort motivet bliver: fra 85 mm til 130. */}
             {urls.length > 0 && (
               <div className="mt-3 grid grid-cols-2 gap-4">
                 {urls.slice(0, 2).map((url, i) => (
@@ -421,7 +428,7 @@ export default async function RapportPage({
                     key={url}
                     src={url}
                     alt={`${s.label}, billede ${i + 1}`}
-                    className="h-[8.5cm] w-full rounded-xl bg-surface-2 object-contain"
+                    className="h-[13cm] w-full rounded-xl bg-surface-2 object-contain"
                   />
                 ))}
               </div>

@@ -160,8 +160,23 @@ så det ikke ligger i den bundt marken henter for at tage en prøve. Brug det
 ikke til at *bygge* PDF'er — så er vi tilbage ved to rapporter der kan sige
 hver sit.
 
-**Papiret er liggende A4.** Stående giver de seksten kolonner 186 mm at dele,
-og så brækker hvert tal i to linjer.
+**Papiret er stående A4**, og det hænger sammen med at
+**analyseskemaets overskrifter står på højkant**. De to kan ikke skilles ad.
+
+Arket lå ned, fordi seksten kolonner ikke kunne dele 186 mm uden at hvert tal
+brækkede i to linjer. Det var rigtigt, så længe overskriften lå ned med dem:
+`Chlorerede paraffiner` er fem gange bredere end sin kolonne. Rejst op koster
+overskriften ingen bredde, og så er det tallet der sætter målet — `< 2500`
+fylder 9,2 mm af de 10,3 en analysekolonne har, når cellernes sideluft holdes
+nede (`--skema-sideluft`). Det er også sådan de rapporter, kunden kender i
+forvejen, er sat.
+
+Lægger du overskrifterne ned igen, skal papiret vendes i samme ombæring — og
+omvendt. Ellers brækker tallene, præcis som før.
+
+Gevinsten er siden med prøven: to billeder ved siden af hinanden går fra
+128 × 85 mm til 89 × 130. Billederne er taget stående med en telefon, så det er
+højden der afgør hvor stort motivet bliver.
 
 **Der må kun være ÉN `@page`-regel**, og dens margin er nul. Sidemarginen
 ligger som `padding: 12mm` inde i hver sektion i stedet. Det lyder omvendt,
@@ -227,13 +242,15 @@ fra den indloggede bruger.
 **Logoet skal på hver side.** Det er én fil i `public/logo/` — se `LAESMIG.md`
 dér — og bruges gennem `src/components/Logo.tsx`. Sidehovedet står inde i hver
 sektion og ikke som et `position: fixed`-element: en fastgjort kasse kan ikke
-undtage forsiden og følger ikke med, når bilagssiderne skifter til stående
-papir. Derfor er metodeteksten delt i grupper à en side (`RAPPORT_SIDER`) —
+undtage forsiden, og den skal kunne tage plads fra bilagets billede.
+Derfor er metodeteksten delt i grupper à en side (`RAPPORT_SIDER`) —
 et afsnit, der selv brækker over to ark, ville efterlade det andet uden mærke.
 
-Eurofins-bilaget er stående sider på et liggende ark. Det giver luft i
-siderne, og det er med vilje: alternativet var en anden sidestørrelse, og den
-kostede kolonner i skemaet.
+Eurofins-bilaget er stående sider på et stående ark, og går op i 89 % uden
+spildt papir. Dengang arket lå ned, måtte den samme side ned på 58 % og
+efterlod 75 mm tomt i hver side — og billedet fik sin højde af `flex: 1` i en
+spalte uden fast højde, altså ingenting, så det løb ud over sidehovedet i
+stedet. Højden på `.print-bilag img` skal stå i hånden.
 
 Der er **én plantegning, men flere dokumenter fra Eurofins** — analyserapport
 og asbestappendiks kommer som hver sin fil. `doc_id` binder et bilags PDF

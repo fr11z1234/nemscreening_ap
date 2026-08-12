@@ -252,6 +252,24 @@ h2 {
 .skema {
   --skema-luft: 0.2rem;
   --skema-linjer: 1.35;
+  /*
+   * Sideluften i cellerne.
+   *
+   * Arket staar op, sa de elleve analysekolonner deler 61 % af 186 mm — 10,3
+   * mm hver. Med 0,45 rem i hver side gik 2,4 af dem til luft, og "< 2500"
+   * braekkede i to linjer. Det er kolonnens smalleste maal der bestemmer her,
+   * ikke hvad der ser rigtigt ud i en bred kasse.
+   */
+  --skema-sideluft: 0.2rem;
+  /*
+   * Hojden pa det lodrette hoved.
+   *
+   * Den laengste overskrift er "Chlorerede paraffiner" — 21 tegn. Et tegn
+   * fylder omtrent en halv em, sa 11em raekker, og staar der en dag en
+   * laengere, braekker den bare til to lodrette linjer ved siden af hinanden.
+   * I em og ikke mm, sa hovedet skrumper sammen med skriften.
+   */
+  --skema-hoved: 11em;
 
   width: 100%;
   /* Fast layout: kolonnerne staar hvor colgroup siger, uanset om et materiale
@@ -267,7 +285,7 @@ h2 {
 
 .skema th,
 .skema td {
-  padding: var(--skema-luft) 0.45rem;
+  padding: var(--skema-luft) var(--skema-sideluft);
   border-right: 1px solid var(--grid);
   border-bottom: 1px solid var(--grid);
   /* Fast layout klipper ikke af sig selv — et langt ord skal have lov at
@@ -287,19 +305,40 @@ h2 {
 }
 
 /*
- * Hovedet saettes mindre end tallene.
+ * Hovedet staar paa hojkant.
  *
- * "Chlorerede paraffiner" og "Kviksølv, Hg" er laengere end deres kolonne er
- * bred, og et ord der braekker midtvejs — "Chlorere de" — er svaerere at
- * laese end det samme ord et hak mindre. Tallene er det man kigger efter;
- * overskriften laeses en gang.
+ * "Chlorerede paraffiner" er fem gange bredere end sin kolonne. Laa den ned,
+ * skulle enten kolonnen vaere bred nok til ordet — og seksten af dem er der
+ * ikke plads til paa et staaende ark — eller ordet braekke midtvejs.
+ * Rejst op koster overskriften ingen bredde overhovedet, og saa er det
+ * tallet der bestemmer hvor smal kolonnen maa vaere. Det er sadan de
+ * rapporter kunden kender i forvejen er sat.
+ *
+ * `vertical-rl` og intet andet: sa laeses der oppefra og ned, med hovedet paa
+ * skra til hojre. En halv omgang oveni ville vende laeseretningen om, sa
+ * ordet begyndte nede ved tallet og lob opad.
+ *
+ * Hojden skal saettes i handen. En rejst overskrift har ingen bredde at give
+ * raekken, sa uden `height` ville hovedet klappe sammen til en enkelt linje.
  */
 .skema thead th {
   background: var(--surface-2);
   font-size: 0.85em;
   font-weight: 600;
-  vertical-align: bottom;
   border-bottom: 2px solid var(--grid-strong);
+  writing-mode: vertical-rl;
+  height: var(--skema-hoved);
+  /* Lodret skrift begynder foroven, og der skal den blive: alle overskrifter
+     starter i samme hojde, og de korte haenger ned mod tallene i stedet for
+     at svaeve midt i hovedet. */
+  text-align: left;
+  white-space: normal;
+}
+
+/* Enheden er en linje ved siden af navnet, ikke under det: i lodret skrift
+   stables blokke vandret, og afstanden mellem dem ligger derfor i blokaksen. */
+.skema thead th>span {
+  margin-block-start: 0.15em;
 }
 
 /*
@@ -364,7 +403,7 @@ h2 {
   overflow: hidden;
   background: var(--fg);
   color: #ffffff;
-  aspect-ratio: 297 / 210;
+  aspect-ratio: 210 / 297;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -503,17 +542,17 @@ h2 {
     border-radius: 1rem;
     box-shadow: var(--shadow);
     padding: 2rem 2.25rem;
+    /* Arket er staaende A4. Uden bredden her ville siderne blive sa brede som
+       kontorets skaerm, og man ville forst i printdialogen opdage hvor lidt
+       der egentlig er plads til. */
+    max-width: 21cm;
+    margin-inline: auto;
   }
 
   /* Forsiden gaar til kant. Polstringen ligger i .forside-indhold. */
   .forside {
     padding: 0;
     background: var(--fg);
-  }
-
-  /* Bilagets sider er billeder af et staaende A4 og skal ses som saadan. */
-  .print-bilag {
-    max-width: 21cm;
   }
 }
 
@@ -605,10 +644,9 @@ h2 {
   /*
    * Teksten saettes i to spalter.
    *
-   * Arket ligger ned, fordi analyseskemaet kraever det. En tekstlinje over
-   * hele bredden bliver 120 anslag lang, og oje't finder ikke tilbage til
-   * begyndelsen af naeste linje. To spalter giver samme laengde som i den
-   * staaende rapport teksten er skrevet til.
+   * Ogsa pa et staaende ark: 186 mm i en spalte bliver 95 anslag pa en linje,
+   * og oje't finder ikke tilbage til begyndelsen af den naeste. To spalter
+   * giver 87 mm og omkring 45 anslag — det maal teksten er skrevet til.
    */
   .print-spalter {
     column-count: 2;
@@ -626,26 +664,27 @@ h2 {
   }
 
   /*
-   * Bilaget fra Eurofins er staaende sider pa et liggende ark.
+   * Bilaget fra Eurofins.
    *
-   * Vi provede at give dem deres egen staaende @page, men to sidestorrelser i
-   * samme dokument klippede analyseskemaet — se ovenfor. Et bilag med luft i
-   * siderne er til at leve med; et skema uden sine sidste kolonner er ikke.
+   * Deres sider staar op, og nu goer vores ogsa. Et staaende A4 i et staaende
+   * A4 gar op i 89 %, oprejst og uden spildt papir — det var hele balladen
+   * dengang arket laa ned, hvor den samme side maatte ned pa 58 % og efterlod
+   * 75 mm tomt i hver side.
    *
-   * Billedet faar hele hojden og centreres, sa siden bliver saa stor som
-   * arket tillader.
+   * Hojden saettes i handen. Fra `flex: 1` fik billedet aldrig arkets maal —
+   * en spalte uden fast hojde giver ingenting at vokse i — og saa lob det ud
+   * over sidehovedet i stedet.
    */
   .print-bilag {
     break-after: page;
     break-inside: avoid;
     max-width: none;
-    display: flex;
-    flex-direction: column;
   }
 
+  /* 273 mm indhold minus sidehovedet. Billedet er bredere end hojt i
+     forholdet, sa det er hojden der binder, og `contain` centrerer resten. */
   .print-bilag img {
-    flex: 1;
-    min-height: 0;
+    max-height: 25.5cm;
     object-fit: contain;
   }
 
@@ -682,17 +721,24 @@ h2 {
   }
 
   /*
-   * Liggende A4. Staaende ville skemaet faa 186 mm at dele mellem seksten
-   * kolonner, og tallene ville staa i to linjer hver — hele pointen med at
-   * kunne laegge en gammel og en ny rapport ved siden af hinanden ryger.
-   */
-  /*
-   * Marginen er nul HER og ligger i stedet som polstring i hver sektion.
-   * Se forklaringen ved .print-side ovenfor: to sidebokse i samme dokument
-   * kostede halvanden analysekolonne.
+   * Staaende A4.
+   *
+   * Arket laa ned, fordi seksten kolonner ikke kunne dele 186 mm uden at hvert
+   * tal braekkede i to linjer. Det holdt kun sa laenge overskriften laa ned
+   * med dem: rejst op koster den ingen bredde, og saa er det "< 2500" der
+   * saetter maalet — 9,2 mm af de 10,3 kolonnen har.
+   *
+   * Til gengaeld far siden hvad den er til for. En prove er to billeder og en
+   * raekke tal, og billederne er det kunden ser efter. Staaende faar de 89 mm
+   * i bredden hver mod 128 for — men hojden, som er den der taeller for et
+   * billede taget med en telefon, gar fra 85 mm til 130.
+   *
+   * Marginen er stadig nul HER og ligger som polstring i hver sektion. Det
+   * er stadig EN sidestorrelse for hele dokumentet: faelden dengang var to
+   * pa en gang, ikke staaende i sig selv.
    */
   @page {
-    size: A4 landscape;
+    size: A4;
     margin: 0;
   }
 }

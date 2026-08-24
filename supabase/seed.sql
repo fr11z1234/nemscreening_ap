@@ -13,14 +13,25 @@
 -- produktionen. To ting afsloerer den: screening har allerede sager, og
 -- public.leads indeholder rigtige henvendelser.
 do $$
+declare
+  antal_sager bigint;
+  antal_leads bigint := 0;
 begin
-  if (select count(*) from screening.cases) > 0 then
+  select count(*) into antal_sager from screening.cases;
+  if antal_sager > 0 then
     raise exception 'seed.sql afbrudt: screening.cases er ikke tom'
       using hint = 'Filen bygger et TOMT miljo op. Er der allerede sager, er det efter alt at doemme produktionen.';
   end if;
 
-  if to_regclass('public.leads') is not null
-     and (select count(*) from public.leads) > 0 then
+  -- Opslaget i public.leads skal vaere dynamisk. PL/pgSQL planlaegger hele
+  -- udtrykket paa forhaand, saa en almindelig reference ville slaa tabellen op
+  -- allerede der — og fejle i et miljo uden website. Altsaa praecis det miljo
+  -- filen er skrevet til. EXECUTE udskyder opslaget til det faktisk koeres.
+  if to_regclass('public.leads') is not null then
+    execute 'select count(*) from public.leads' into antal_leads;
+  end if;
+
+  if antal_leads > 0 then
     raise exception 'seed.sql afbrudt: public.leads indeholder data'
       using hint = 'Websitets henvendelser findes kun i produktionen. Stop her.';
   end if;

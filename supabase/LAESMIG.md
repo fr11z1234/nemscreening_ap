@@ -61,3 +61,35 @@ Brugerne følger heller ikke med, så der skal seedes en, man kan logge ind som.
 Sletter man branchen, er alt i den væk. Det er netop pointen, når man vil kunne
 starte forfra — men det betyder også, at intet i en branch må være det eneste
 sted, noget findes.
+
+## To ting en ny branch ikke arver
+
+Begge fik appen til at se ødelagt ud på hver sin måde, og ingen af fejlene
+siger hvad de handler om.
+
+**API'et udstiller ikke `screening`.** Produktionen har det slået til, men en
+branch oprettet uden GitHub-integrationen får ikke `config.toml` anvendt —
+Supabase' dokumentation nævner det kun i en parentes ved «Configure». Uden det
+svarer hver eneste forespørgsel `PGRST106 Invalid schema: screening`, og appen
+ser ud som om databasen er tom. Rettes fra SQL på branchen:
+
+```sql
+alter role authenticator set pgrst.db_schemas = 'public, graphql_public, screening';
+notify pgrst, 'reload config';
+notify pgrst, 'reload schema';
+```
+
+Begge `notify` er nødvendige. Uden den sidste kender PostgREST skemaet, men
+ikke dens tabeller, og svarer `PGRST205 Could not find the table` i stedet.
+
+Sådan skelnes de to tilstande fra hinanden: er skemaet udstillet korrekt,
+svarer en forespørgsel uden login `42501 permission denied for schema
+screening` — altså at Postgres kender skemaet og nægter adgang, præcis som
+produktionen gør. Det er svaret man vil se.
+
+Kobles repoet til Supabase' GitHub-integration, anvendes `config.toml` af sig
+selv, og indstillingen skal ikke sættes i hånden på hver branch.
+
+**Brugerne kan ikke logge ind.** Se kommentaren ved `auth.users` i `seed.sql`:
+fire token-kolonner uden standardværdi skal sættes til tom streng, ellers
+svarer hvert login 500 «Database error querying schema».

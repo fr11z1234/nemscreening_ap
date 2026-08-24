@@ -19,11 +19,16 @@ import {
 import { formatDecimal, parseDecimal } from "@/lib/format";
 import {
   ANALYSIS_FIELDS,
+  BUILDING_PARTS,
+  MATERIAL_CONDITIONS,
   PERIOD_LABEL,
+  RESOURCE_HANDLINGS,
+  RESOURCE_HANDLING_LABEL,
   analysesForPeriod,
   analysisApplies,
   type BuildingPeriod,
   type CaseBuilding,
+  type ReportType,
   type Sample,
 } from "@/lib/types";
 
@@ -56,12 +61,17 @@ const EXCLUDED_LABELS = (() => {
 })();
 
 /**
- * En ny raekke starter blank. Kun bygningen folger med.
+ * En ny raekke starter blank. Kun bygningen og bygningsdelen folger med.
  *
- * Bygningen er den eneste oplysning der er givet af hvor screeneren fysisk
- * star, og den kan skiftes med et tryk som alt andet. Alt ovrigt — materiale,
- * proveart, maengde og ikke mindst analyserne — skal vaelges bevidst for hver
- * prove.
+ * De to er de eneste oplysninger, der er givet af hvor screeneren fysisk star,
+ * og de kan skiftes med et tryk som alt andet. Alt ovrigt — materiale,
+ * proveart, maengde, stand, handtering og ikke mindst analyserne — skal vaelges
+ * bevidst for hver prove.
+ *
+ * Bygningsdelen folger med af samme grund som bygningen: staar man pa taget,
+ * tages der flere prover pa taget. Standen og handteringen gor ikke, for de er
+ * vurderinger af netop dette materiale — arvet ville de blive rigtige for den
+ * forste prove og stiltiende forkerte for de naeste.
  *
  * Og kun den forste bygning folger med. En prove der daekker alle tre
  * bygninger er undtagelsen — typisk en enkelt facademaling — og naeste prove
@@ -79,6 +89,9 @@ function nextDraft(caseId: string, seq: number, userId: string, from?: Draft): D
     period: null,
     location_note: null,
     estimated_tons: null,
+    building_part: from?.building_part ?? null,
+    material_condition: null,
+    resource_handling: null,
     analysis_pcb: false,
     analysis_asbestos: false,
     analysis_metals: false,
@@ -103,6 +116,9 @@ function toDraft(s: Sample, userId: string, kendteBygninger: Set<string>): Draft
     location_note: s.location_note,
     estimated_tons: s.estimated_tons,
     period: s.period,
+    building_part: s.building_part,
+    material_condition: s.material_condition,
+    resource_handling: s.resource_handling,
     analysis_pcb: s.analysis_pcb,
     analysis_asbestos: s.analysis_asbestos,
     analysis_metals: s.analysis_metals,
@@ -145,6 +161,7 @@ export function SamplingView({
   buildings,
   materials,
   sampleTypes,
+  reportType,
   initialSamples,
   initialPhotos,
   samplesWithResults,
@@ -155,6 +172,8 @@ export function SamplingView({
   buildings: CaseBuilding[];
   materials: string[];
   sampleTypes: string[];
+  /** Selektiv nedrivning giver tre felter mere. Se BUILDING_PARTS. */
+  reportType: ReportType;
   initialSamples: Sample[];
   initialPhotos: InitialPhoto[];
   /** Prover der har et svar fra laboratoriet. Det folger med, hvis de slettes. */
@@ -207,6 +226,10 @@ export function SamplingView({
    * Skelner den blanke raekke i enden — som bare ligger klar — fra en prove
    * der bevidst er efterladt uden materiale. Materiale kan ikke laengere
    * bruges til det, nu hvor det er frivilligt.
+   *
+   * Bygningsdelen taeller bevidst IKKE med: den arves fra forrige prove, sa
+   * den blanke raekke i enden har den allerede. Talte den med, ville hver ny
+   * raekke se rort ud og blive gemt som en tom registrering.
    */
   const started = (d: Draft) =>
     (photos[d.id]?.length ?? 0) > 0 ||
@@ -214,6 +237,8 @@ export function SamplingView({
     !!d.sample_type ||
     !!d.comment ||
     d.estimated_tons != null ||
+    d.material_condition != null ||
+    !!d.resource_handling ||
     ANALYSIS_FIELDS.some((a) => d[a.key]);
 
   const draft = rows[index];
@@ -242,6 +267,10 @@ export function SamplingView({
   const atPhotoLimit = thumbs.length >= MAX_PHOTOS;
   const photoLimitNotice = `Der er plads til ${MAX_PHOTOS} billeder pr. prøve. Slet et for at tage et nyt.`;
   const isLabSample = ANALYSIS_FIELDS.some((a) => draft[a.key]);
+  const erSelektiv = reportType === "selektiv";
+  const valgtStand = MATERIAL_CONDITIONS.find(
+    (c) => c.grade === draft.material_condition,
+  );
   const label = labelFor(draft);
   const isLastRow = index === rows.length - 1;
   const harSvar = samplesWithResults.includes(draft.id);
@@ -557,11 +586,19 @@ export function SamplingView({
   /**
    * Gemmer den aktuelle raekke.
    *
-   * En prove skal have en lokalitet og mindst et billede. Materiale,
-   * proveart, maengde og analyser er frivillige — screeneren skal kunne
-   * registrere at hun har staet et sted og fotograferet det, uden at kunne
-   * sige hvad det er. En sadan raekke far ingen P og sendes ikke til
-   * laboratoriet, praecis som en raekke uden analyser.
+   * En prove skal have en lokalitet. Materiale, proveart, maengde og analyser
+   * er frivillige — screeneren skal kunne registrere at hun har staet et sted
+   * og fotograferet det, uden at kunne sige hvad det er. En sadan raekke far
+   * ingen P og sendes ikke til laboratoriet.
+   *
+   * Billedet kraeves kun, nar der er bestilt en analyse. Et billede er
+   * dokumentation af hvor proven i posen blev taget, og det er derfor det er
+   * ufravigeligt for enhver raekke, der skal til laboratoriet. En ressource er
+   * noget andet: «beton, baerende, 40 ton» er en opmaaling, ikke en prove, og
+   * der er tyve af dem i en bygning. Kraevede hver af dem et billede, ville
+   * ressourcescreeningen tage laengere tid end selve provetagningen — og
+   * billederne blive taget for at komme videre frem for for at dokumentere
+   * noget.
    *
    * require er "screeneren gar videre til naeste prove"; sa skal raekken vaere
    * hel. Uden require er det et sideskift eller en afslutning, og sa gemmes
@@ -573,8 +610,8 @@ export function SamplingView({
         setNotice("Vælg en lokalitet, før du går videre.");
         return false;
       }
-      if (thumbs.length === 0) {
-        setNotice("Tag mindst ét billede, før du går videre.");
+      if (isLabSample && thumbs.length === 0) {
+        setNotice("Tag mindst ét billede af prøven, før du går videre.");
         return false;
       }
     } else if (!started(draft)) {
@@ -773,7 +810,9 @@ export function SamplingView({
       <div className="flex items-center gap-2 overflow-x-auto px-4 py-3">
         {thumbs.length === 0 ? (
           <p className="text-[13px] text-muted">
-            Tryk på billedet ovenfor — hver prøve skal have mindst ét billede
+            {isLabSample
+              ? "Tryk på billedet ovenfor — en prøve til laboratoriet skal have mindst ét billede"
+              : "Tryk på billedet ovenfor for at tage et billede"}
           </p>
         ) : (
           thumbs.map((t) => (
@@ -844,6 +883,43 @@ export function SamplingView({
           </div>
         )}
 
+        {/* Bygningsdelen staar hos lokaliteten, fordi den svarer pa det samme
+            sporgsmal: hvor staar screeneren. Den afgor hvilken overskrift
+            materialet havner under i ressourcescreeningen. */}
+        {erSelektiv && (
+          <div className="flex flex-col gap-1.5">
+            <span className="label-xs">Bygningsdel</span>
+            <div className="grid grid-cols-2 gap-2">
+              {BUILDING_PARTS.map((p) => {
+                const valgt = draft.building_part === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() =>
+                      update({ building_part: valgt ? null : p.key })
+                    }
+                    aria-pressed={valgt}
+                    className={`tap rounded-xl px-3 text-left text-sm transition-colors ${
+                      valgt
+                        ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                        : "bg-surface shadow-card hover:bg-surface-2"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!draft.building_part && (
+              <p className="text-xs leading-relaxed text-muted">
+                Uden bygningsdel kommer materialet ikke med i
+                ressourcescreeningen — rapporten ved ikke hvor det hører hjemme.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5">
           <span className="label-xs">Periode</span>
           <div className="grid grid-cols-2 gap-2">
@@ -884,6 +960,80 @@ export function SamplingView({
             className="tap tabular w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
           />
         </label>
+
+        {erSelektiv && (
+          <>
+            {/* Standen er et tal fra 1 til 5, og forklaringen staar under de
+                fem knapper frem for pa hver. Forskellen mellem «god» og
+                «middel» afgor om materialet kan genbruges som det er eller skal
+                knuses, sa den skal kunne laeses — men den skal ikke fylde fem
+                linjer, nar valget er truffet. */}
+            <div className="flex flex-col gap-1.5">
+              <span className="label-xs">Materiale stand</span>
+              <div className="grid grid-cols-5 gap-2">
+                {MATERIAL_CONDITIONS.map((c) => {
+                  const valgt = draft.material_condition === c.grade;
+                  return (
+                    <button
+                      key={c.grade}
+                      type="button"
+                      onClick={() =>
+                        update({ material_condition: valgt ? null : c.grade })
+                      }
+                      aria-pressed={valgt}
+                      aria-label={`${c.label} — ${c.description}`}
+                      className={`tap tabular rounded-xl px-3 font-semibold transition-colors ${
+                        valgt
+                          ? "bg-primary-soft text-primary inset-ring inset-ring-primary-line"
+                          : "bg-surface shadow-card hover:bg-surface-2"
+                      }`}
+                    >
+                      {c.grade}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs leading-relaxed text-muted">
+                {valgtStand ? (
+                  <>
+                    <span className="font-medium text-fg-2">
+                      {valgtStand.label}
+                    </span>{" "}
+                    — {valgtStand.description}
+                  </>
+                ) : (
+                  "1 er fremragende, 5 er dårlig. Standen står i rapporten sammen med mængden."
+                )}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="label-xs">Miljø &amp; ressourcehåndtering</span>
+              <div className="grid grid-cols-3 gap-2">
+                {RESOURCE_HANDLINGS.map((h) => {
+                  const valgt = draft.resource_handling === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() =>
+                        update({ resource_handling: valgt ? null : h })
+                      }
+                      aria-pressed={valgt}
+                      className={`tap rounded-xl px-3 text-sm transition-colors ${
+                        valgt
+                          ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+                          : "bg-surface shadow-card hover:bg-surface-2"
+                      }`}
+                    >
+                      {RESOURCE_HANDLING_LABEL[h]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <span className="label-xs">Analyser</span>

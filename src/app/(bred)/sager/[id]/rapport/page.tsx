@@ -24,6 +24,13 @@ import {
   GRAENSE_NOTER,
   RAPPORT_SIDER,
 } from "@/lib/rapport/tekst";
+import {
+  RESSOURCE_INDLEDNING,
+  ressourceLinjeHale,
+  ressourceSider,
+  ressourceoversigt,
+} from "@/lib/rapport/ressourcer";
+import { bygningsBlok, bygningsSider } from "@/lib/rapport/bygninger";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
 import {
@@ -138,6 +145,61 @@ export default async function RapportPage({
     }
   }
 
+  /*
+   * Ressourcescreeningen — kun pa en selektiv nedrivning.
+   *
+   * Den bygges af de prover, der ER registreret, og ikke af en liste over alt
+   * hvad en bygning kan indeholde. Det er hele forskellen fra Word-skabelonen,
+   * hvor alle fyrre linjer altid star, og den der laver rapporten skal slette
+   * de tredive der ikke passer.
+   */
+  const erSelektiv = sag.report_type === "selektiv";
+
+  // Projektets omfang. Kun pa en selektiv sag: den almindelige rapport har
+  // ejendommens tal i boksen pa side 2 og skal blive ved med at se ud som den
+  // altid har gjort.
+  const bygningsSiderListe =
+    erSelektiv && buildings.length > 0
+      ? bygningsSider(buildings.map(bygningsBlok))
+      : [];
+
+  const ressourcer = erSelektiv
+      ? ressourceoversigt(
+          samples.map((s) => ({
+            label: s.label,
+            material: s.material,
+            building_part: s.building_part,
+            material_condition: s.material_condition,
+            resource_handling: s.resource_handling,
+            estimated_tons: s.estimated_tons,
+            level: levelOfSample(results.get(s.id)),
+            isLabSample: s.is_lab_sample,
+          })),
+        )
+      : null;
+
+  const ressourceSiderListe = ressourcer ? ressourceSider(ressourcer.grupper) : [];
+  const ressourceNoter = ressourcer
+    ? [
+        ressourcer.afventer > 0
+          ? `${ressourcer.afventer} ${ressourcer.afventer === 1 ? "prøve afventer" : "prøver afventer"} svar fra laboratoriet og indgår derfor ikke i oversigten endnu.`
+          : null,
+        ressourcer.udenMateriale > 0
+          ? `${ressourcer.udenMateriale} ${ressourcer.udenMateriale === 1 ? "registrering mangler" : "registreringer mangler"} materiale og kan derfor ikke navngives.`
+          : null,
+      ].filter((n): n is string => n !== null)
+    : [];
+
+  // En tom sektion ville blive et blankt ark. Men er der noget at fortaelle om
+  // hvorfor oversigten er kort, skal siden med — ellers ser afsnittet bare ud
+  // som om der ikke er nogen ressourcer i bygningen.
+  const visRessourcer =
+    !!ressourcer &&
+    (ressourceSiderListe.length > 0 || ressourceNoter.length > 0);
+  const ressourceSiderTilVisning = ressourceSiderListe.length
+    ? ressourceSiderListe
+    : [[]];
+
   const skemaSamples: SkemaSample[] = samples.map((s) => ({
     id: s.id,
     label: s.label,
@@ -145,6 +207,8 @@ export default async function RapportPage({
     sample_type: s.sample_type,
     building_label: lokalitet(s),
     estimated_tons: s.estimated_tons,
+    material_condition: s.material_condition,
+    resource_handling: s.resource_handling,
   }));
   const skemaById = new Map(skemaSamples.map((s) => [s.id, s]));
 
@@ -320,6 +384,106 @@ export default async function RapportPage({
         </div>
       </section>
 
+      {/* Projektets omfang: hvilke bygninger sagen daekker, hvad BBR ved om
+          dem, og hvad der skal ske med dem. Delt i sider af `bygningsSider`. */}
+      {bygningsSiderListe.map((sideBygninger, nr) => (
+        <section key={nr} className="print-side mt-10 print:mt-0">
+          {sidehoved}
+          <Overskrift>
+            {nr === 0 ? "Projektets omfang" : "Projektets omfang, fortsat"}
+          </Overskrift>
+          {nr === 0 && (
+            <p className="mt-2 text-sm font-semibold">
+              BBR – bygningsoversigt og konstruktionsbeskrivelse
+            </p>
+          )}
+
+          {sideBygninger.map((blok) => (
+            <div key={blok.label} className="mt-5">
+              <h3 className="font-semibold">
+                {blok.label}
+                {blok.usageText && (
+                  <span className="font-normal text-muted">
+                    {" "}
+                    – {blok.usageText}
+                  </span>
+                )}
+              </h3>
+
+              {blok.fakta.length > 0 && (
+                <dl className="mt-1.5 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+                  {blok.fakta.map((f) => (
+                    <div key={f.navn} className="flex gap-1.5">
+                      <dt className="text-muted">{f.navn}:</dt>
+                      <dd className="font-medium">{f.vaerdi}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {blok.noter.map((n) => (
+                <div key={n.navn} className="mt-2 text-sm leading-relaxed">
+                  <span className="text-muted">{n.navn}: </span>
+                  {n.tekst}
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      ))}
+
+      {/* Ressourcescreeningen. Star for analyseskemaet, som i skabelonen, og
+          kun pa en selektiv nedrivning. Delt i sider af `ressourceSider`, fordi
+          .print-side ikke braekker af sig selv og hver side skal baere
+          maerket — samme grund som metodetekstens grupper. */}
+      {visRessourcer &&
+        ressourceSiderTilVisning.map((sideGrupper, nr) => (
+          <section key={nr} className="print-side mt-10 print:mt-0">
+            {sidehoved}
+            {nr === 0 ? (
+              <>
+                <Overskrift>Ressourcescreening</Overskrift>
+                <div className="mt-2 text-sm leading-relaxed">
+                  {RESSOURCE_INDLEDNING.map((afsnit) => (
+                    <p key={afsnit} className="mt-2 first:mt-0">
+                      {afsnit}
+                    </p>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <Overskrift>Ressourcescreening, fortsat</Overskrift>
+            )}
+
+            {sideGrupper.map((gruppe) => (
+              <div key={gruppe.overskrift} className="mt-5">
+                <h3 className="font-semibold">{gruppe.overskrift}</h3>
+                <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
+                  {gruppe.linjer.map((linje) => (
+                    <li key={linje.navn} className="mt-1 first:mt-0">
+                      <span className="font-medium">{linje.navn}</span>{" "}
+                      {ressourceLinjeHale(linje)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+
+            {/* Noterne staar pa den sidste side: de handler om hele
+                oversigten, ikke om linjerne lige over dem. */}
+            {nr === ressourceSiderTilVisning.length - 1 &&
+              ressourceNoter.length > 0 && (
+                <div className="mt-5 text-sm leading-relaxed text-muted">
+                  {ressourceNoter.map((note) => (
+                    <p key={note} className="mt-1 first:mt-0">
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              )}
+          </section>
+        ))}
+
       {/* Analyseskemaet: hele sagen pa et bord. */}
       <section className="print-side mt-10 print:mt-0">
         {sidehoved}
@@ -340,9 +504,13 @@ export default async function RapportPage({
         <Overskrift>Analyseskema</Overskrift>
         <div className="mt-2">
           <TilpasBredde bredde={SKEMA_BREDDE}>
-            <ResultatSkema samples={skemaSamples} results={results} />
+            <ResultatSkema
+              samples={skemaSamples}
+              results={results}
+              visRessourcer={erSelektiv}
+            />
           </TilpasBredde>
-          <SkemaForklaring />
+          <SkemaForklaring visRessourcer={erSelektiv} />
         </div>
       </section>
 
@@ -437,9 +605,13 @@ export default async function RapportPage({
             <Overskrift>Analyseresultat</Overskrift>
             <div className="mt-2">
               <TilpasBredde bredde={SKEMA_BREDDE}>
-                <ResultatSkema samples={[skema]} results={results} />
+                <ResultatSkema
+                  samples={[skema]}
+                  results={results}
+                  visRessourcer={erSelektiv}
+                />
               </TilpasBredde>
-              <SkemaForklaring />
+              <SkemaForklaring visRessourcer={erSelektiv} />
             </div>
           </section>
         );

@@ -1,5 +1,9 @@
 import { createStore, del, entries, set } from "idb-keyval";
-import type { BuildingPeriod } from "@/lib/types";
+import type {
+  BuildingPart,
+  BuildingPeriod,
+  ResourceHandling,
+} from "@/lib/types";
 
 /**
  * Lokalt lager for prover og fotos der endnu ikke er landet i Supabase.
@@ -26,6 +30,10 @@ export type PendingSample = {
   location_note: string | null;
   estimated_tons: number | null;
   period: BuildingPeriod | null;
+  /** De selektive felter. Null pa en almindelig miljoscreening. */
+  building_part: BuildingPart | null;
+  material_condition: number | null;
+  resource_handling: ResourceHandling | null;
   analysis_pcb: boolean;
   analysis_asbestos: boolean;
   analysis_metals: boolean;
@@ -56,15 +64,25 @@ export async function dropPendingSample(id: string) {
 }
 
 /**
- * Raekker gemt for en prove kunne daekke flere bygninger, baerer stadig det
- * gamle enkelte building_id.
+ * Bringer en raekke fra en aeldre udgave af appen op pa formen.
  *
- * De ligger i koen pa de telefoner der var uden daekning da appen blev
- * opdateret. Uden det her tabte de lokaliteten pa vej op.
+ * Koen ligger pa telefonen, og en screener kan have staaet uden daekning da
+ * appen blev opdateret. Raekken skal stadig kunne sendes op bagefter.
+ *
+ * `building_ids` kom, da en prove kunne begynde at daekke flere bygninger;
+ * uden det her tabte de gamle raekker lokaliteten pa vej op. De tre selektive
+ * felter kom senere og skal vaere null frem for undefined, sa `toRow` sender
+ * en kolonne og ikke ingenting.
  */
 function normaliser(row: PendingSample & { building_id?: string | null }) {
-  if (row.building_ids) return row;
-  return { ...row, building_ids: row.building_id ? [row.building_id] : [] };
+  return {
+    ...row,
+    building_ids:
+      row.building_ids ?? (row.building_id ? [row.building_id] : []),
+    building_part: row.building_part ?? null,
+    material_condition: row.material_condition ?? null,
+    resource_handling: row.resource_handling ?? null,
+  };
 }
 
 export async function allPendingSamples(): Promise<PendingSample[]> {

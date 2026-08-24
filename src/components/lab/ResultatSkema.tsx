@@ -9,6 +9,10 @@ import {
   type LabLevel,
   type LabParameterKey,
 } from "@/lib/lab/parametre";
+import {
+  RESOURCE_HANDLING_LABEL,
+  type ResourceHandling,
+} from "@/lib/types";
 
 /**
  * Analyseskemaet, som screenerne kender det fra regnearket.
@@ -28,6 +32,9 @@ export type SkemaSample = {
   sample_type: string | null;
   building_label: string | null;
   estimated_tons: number | null;
+  /** Kun udfyldt pa en selektiv nedrivning. Se `visRessourcer`. */
+  material_condition?: number | null;
+  resource_handling?: ResourceHandling | null;
 };
 
 /** Resultatraekken som den ligger i databasen: en tekst pr. parameter. */
@@ -106,29 +113,75 @@ export const SKEMA_BREDDE_SKAERM = 1480;
  *
  * Procent og ikke px, fordi det samme skema skal passe bade i designbredden
  * pa skaermen og i papirets bredde, hvor der ikke skaleres.
+ *
+ * Provenr., Materiale, Proveart, Lokalitet, Est. ton.
  */
-const NAVNEKOLONNER = [5, 11.5, 9, 8, 5.5];
-const ANALYSEKOLONNE =
-  (100 - NAVNEKOLONNER.reduce((sum, n) => sum + n, 0)) / LAB_PARAMETERS.length;
+export const NAVNEKOLONNER = [5, 11.5, 9, 8, 5.5];
+
+/**
+ * Det samme skema med de to selektive kolonner: Materiale stand og
+ * Ressourcehandtering, indsat mellem Lokalitet og Est. ton som i regnearket.
+ *
+ * REGNESTYKKET, og det ma ikke rores uden at en rapport med et FULDT skema
+ * printes bagefter:
+ *
+ * Arket giver skemaet 186 mm. I dag deler de elleve analysekolonner 61 % af
+ * dem — 10,31 mm hver — og med 0,2 rem sideluft i hver side gar 1,7 mm til
+ * luft. Der er altsa 8,6 mm til tallet, og «< 2500» skal have 9,2 mm... nej:
+ * malt den anden vej rundt er der 32,6 px indhold ved 10 px skrift, og det er
+ * praecis hvad «< 2500» kraever. Slupen er under en millimeter.
+ *
+ * De to nye kolonner kan derfor ikke tages af analysekolonnerne alene. I
+ * stedet skrues sideluften ned til 0,15 rem (`.skema-selektiv` i globals.css),
+ * og det er den, der betaler: 0,05 rem sparet i atten kolonners to sider giver
+ * 1,8 rem = 7,6 mm tilbage til indhold. Regnet igennem far en analysekolonne
+ * 5,318 % = 9,89 mm, minus 4,8 px luft = 32,6 px indhold. Altsaa PRAECIS lige
+ * saa meget plads til tallet som i dag.
+ *
+ * Handteringskolonnen er 6 %, fordi «Genbrug» skal kunne staa pa en linje;
+ * «Genanvendelse» og «Bortskaffelse» braekker til to, og det koster ingen
+ * hojde, fordi hver raekke alligevel er mindst to linjer hoj. Standkolonnen er
+ * 3 % — cellen er et ciffer, men et lodret hoved skal have plads til sin egen
+ * linjehojde, og under 2,6 % kan overskriften ikke sta.
+ */
+export const NAVNEKOLONNER_SELEKTIV = [4, 9, 7, 8, 3, 6, 4.5];
+
+export const analysekolonne = (navne: number[]) =>
+  (100 - navne.reduce((sum, n) => sum + n, 0)) / LAB_PARAMETERS.length;
 
 export function ResultatSkema({
   samples,
   results,
   showThresholds = true,
+  visRessourcer = false,
 }: {
   samples: SkemaSample[];
   results: Map<string, SkemaResult>;
   showThresholds?: boolean;
+  /**
+   * Tag Materiale stand og Ressourcehandtering med.
+   *
+   * Kun pa en selektiv nedrivning: pa en almindelig miljoscreening er
+   * felterne tomme, og to tomme kolonner ville tage plads fra tallene uden at
+   * sige noget. Skemaet skal ogsa blive ved med at vaere praecis det samme,
+   * som det altid har vaeret, pa de sager der fandtes for.
+   */
+  visRessourcer?: boolean;
 }) {
+  const navnekolonner = visRessourcer
+    ? NAVNEKOLONNER_SELEKTIV
+    : NAVNEKOLONNER;
+  const analysebredde = analysekolonne(navnekolonner);
+
   return (
     <div className="skema-ramme">
-      <table className="skema">
+      <table className={`skema${visRessourcer ? " skema-selektiv" : ""}`}>
         <colgroup>
-          {NAVNEKOLONNER.map((andel, i) => (
+          {navnekolonner.map((andel, i) => (
             <col key={i} style={{ width: `${andel}%` }} />
           ))}
           {LAB_PARAMETERS.map((p) => (
-            <col key={p.key} style={{ width: `${ANALYSEKOLONNE}%` }} />
+            <col key={p.key} style={{ width: `${analysebredde}%` }} />
           ))}
         </colgroup>
 
@@ -138,6 +191,16 @@ export function ResultatSkema({
             <th>Materiale</th>
             <th>Prøveart</th>
             <th>Lokalitet</th>
+            {visRessourcer && (
+              <>
+                <th>Materiale stand</th>
+                {/* Regnearket skriver «Miljø & Ressourcehåndtering». Forkortet
+                    her, fordi et lodret hoved kun har 11 em: den fulde titel
+                    braekker til to lodrette linjer, og de koster bredde i
+                    netop den kolonne, hvor ordene skal staa. */}
+                <th>Ressourcehåndtering</th>
+              </>
+            )}
             {/* Ingen text-align her: hovedet staar op, og hvor teksten
                 begynder styres af `.skema thead th` — en vandret klasse ville
                 betyde noget andet end den ser ud til. */}
@@ -162,6 +225,18 @@ export function ResultatSkema({
                 <td className="font-medium">{sample.material ?? "—"}</td>
                 <td className="text-muted">{sample.sample_type ?? "—"}</td>
                 <td className="text-muted">{sample.building_label ?? "—"}</td>
+                {visRessourcer && (
+                  <>
+                    <td className="tabular text-center text-muted">
+                      {sample.material_condition ?? "—"}
+                    </td>
+                    <td className="text-muted">
+                      {sample.resource_handling
+                        ? RESOURCE_HANDLING_LABEL[sample.resource_handling]
+                        : "—"}
+                    </td>
+                  </>
+                )}
                 <td className="skel tabular text-right text-muted">
                   {sample.estimated_tons != null
                     ? String(sample.estimated_tons).replace(".", ",")
@@ -196,7 +271,10 @@ export function ResultatSkema({
           <tfoot>
             {(["rent", "forurenet", "farligt"] as LabLevel[]).map((level) => (
               <tr key={level}>
-                <td className="skel font-medium text-fg-2" colSpan={5}>
+                <td
+                  className="skel font-medium text-fg-2"
+                  colSpan={navnekolonner.length}
+                >
                   <span
                     className={`mr-1.5 inline-block h-[0.6em] w-[0.6em] rounded-full align-middle ${LEVEL_CLASS[level]}`}
                   />
@@ -217,13 +295,25 @@ export function ResultatSkema({
 }
 
 /** Forklaringen der altid har staet under skemaet. */
-export function SkemaForklaring() {
+export function SkemaForklaring({
+  visRessourcer = false,
+}: {
+  visRessourcer?: boolean;
+}) {
   return (
     <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
       <Forklaring term="I.a." desc="Ikke analyseret" />
       <Forklaring term="I.P." desc="Ikke påvist" />
       <Forklaring term="<" desc="Under detektionsgrænsen" />
       <Forklaring term="Enhed" desc="mg/kg, med mindre andet er angivet" />
+      {/* Standen staar som et ciffer i skemaet, fordi kolonnen ikke kan
+          rumme ordet. Uden skalaen her ville "3" ikke betyde noget. */}
+      {visRessourcer && (
+        <Forklaring
+          term="Stand"
+          desc="1 fremragende, 2 god, 3 middel, 4 ringe, 5 dårlig"
+        />
+      )}
     </dl>
   );
 }

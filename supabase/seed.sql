@@ -100,14 +100,18 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------------
 -- En sag med bygninger
 -- ---------------------------------------------------------------------------
+-- Sagen er en SELEKTIV nedrivning, sa ressourcescreeningen kan ses uden at der
+-- forst skal oprettes en sag og tages prover i hand. Den almindelige
+-- miljoscreening er standardvaerdien og fas ved at oprette en ny sag.
 insert into screening.cases (
-  id, case_name, status, customer_name, customer_contact, customer_email,
-  customer_phone, address_text, postnr, city, area_m2, built_year,
-  rebuilt_year, note, created_by
+  id, case_name, status, report_type, customer_name, customer_contact,
+  customer_email, customer_phone, address_text, postnr, city, area_m2,
+  built_year, rebuilt_year, note, created_by
 ) values (
   'ca5e0001-0000-4000-8000-000000000001',
   'Nørrebrogade 12, 2200 København N',
   'sendt_til_lab',
+  'selektiv',
   'Testkunde ApS', 'Hanne Jensen', 'hanne@testkunde.dk', '12 34 56 78',
   'Nørrebrogade 12, 2200 København N', '2200', 'København N',
   418, 1968, 2004,
@@ -115,18 +119,37 @@ insert into screening.cases (
   '11111111-1111-4111-8111-111111111111'
 );
 
+-- Materiale- og varmefelterne er BBR-KODER og ikke tekst; ordlyden slas op i
+-- src/lib/bbr/map.ts. Garagens tag star som kode 3, «Fibercement herunder
+-- asbest» — det er BBR's egen made at sige, at der kan vaere asbest i pladerne,
+-- og det er netop den bygning, prove P4 er taget pa. Sa er advarslen pa
+-- BBR-siden ogsa noget man kan se virke.
 insert into screening.case_buildings (
   id, case_id, building_no, label, usage_code, usage_text,
-  built_year, area_built, area_total, is_manual, sort_order
+  built_year, area_built, area_total, floors,
+  wall_material_code, roof_material_code, heating_code,
+  usage_note, construction_note, plan_note,
+  is_manual, sort_order
 ) values
   ('b0110001-0000-4000-8000-000000000001',
    'ca5e0001-0000-4000-8000-000000000001',
-   '1', 'Bygning 1', '140', 'Etagebolig-bygning, flerfamiliehus',
-   1968, 320, 418, false, 1),
+   '1', 'Bygning 1', '140',
+   'Etagebolig-bygning, flerfamiliehus eller to-familiehus',
+   1968, 320, 418, 4,
+   '1', '5', '1',
+   'Privat beboelse med erhverv i stueetagen.',
+   'Opført som traditionel muret konstruktion med tegltag. Fremstår generelt i ældre stand med slidte overflader.',
+   'Bygningen er planlagt til fuldstændig nedrivning.',
+   false, 1),
   ('b0110002-0000-4000-8000-000000000002',
    'ca5e0001-0000-4000-8000-000000000001',
    '2', 'Bygning 2', '910', 'Garage',
-   1972, 98, 98, false, 2);
+   1972, 98, 98, 1,
+   '2', '3', '9',
+   'Garage og opmagasinering.',
+   'Letbetonsten med tagplader af fibercement. Fremstår i ringe stand.',
+   'Bygningen er planlagt til fuldstændig nedrivning.',
+   false, 2);
 
 -- ---------------------------------------------------------------------------
 -- Proever
@@ -137,10 +160,17 @@ insert into screening.case_buildings (
 --
 -- P5 er efter 1990 og har derfor hverken PCB eller asbest. Reglen ligger i
 -- types.ts, men den skal ogsaa holde i de data man udvikler imod.
+--
+-- Bygningsdel, stand og handtering er de selektive felter. De er sat pa alle
+-- fem prover, men kun de to rene naar frem til ressourcescreeningen: en prove
+-- der er kommet tilbage som forurenet eller farligt affald er ikke en
+-- ressource, og rapporten ma ikke love at den kan genbruges. Prove 3 er ren
+-- fordi den aldrig blev analyseret, P5 fordi svaret la under graenserne.
 insert into screening.samples (
   id, case_id, seq, material, sample_type, building_id, building_ids,
   location_note, estimated_tons, period,
   analysis_pcb, analysis_asbestos, analysis_metals, analysis_pah,
+  building_part, material_condition, resource_handling,
   comment, created_by
 ) values
   ('5a3b0001-0000-4000-8000-000000000001',
@@ -150,6 +180,7 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Fuger omkring vinduer, gadeside', 0.4, 'foer_1990',
    true, false, true, false,
+   'facade', 3, 'bortskaffelse',
    'Elastisk fuge, blød', '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0002-0000-4000-8000-000000000002',
@@ -160,6 +191,7 @@ insert into screening.samples (
          'b0110002-0000-4000-8000-000000000002']::uuid[],
    'Facademaling, samme på begge bygninger', 1.2, 'foer_1990',
    false, false, true, false,
+   'facade', 3, 'bortskaffelse',
    null, '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0003-0000-4000-8000-000000000003',
@@ -169,6 +201,7 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Bærende vægge, kælder', 42, 'foer_1990',
    false, false, false, false,
+   'fundament', 2, 'genanvendelse',
    'Kun kortlagt — ingen analyse bestilt',
    '22222222-2222-4222-8222-222222222222'),
 
@@ -179,6 +212,7 @@ insert into screening.samples (
    array['b0110002-0000-4000-8000-000000000002']::uuid[],
    'Tagplader på garage', 2.8, 'foer_1990',
    false, true, false, false,
+   'tag', 4, 'bortskaffelse',
    null, '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0005-0000-4000-8000-000000000005',
@@ -188,6 +222,7 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Gulvbrædder, tilbygning fra 2004', 3.5, 'efter_1990',
    false, false, true, true,
+   'indvendige_overflader', 2, 'genbrug',
    null, '22222222-2222-4222-8222-222222222222');
 
 -- ---------------------------------------------------------------------------

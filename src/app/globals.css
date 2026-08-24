@@ -283,6 +283,22 @@ h2 {
   line-height: var(--skema-linjer);
 }
 
+/*
+ * Skemaet med de to selektive kolonner.
+ *
+ * Atten kolonner skal dele de samme 186 mm som seksten gjorde. Pladsen tages
+ * ikke fra tallene men fra luften: 0,05 rem sparet i hver side af atten
+ * kolonner giver 1,8 rem — 7,6 mm — tilbage til indhold. Regnestykket star i
+ * ResultatSkema.tsx ved NAVNEKOLONNER_SELEKTIV, og det ender med, at en
+ * analysekolonne har praecis lige saa mange pixel til "< 2500" som i dag.
+ *
+ * Skru den ikke op igen uden at printe en rapport med et fuldt skema og se
+ * efter, om tallene stadig staar paa en linje.
+ */
+.skema-selektiv {
+  --skema-sideluft: 0.15rem;
+}
+
 .skema th,
 .skema td {
   padding: var(--skema-luft) var(--skema-sideluft);

@@ -13,7 +13,23 @@ import {
   billedNavn,
   rapportSti,
 } from "@/lib/rapport/filer";
+import { REPORT_TYPE_LABEL, type ReportType } from "@/lib/types";
 import { createCase, type CreateCaseState } from "./actions";
+
+/**
+ * Hvad valget betyder, sagt i marken og ikke i planen.
+ *
+ * Uden en forklaring er de to muligheder to ord der ligner hinanden, og valget
+ * bliver truffet pa maven. Det er ikke gratis at gaette: den selektive beder om
+ * tre felter mere pa hver prove, og de kan ikke sattes bagefter uden at ga hele
+ * sagen igennem igen.
+ */
+const REPORT_TYPE_FORKLARING: Record<ReportType, string> = {
+  miljoescreening:
+    "Prøver, analyser og rapport som hidtil.",
+  selektiv:
+    "Samme prøvetagning og samme fil til Eurofins, men hver prøve får også bygningsdel, stand og håndtering — og rapporten får en ressourcescreening.",
+};
 
 function SubmitButton({ optaget }: { optaget: boolean }) {
   const { pending } = useFormStatus();
@@ -49,6 +65,7 @@ export function NewCaseForm() {
   });
   const [showCustomer, setShowCustomer] = useState(false);
   const [forside, setForside] = useState<Captured | null>(null);
+  const [reportType, setReportType] = useState<ReportType>("miljoescreening");
 
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -106,6 +123,41 @@ export function NewCaseForm() {
           {state.error}
         </p>
       )}
+
+      {/* Rapporttypen staar forst, fordi den afgor hvad resten af sagen beder
+          om. Truffet nederst pa siden ville den vaere et valg man scroller
+          forbi. */}
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-sm font-medium">Rapporttype</legend>
+        <input type="hidden" name="report_type" value={reportType} />
+        <div className="mt-1 flex flex-col gap-2">
+          {(Object.keys(REPORT_TYPE_LABEL) as ReportType[]).map((t) => {
+            const valgt = reportType === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setReportType(t)}
+                aria-pressed={valgt}
+                className={`tap rounded-xl px-3.5 py-2.5 text-left transition-colors ${
+                  valgt
+                    ? "bg-primary-soft text-primary inset-ring inset-ring-primary-line"
+                    : "bg-surface shadow-card hover:bg-surface-2"
+                }`}
+              >
+                <span className="block font-medium">{REPORT_TYPE_LABEL[t]}</span>
+                <span
+                  className={`mt-0.5 block text-xs leading-snug ${
+                    valgt ? "text-primary/80" : "text-muted"
+                  }`}
+                >
+                  {REPORT_TYPE_FORKLARING[t]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium">Adresse</label>

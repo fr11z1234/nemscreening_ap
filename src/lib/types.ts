@@ -9,6 +9,22 @@ export type CaseStatus =
 
 export type BuildingPeriod = "foer_1990" | "efter_1990";
 
+/**
+ * Hvad sagen skal ende som.
+ *
+ * `miljoescreening` er det appen altid har lavet, og den er standard. `selektiv`
+ * korer den samme miljoscreening igennem — samme prover, samme fil til Eurofins
+ * — men beder om tre felter mere pr. prove og giver rapporten et
+ * ressourceafsnit. Typen er derfor et valg om rapportens indhold, ikke om
+ * hvordan der arbejdes i marken.
+ */
+export type ReportType = "miljoescreening" | "selektiv";
+
+export const REPORT_TYPE_LABEL: Record<ReportType, string> = {
+  miljoescreening: "Miljøscreening og kortlægning",
+  selektiv: "Selektiv nedrivning",
+};
+
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
   oprettet: "Oprettet",
   under_screening: "Under screening",
@@ -22,6 +38,112 @@ export const PERIOD_LABEL: Record<BuildingPeriod, string> = {
   efter_1990: "Efter 1990",
 };
 
+/**
+ * Hvor i bygningen materialet sidder.
+ *
+ * Ikke det samme som `building_ids`, der siger hvilke bygninger proven daekker.
+ * Bygningsdelen afgor hvilken overskrift materialet havner under i
+ * ressourcescreeningen, og det er ogsa den, der skiller to prover af samme
+ * materiale fra hinanden: trae i taget er en tagkonstruktion, trae pa gulvet er
+ * et traegulv, og de har hver sin skaebne i rapporten.
+ */
+export type BuildingPart =
+  | "fundament"
+  | "baerende"
+  | "facade"
+  | "vaegge"
+  | "vinduer_doere"
+  | "indvendige_overflader"
+  | "tag"
+  | "oevrige";
+
+/**
+ * Bygningsdelene i den raekkefolge de vaelges — og vises i rapporten.
+ *
+ * Nedefra og op gennem bygningen, som en nedrivning laeses. Raekkefolgen her ER
+ * afsnittenes raekkefolge; ressourcescreeningen henter den herfra frem for at
+ * have sin egen.
+ *
+ * `facade` og `vaegge` deler overskrift i rapporten, men star hver for sig,
+ * fordi udvendigt og indvendigt teglmurvaerk ikke kan det samme: det udvendige
+ * kan genbruges som hele sten, det indvendige kun nyttiggores ved nedknusning.
+ */
+export const BUILDING_PARTS: { key: BuildingPart; label: string }[] = [
+  { key: "fundament", label: "Fundament og sokkel" },
+  { key: "baerende", label: "Bærende konstruktioner" },
+  { key: "facade", label: "Facade (udvendig)" },
+  { key: "vaegge", label: "Vægge (indvendig)" },
+  { key: "vinduer_doere", label: "Vinduer og døre" },
+  { key: "indvendige_overflader", label: "Indvendige overflader" },
+  { key: "tag", label: "Tag" },
+  { key: "oevrige", label: "Øvrige" },
+];
+
+export const BUILDING_PART_LABEL: Record<BuildingPart, string> =
+  Object.fromEntries(BUILDING_PARTS.map((p) => [p.key, p.label])) as Record<
+    BuildingPart,
+    string
+  >;
+
+/** Screenerens vurdering af hvad der skal ske med materialet. */
+export type ResourceHandling = "genbrug" | "genanvendelse" | "bortskaffelse";
+
+export const RESOURCE_HANDLINGS: ResourceHandling[] = [
+  "genbrug",
+  "genanvendelse",
+  "bortskaffelse",
+];
+
+export const RESOURCE_HANDLING_LABEL: Record<ResourceHandling, string> = {
+  genbrug: "Genbrug",
+  genanvendelse: "Genanvendelse",
+  bortskaffelse: "Bortskaffelse",
+};
+
+/**
+ * Materialets stand, 1-5, hvor 1 er bedst.
+ *
+ * Graderne og forklaringerne er regnearkets egne og staar ordret. Forklaringen
+ * er ikke pynt: forskellen mellem «god» og «middel» afgor om et materiale kan
+ * genbruges som det er eller skal knuses, og to screenere skal laegge samme
+ * betydning i tallet.
+ */
+export const MATERIAL_CONDITIONS: {
+  grade: number;
+  label: string;
+  description: string;
+}[] = [
+  {
+    grade: 1,
+    label: "Fremragende stand",
+    description: "Intet eller minimalt slid, fuldt funktionsdygtigt.",
+  },
+  {
+    grade: 2,
+    label: "God stand",
+    description: "Lettere brugsspor, men uden betydning for funktion.",
+  },
+  {
+    grade: 3,
+    label: "Middel stand",
+    description: "Synligt slid og begyndende funktionsmæssige svagheder.",
+  },
+  {
+    grade: 4,
+    label: "Ringe stand",
+    description: "Betydeligt slid, nedsat funktionalitet.",
+  },
+  {
+    grade: 5,
+    label: "Dårlig stand",
+    description:
+      "Defekt eller uanvendeligt uden væsentlig reparation/udskiftning.",
+  },
+];
+
+export const conditionLabel = (grade: number | null): string | null =>
+  MATERIAL_CONDITIONS.find((c) => c.grade === grade)?.label ?? null;
+
 export type AppUser = {
   id: string;
   full_name: string | null;
@@ -34,6 +156,7 @@ export type Case = {
   id: string;
   case_name: string;
   status: CaseStatus;
+  report_type: ReportType;
   customer_name: string | null;
   customer_contact: string | null;
   customer_email: string | null;
@@ -65,6 +188,18 @@ export type CaseBuilding = {
   area_built: number | null;
   area_total: number | null;
   area_residential: number | null;
+  /**
+   * Rapportens bygningsoversigt. De tre materiale- og varmefelter er BBR-koder
+   * og ikke tekst; ordlyden slas op i `src/lib/bbr/map.ts`.
+   */
+  floors: number | null;
+  wall_material_code: string | null;
+  roof_material_code: string | null;
+  heating_code: string | null;
+  /** Skrevet i hand pa BBR-siden. BBR har ingen felter for dem. */
+  usage_note: string | null;
+  construction_note: string | null;
+  plan_note: string | null;
   raw_bbr: unknown;
   is_manual: boolean;
   sort_order: number;
@@ -92,6 +227,14 @@ export type Sample = {
   location_note: string | null;
   estimated_tons: number | null;
   period: BuildingPeriod | null;
+  /**
+   * De tre selektive felter. Null pa en almindelig miljoscreening, hvor de
+   * hverken vises eller bruges.
+   */
+  building_part: BuildingPart | null;
+  /** 1-5, hvor 1 er bedst. Se MATERIAL_CONDITIONS. */
+  material_condition: number | null;
+  resource_handling: ResourceHandling | null;
   analysis_pcb: boolean;
   analysis_asbestos: boolean;
   analysis_metals: boolean;

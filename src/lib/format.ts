@@ -23,3 +23,15 @@ export function formatDecimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return "";
   return String(value).replace(".", ",");
 }
+
+const heltalFmt = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 });
+
+/**
+ * Hele tal med dansk tusindtalsskilletegn: 42000 bliver "42.000".
+ *
+ * Maengderne i ressourcescreeningen star i kilo og bliver store. Uden
+ * skilletegn er 42000 og 4200 svaere at skelne pa en side med tyve linjer.
+ */
+export function formatHeltal(value: number): string {
+  return heltalFmt.format(value);
+}

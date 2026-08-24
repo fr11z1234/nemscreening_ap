@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/AppHeader";
 import { BbrError, hentBygninger } from "@/lib/bbr/datafordeler";
-import { mapBuildings, type BbrBuilding } from "@/lib/bbr/map";
+import {
+  mapBuildings,
+  TOMME_NOTER,
+  type BbrBuilding,
+  type BygningsNoter,
+} from "@/lib/bbr/map";
 import { BbrPicker } from "./BbrPicker";
 import type { Case, CaseBuilding } from "@/lib/types";
 
@@ -30,18 +35,27 @@ export default async function BbrPage({
   const sag = caseRes.data;
   if (!sag) notFound();
 
-  const saved: BbrBuilding[] = (buildingsRes.data ?? []).map((b) => ({
-    bbrBuildingId: b.bbr_building_id,
-    buildingNo: b.building_no,
-    label: b.label,
-    usageCode: b.usage_code,
-    usageText: b.usage_text,
-    builtYear: b.built_year,
-    rebuiltYear: b.rebuilt_year,
-    areaBuilt: b.area_built,
-    areaTotal: b.area_total,
-    areaResidential: b.area_residential,
-  }));
+  const saved: (BbrBuilding & BygningsNoter)[] = (buildingsRes.data ?? []).map(
+    (b) => ({
+      bbrBuildingId: b.bbr_building_id,
+      buildingNo: b.building_no,
+      label: b.label,
+      usageCode: b.usage_code,
+      usageText: b.usage_text,
+      builtYear: b.built_year,
+      rebuiltYear: b.rebuilt_year,
+      areaBuilt: b.area_built,
+      areaTotal: b.area_total,
+      areaResidential: b.area_residential,
+      floors: b.floors,
+      wallMaterialCode: b.wall_material_code,
+      roofMaterialCode: b.roof_material_code,
+      heatingCode: b.heating_code,
+      usageNote: b.usage_note,
+      constructionNote: b.construction_note,
+      planNote: b.plan_note,
+    }),
+  );
 
   /**
    * BBR hentes her pa serveren, ikke i browseren.
@@ -50,7 +64,7 @@ export default async function BbrPage({
    * ny hent-knap her ville vaere at spoerge om det samme to gange. Sagens
    * gemte bygninger vinder, hvis de findes: dem har screeneren bekraeftet.
    */
-  let suggested: BbrBuilding[] = [];
+  let suggested: (BbrBuilding & BygningsNoter)[] = [];
   let fetchError: string | null = null;
   const attempted = saved.length === 0 && Boolean(sag.dawa_adgangsadresse_id);
 
@@ -58,7 +72,7 @@ export default async function BbrPage({
     try {
       suggested = mapBuildings(
         await hentBygninger(sag.dawa_adgangsadresse_id!),
-      );
+      ).map((b) => ({ ...b, ...TOMME_NOTER }));
       if (suggested.length === 0) {
         fetchError =
           "BBR har ingen registrerede bygninger på adressen. Tilføj dem i hånden.";
@@ -89,6 +103,7 @@ export default async function BbrPage({
           fromBbr={saved.length === 0 && suggested.length > 0}
           attempted={attempted}
           fetchError={fetchError}
+          erSelektiv={sag.report_type === "selektiv"}
         />
       </main>
     </>

@@ -88,6 +88,8 @@ export default async function ResultaterPage({
   const receivedAt = (resultsRes.data ?? []).find((r) => r.received_at)
     ?.received_at;
 
+  const erSelektiv = sag.report_type === "selektiv";
+
   const skemaSamples: SkemaSample[] = samples.map((s) => ({
     id: s.id,
     label: s.label,
@@ -95,6 +97,8 @@ export default async function ResultaterPage({
     sample_type: s.sample_type,
     building_label: lokalitet(s),
     estimated_tons: s.estimated_tons,
+    material_condition: s.material_condition,
+    resource_handling: s.resource_handling,
   }));
 
   const filerRes = await supabase
@@ -245,9 +249,13 @@ export default async function ResultaterPage({
 
             <div className="mt-4">
               <TilpasBredde bredde={SKEMA_BREDDE_SKAERM}>
-                <ResultatSkema samples={skemaSamples} results={results} />
+                <ResultatSkema
+                  samples={skemaSamples}
+                  results={results}
+                  visRessourcer={erSelektiv}
+                />
               </TilpasBredde>
-              <SkemaForklaring />
+              <SkemaForklaring visRessourcer={erSelektiv} />
             </div>
           </section>
         )}

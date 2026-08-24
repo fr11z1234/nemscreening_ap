@@ -25,6 +25,13 @@ Opret sag ──► Hent bygninger fra BBR ──► Prøvetagning i marken
 Første halvdel foregår på en telefon, ofte uden dækning. Anden halvdel
 foregår på kontorets pc. De to har hvert sit layout — se nedenfor.
 
+Ved oprettelsen vælges det, om sagen ender som en **miljøscreening og
+kortlægning** eller som en **selektiv nedrivning**. Kæden er den samme, og
+laboratoriet får de samme prøver; den selektive beder om tre felter mere pr.
+prøve — bygningsdel, stand og håndtering — og giver rapporten to afsnit mere:
+en bygningsoversigt («Projektets omfang») og en ressourcescreening, der opgør de
+rene materialer i kilo under deres egen overskrift. Se `AGENTS.md`.
+
 Forsidebilledet af ejendommen tages allerede når sagen oprettes, og bliver
 baggrund på rapportens forside. Resten af bilagene lægger kontoret på
 bagefter: en plantegning, og de PDF'er Eurofins sender med — analyserapporten
@@ -50,18 +57,20 @@ Login er e-mail og kodeord. Adgang kræver en aktiv række i
 ## Kontrol
 
 ```bash
-npm run verify:eurofins   # eksportfilen mod Eurofins' skabelon
-npm run verify:lab        # indlæsning af labsvar og farvelægning
+npm run verify:eurofins    # eksportfilen mod Eurofins' skabelon
+npm run verify:lab         # indlæsning af labsvar og farvelægning
+npm run verify:ressourcer  # ressourcescreeningens linjer og mængder
 npm run lint
 npx tsc --noEmit
 npm run build
 ```
 
-De to `verify`-scripts er projektets egentlige testdækning. De kører uden
+De tre `verify`-scripts er projektets egentlige testdækning. De kører uden
 database og uden browser, og de dækker præcis de steder hvor en fejl er dyr:
-en importfil Eurofins afviser, eller et analysesvar der får den forkerte
-farve. **Kør dem efter enhver ændring i `src/lib/eurofins/` eller
-`src/lib/lab/`.**
+en importfil Eurofins afviser, et analysesvar der får den forkerte farve,
+eller et forkert antal kilo beton i en rapport. **Kør dem efter enhver
+ændring i `src/lib/eurofins/`, `src/lib/lab/` eller
+`src/lib/rapport/ressourcer.ts`.**
 
 ## Hvor tingene ligger
 
@@ -74,7 +83,7 @@ farve. **Kør dem efter enhver ændring i `src/lib/eurofins/` eller
 | `src/lib/cases/` | Sagens status, og sletning af en sag med alt under den. |
 | `src/lib/eurofins/` | Eksport til laboratoriet. Se `skabelon/LAESMIG.md`. |
 | `src/lib/lab/` | Indlæsning af svar og grænseværdier. Se `LAESMIG.md`. |
-| `src/lib/rapport/` | Rapportens bilag og faste tekst. |
+| `src/lib/rapport/` | Rapportens bilag og faste tekst. `ressourcer.ts` er ressourcescreeningen, `bygninger.ts` er «Projektets omfang». |
 | `src/lib/bbr/` | Opslag i BBR via Datafordelerens GraphQL. |
 | `scripts/` | Verifikation. Køres med `npm run verify:*`. |
 
@@ -91,9 +100,9 @@ med `db: { schema: "screening" }`, så `.from("samples")` rammer
 
 | Tabel | Noter |
 | --- | --- |
-| `cases` | Sagen. `status` styrer hvad appen viser. |
-| `case_buildings` | Bygninger, typisk hentet fra BBR. |
-| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. `building_ids` er bygningerne prøven dækker; `building_id` er den første af dem. |
+| `cases` | Sagen. `status` styrer hvad appen viser; `report_type` om rapporten er en almindelig miljøscreening eller en selektiv nedrivning. |
+| `case_buildings` | Bygninger, typisk hentet fra BBR. `wall_material_code`, `roof_material_code` og `heating_code` er BBR-koder; ordlyden slås op i `src/lib/bbr/map.ts`. De tre `*_note`-felter skrives i hånden. |
+| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. `building_ids` er bygningerne prøven dækker; `building_id` er den første af dem. `building_part`, `material_condition` og `resource_handling` udfyldes kun på en selektiv nedrivning. |
 | `sample_photos` | Fotos. Filerne ligger i storage-bucket'en `screening-photos`, som er privat. |
 | `exports` | Log over genererede Eurofins-filer. |
 | `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |

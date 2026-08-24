@@ -114,6 +114,7 @@ export default async function SamplingPage({
       buildings={buildingsRes.data ?? []}
       materials={(materialsRes.data ?? []).map((m) => m.name)}
       sampleTypes={(typesRes.data ?? []).map((t) => t.name)}
+      reportType={sag.report_type}
       initialSamples={samples}
       initialPhotos={initialPhotos}
       samplesWithResults={(svarRows ?? []).map((r) => r.sample_id)}

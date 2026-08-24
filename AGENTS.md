@@ -92,12 +92,13 @@ ny branch falder i.
 ## Kør altid dette
 
 ```bash
-npm run verify:eurofins && npm run verify:lab && npx tsc --noEmit && npm run lint && npm run build
+npm run verify:eurofins && npm run verify:lab && npm run verify:ressourcer && npx tsc --noEmit && npm run lint && npm run build
 ```
 
-De to `verify`-scripts er den eneste rigtige testdækning. De kører uden
-database og uden browser. Rør du `src/lib/eurofins/` eller `src/lib/lab/`,
-skal de køre — og udvid dem, når du tilføjer noget.
+De tre `verify`-scripts er den eneste rigtige testdækning. De kører uden
+database og uden browser. Rør du `src/lib/eurofins/`, `src/lib/lab/` eller
+`src/lib/rapport/ressourcer.ts`, skal de køre — og udvid dem, når du tilføjer
+noget.
 
 Der er ingen automatiseret browsertest. Kan du ikke se ændringen i en browser,
 så **sig det** i stedet for at melde den færdig.
@@ -129,9 +130,15 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 - **Numre genbruges ikke.** Sletter man P3, hedder de næste stadig P4 og P5 —
   poserne i bilen er mærket.
 - **Efter 1990 udelukker PCB og asbest.** Reglen ligger i `src/lib/types.ts` og
-  bruges både i prøvetagningen og i eksportkontrollen.
-- En prøve kræver **lokalitet og mindst ét billede**. Materiale og prøveart er
-  frivillige — en tom prøve er tilladt og kommer ikke med til laboratoriet.
+ bruges både i prøvetagningen og i eksportkontrollen.
+- En prøve kræver **lokalitet**. Materiale og prøveart er frivillige — en tom
+ prøve er tilladt og kommer ikke med til laboratoriet.
+- **Et billede kræves kun, når der er valgt en analyse.** Billedet dokumenterer
+ hvor prøven i posen blev taget, og det er ufravigeligt for enhver række der
+ skal til laboratoriet. En ressource er noget andet: «beton, bærende, 40 ton»
+ er en opmåling, og der er tyve af dem i en bygning. Krævede hver af dem et
+ billede, ville ressourcescreeningen tage længere tid end prøvetagningen — og
+ billederne blive taget for at komme videre frem for for at dokumentere noget.
 - **Højst to billeder pr. prøve.**
 - **Prøvetagningen åbner der hvor man slap.** Uden `?seq=` i adressen er man
   kommet fra "Fortsæt prøvetagning", og så skal man tilbage til den senest
@@ -140,6 +147,112 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 - **Påvist asbest er farligt affald.** Rød, hver gang. Der er intet gult
   mellemniveau og ingen manuel vurdering af om den støver — den vurdering
   fandtes, og den blev ikke sat.
+
+## Selektiv nedrivning
+
+`cases.report_type` er `miljoescreening` eller `selektiv` og vælges, når sagen
+oprettes. Standardværdien er den almindelige miljøscreening, så alt der fandtes
+før opfører sig præcis som før. Typen kan endnu ikke ændres bagefter.
+
+Den selektive rapport har i dag Projektets omfang (bygningsoversigten) og
+Ressourcescreening ud over den almindelige rapports sider. Forureningsafsnittet,
+saneringsbeskrivelsen og regelmotoren mangler.
+
+**Eurofins-filen er den samme.** Den bygges af prøvemærkning, sagsnavn og de
+fire analysefelter, og rapporttypen rører ingen af dem. En selektiv sag sender
+de samme prøver til laboratoriet.
+
+Selektiv slår tre felter til på prøven: `building_part`, `material_condition`
+(1-5, hvor 1 er bedst) og `resource_handling`. Bygningsdelen arves til næste
+prøve som bygningen gør — står man på taget, tages der flere prøver på taget —
+men stand og håndtering gør ikke: de er vurderinger af netop dette materiale,
+og arvet ville de være rigtige for den første prøve og stiltiende forkerte for
+de næste.
+
+**Ressourceafsnittet skriver kun det, der er registreret.** Det er hele
+pointen. I Word-skabelonen står alle fyrre linjer altid, og den der laver
+rapporten skal slette de tredive der ikke passer — det er arbejde, hvor en
+glemt sletning bliver en påstand om et materiale, der ikke findes i bygningen.
+
+Kataloget ligger i `src/lib/rapport/ressourcer.ts` og er nøglet på **parret
+(bygningsdel, materiale)**. Det er derfor bygningsdelen betyder noget: `Træ`
+bliver spærtræ i den bærende konstruktion, facadebeklædning på facaden, en dør
+i dørhullet, et trægulv indenfor og en tagkonstruktion oppe. Samme materiale,
+fem forskellige skæbner. `facade` og `vaegge` deler overskrift i rapporten, men
+er to bygningsdele, fordi udvendigt og indvendigt teglmurværk ikke kan det
+samme.
+
+**Opfind ikke en sætning.** En sætning må genbruges ordret for det *samme*
+materiale i en anden bygningsdel — beton knuses ens, om den sad i fundamentet
+eller i en bærende væg. Den må ikke lånes til et andet materiale: så er det en
+ny faglig påstand, og den skal komme fra Nemscreening. Mangler sætningen,
+skriver rapporten navn og mængde og lover ingenting.
+
+**Kun rene materialer bliver ressourcer.** En prøve uden analyser er kun
+kortlagt, og der kommer aldrig et svar — den er ren i den forstand, at intet har
+vist andet. Er der bestilt analyser, skal svaret være kommet og være rent.
+Forurenet og farligt affald holdes ude, og prøver der stadig venter på
+laboratoriet tælles og siges højt under afsnittet frem for bare at mangle.
+
+**Screeneren taster ton, rapporten skriver kilo.** Ton er den enhed, en prøve og
+en aflæsning i marken hænger sammen i; kilo er den enhed, kunden kender
+rapporten i. Omregningen ligger ét sted, i `byggLinje`.
+
+**Analyseskemaet får to kolonner mere** på en selektiv sag — Materiale stand og
+Ressourcehåndtering, mellem Lokalitet og Est. ton, som i regnearket. Standen
+står som et ciffer, fordi kolonnen ikke kan rumme ordet; skalaen forklares i
+`SkemaForklaring` under skemaet.
+
+Atten kolonner skal dele de samme 186 mm som seksten gjorde, og pladsen er
+**ikke** taget fra tallene. Den er taget fra cellernes sideluft:
+`.skema-selektiv` skruer `--skema-sideluft` fra 0,2 til 0,15 rem, og 0,05 rem
+sparet i atten kolonners to sider giver 7,6 mm tilbage til indhold. Regnet
+igennem har en analysekolonne 32,59 px til «< 2500» mod 32,58 px i det
+almindelige skema — altså en hårsbredde mere plads, ikke mindre.
+`npm run verify:ressourcer` regner det efter ved hver kørsel og læser
+sideluften ud af `globals.css`, så CSS'en bliver ved med at være det ene sted
+den står. Skruer du på bredderne, skal du **printe en rapport med et fuldt
+skema** bagefter og se, om tallene stadig står på én linje.
+
+Afsnittet deles i sider af `ressourceSider` af samme grund som metodeteksten er
+delt i `RAPPORT_SIDER`: `.print-side` har `break-inside: avoid`, og hver side
+skal bære mærket i hovedet.
+
+## Bygningsoversigten
+
+Rapportens «Projektets omfang» står på en selektiv sag og bygger på syv felter
+pr. bygning. Fire kommer fra BBR — etager, ydervæggens materiale,
+tagdækningsmaterialet og varmeinstallationen — og tre gør ikke og **kan ikke**:
+bygningens anvendelse, dens konstruktion og stand, og hvad der skal ske med
+den. «Bygningen er planlagt til delvis nedrivning» er en beslutning i
+projektet, ikke en registrering om ejendommen. De tre skrives i hånden på
+BBR-siden, i afsnittet under bygningsvalget.
+
+**Koderne gemmes, ikke teksten.** BBR svarer «1» og ikke «Mursten». Ordlyden
+ligger i kodelisterne i `src/lib/bbr/map.ts`, hentet ordret fra
+bbr.dk/kodelister, så en rettet ordlyd gælder hver eksisterende sag med det
+samme og ikke kun de næste. `usage_code` og `usage_text` står begge, men de er
+ældre end denne beslutning.
+
+**Kode 3 betyder asbest.** I både ydervæg og tagdækning hedder kode 3
+«Fibercement herunder asbest», og kode 10 er den samme plade uden. BBR fortæller
+altså før besøget, om der kan være asbest i facaden eller taget, og derfor står
+advarslen på BBR-siden ved bygningen — ikke kun i den selektive beskrivelse. Den
+gælder lige så meget en almindelig miljøscreening, for den afgør hvad screeneren
+skal have med i bilen. BBR er ikke et bevis: pladen kan være skiftet uden at
+nogen har indberettet det. Byt aldrig de to koder om.
+
+**De skrevne noter overlever et nyt BBR-opslag.** `saveBuildings` sletter og
+skriver alle bygninger op igen — det er med vilje, se «Lokalitet» nedenfor — men
+den bærer nu noterne med over på den bygning, der har samme `bbr_building_id`.
+Uden det ville tre afsnit skrevet stående i bygningen forsvinde, fordi nogen
+trykkede «Hent fra BBR igen». Browseren gør det samme i sin egen liste. Manuelt
+oprettede bygninger har ingen BBR-id og kan ikke genkendes på tværs af et
+opslag; deres noter lever kun så længe siden ikke er genindlæst.
+
+Afsnittet deles i sider af `bygningsSider`, og en bygning brækkes ikke over to
+ark: dens oplysninger og dens beskrivelse hører sammen. Tre bygninger med alle
+tre beskrivelser går på ét ark, som i skabelonen.
 
 ## Lokalitet
 

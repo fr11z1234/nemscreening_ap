@@ -30,6 +30,20 @@ export type BbrBuildingRaw = {
   byg038SamletBygningsareal: number | null;
   byg039BygningensSamledeBoligAreal: number | null;
   byg041BebyggetAreal: number | null;
+  /**
+   * Felterne bag rapportens bygningsoversigt.
+   *
+   * De tre materiale- og varmefelter er kodelister — BBR svarer med "1" og
+   * ikke med "Mursten". Oversaettelsen ligger i ./map.ts.
+   *
+   * Ydervaeg og tag er ikke kun oplysninger til rapporten: koden 3 hedder
+   * «Fibercement herunder asbest», og den siger altsa for besoeget, at der kan
+   * vaere asbest i facaden eller taget.
+   */
+  byg032YdervaeggensMateriale: string | null;
+  byg033Tagdaekningsmateriale: string | null;
+  byg054AntalEtager: number | null;
+  byg056Varmeinstallation: string | null;
 };
 
 /**
@@ -56,6 +70,10 @@ const QUERY = `query Bygninger($hus: String!, $nu: DafDateTime!) {
       byg038SamletBygningsareal
       byg039BygningensSamledeBoligAreal
       byg041BebyggetAreal
+      byg032YdervaeggensMateriale
+      byg033Tagdaekningsmateriale
+      byg054AntalEtager
+      byg056Varmeinstallation
     }
   }
 }`;

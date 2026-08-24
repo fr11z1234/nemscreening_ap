@@ -2,24 +2,32 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import type { BbrBuilding } from "@/lib/bbr/map";
+import {
+  tagTekst,
+  varmeTekst,
+  ydervaegTekst,
+  type BbrBuilding,
+  type BygningsNoter,
+} from "@/lib/bbr/map";
 import { formatDecimal, parseDecimal } from "@/lib/format";
 import { saveBuildings } from "./actions";
 
+type Bygning = BbrBuilding & BygningsNoter;
+
 /** `key` er kun til Reacts liste — den folger ikke med i databasen. */
-type Row = BbrBuilding & { key: string; selected: boolean; isManual?: boolean };
+type Row = Bygning & { key: string; selected: boolean; isManual?: boolean };
 
 const field =
   "tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted";
 
-const asRows = (buildings: BbrBuilding[]): Row[] =>
+const asRows = (buildings: Bygning[]): Row[] =>
   buildings.map((b, i) => ({
     ...b,
     key: b.bbrBuildingId ?? `bbr-${i}`,
     selected: true,
   }));
 
-function toBuilding(row: Row): BbrBuilding & { isManual?: boolean } {
+function toBuilding(row: Row): Bygning & { isManual?: boolean } {
   return {
     bbrBuildingId: row.bbrBuildingId,
     buildingNo: row.buildingNo,
@@ -31,6 +39,13 @@ function toBuilding(row: Row): BbrBuilding & { isManual?: boolean } {
     areaBuilt: row.areaBuilt,
     areaTotal: row.areaTotal,
     areaResidential: row.areaResidential,
+    floors: row.floors,
+    wallMaterialCode: row.wallMaterialCode,
+    roofMaterialCode: row.roofMaterialCode,
+    heatingCode: row.heatingCode,
+    usageNote: row.usageNote,
+    constructionNote: row.constructionNote,
+    planNote: row.planNote,
     isManual: row.isManual,
   };
 }
@@ -42,14 +57,23 @@ export function BbrPicker({
   fromBbr,
   attempted,
   fetchError,
+  erSelektiv,
 }: {
   caseId: string;
   husnummerId: string | null;
   /** Gemte bygninger, eller — hvis der ingen er — dem serveren lige hentede. */
-  initial: BbrBuilding[];
+  initial: Bygning[];
   fromBbr: boolean;
   attempted: boolean;
   fetchError: string | null;
+  /**
+   * Om sagen er en selektiv nedrivning.
+   *
+   * Kun da beder vi om de tre beskrivelser: de star i den selektive rapports
+   * bygningsoversigt og ingen andre steder. Tre tekstfelter pr. bygning pa en
+   * almindelig miljoscreening ville vaere arbejde, der aldrig blev laest.
+   */
+  erSelektiv: boolean;
 }) {
   const [rows, setRows] = useState<Row[]>(() => asRows(initial));
   const [loading, setLoading] = useState(false);
@@ -106,7 +130,28 @@ export function BbrPicker({
       if (found.length === 0) {
         setError("BBR har ingen bygninger på adressen. Opret dem i hånden.");
       }
-      setRows(asRows(found));
+      // BBR svarer ikke med vores egne beskrivelser, sa de baeres over pa den
+      // bygning der har samme id. Uden det ville et tryk pa «Hent fra BBR
+      // igen» tomme tre tekstfelter, nogen har skrevet staaende i bygningen.
+      // Serveren gor det samme mod databasen; se saveBuildings.
+      setRows((tidligere) => {
+        const noter = new Map(
+          tidligere
+            .filter((r) => r.bbrBuildingId)
+            .map((r) => [r.bbrBuildingId!, r]),
+        );
+        return asRows(
+          found.map((b) => {
+            const gammel = b.bbrBuildingId ? noter.get(b.bbrBuildingId) : null;
+            return {
+              ...b,
+              usageNote: gammel?.usageNote ?? null,
+              constructionNote: gammel?.constructionNote ?? null,
+              planNote: gammel?.planNote ?? null,
+            };
+          }),
+        );
+      });
       setTouched(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Opslaget mislykkedes.");
@@ -131,6 +176,13 @@ export function BbrPicker({
         areaBuilt: null,
         areaTotal: null,
         areaResidential: null,
+        floors: null,
+        wallMaterialCode: null,
+        roofMaterialCode: null,
+        heatingCode: null,
+        usageNote: null,
+        constructionNote: null,
+        planNote: null,
         selected: true,
         isManual: true,
       },
@@ -214,6 +266,35 @@ export function BbrPicker({
         )}
       </div>
 
+      {/* Beskrivelserne staar for sig og ikke bag "Ret" pa hver bygning: de er
+          et trin i arbejdet, ikke en rettelse af BBR. Kun de valgte bygninger
+          er med — det er dem, der kommer i rapporten. */}
+      {erSelektiv && selected.length > 0 && (
+        <section>
+          <h2 className="font-semibold">Beskriv bygningerne</h2>
+          <p className="mt-1 text-sm text-muted">
+            Står i rapportens afsnit «Projektets omfang», én blok pr. bygning.
+            BBR-tallene til højre er hentet — de tre felter skal skrives.
+          </p>
+          <ul className="mt-3 flex flex-col gap-3">
+            {rows.map((b, i) =>
+              b.selected ? (
+                <li key={b.key}>
+                  <Beskrivelse
+                    row={b}
+                    onChange={(patch) =>
+                      setRows((r) =>
+                        r.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                      )
+                    }
+                  />
+                </li>
+              ) : null,
+            )}
+          </ul>
+        </section>
+      )}
+
       {touched && (
         <section className="flex flex-col gap-4">
           <div>
@@ -287,6 +368,99 @@ export function BbrPicker({
 }
 
 /**
+ * En bygning som rapporten beskriver den: BBR's tal, og de tre saetninger
+ * screeneren skriver.
+ *
+ * Tallene staar fremme og ikke bag et panel, fordi de er det, teksten skrives
+ * ud fra: man skriver "traditionel muret konstruktion med tegltag" mens man
+ * kan se "Ydervægge: Mursten" og "Tag: Tegl" ved siden af.
+ */
+function Beskrivelse({
+  row,
+  onChange,
+}: {
+  row: Row;
+  onChange: (patch: Partial<Row>) => void;
+}) {
+  const fakta: [string, string | number | null][] = [
+    ["Opført", row.builtYear],
+    ["Etager", row.floors],
+    ["Samlet areal", row.areaTotal ? `${formatDecimal(row.areaTotal)} m²` : null],
+    ["Ydervægge", ydervaegTekst(row.wallMaterialCode)],
+    ["Tag", tagTekst(row.roofMaterialCode)],
+    ["Varmeforsyning", varmeTekst(row.heatingCode)],
+  ];
+
+  return (
+    <div className="rounded-xl bg-surface p-3 shadow-card">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="font-medium">{row.label}</span>
+        {row.usageText && (
+          <span className="text-sm text-muted">{row.usageText}</span>
+        )}
+      </div>
+
+      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        {fakta.map(([navn, vaerdi]) => (
+          <div key={navn} className="flex gap-1.5">
+            <dt className="text-muted">{navn}:</dt>
+            <dd className={vaerdi ? "font-medium" : "text-muted"}>
+              {vaerdi ?? "—"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mt-3 flex flex-col gap-3">
+        <NoteFelt
+          label="Bygningens anvendelse"
+          hint="Fx privat bolig, erhverv, lager, værksted, institution."
+          value={row.usageNote}
+          onChange={(v) => onChange({ usageNote: v })}
+        />
+        <NoteFelt
+          label="Konstruktion og stand"
+          hint="Fx «opført som traditionel muret konstruktion med tegltag, fremstår i ældre stand»."
+          value={row.constructionNote}
+          onChange={(v) => onChange({ constructionNote: v })}
+        />
+        <NoteFelt
+          label="Hvad skal der ske?"
+          hint="Fx «bygningen er planlagt til fuldstændig nedrivning»."
+          value={row.planNote}
+          onChange={(v) => onChange({ planNote: v })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function NoteFelt({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="label-xs">{label}</span>
+      <textarea
+        rows={2}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="w-full rounded-xl bg-surface-2 px-3.5 py-2.5 outline-none"
+      />
+      <span className="text-xs text-muted">{hint}</span>
+    </label>
+  );
+}
+
+/**
  * Tal-felt der holder sin egen tekst.
  *
  * Uden det ville "1,5" forsvinde midt i indtastningen: efter komma'et kan
@@ -342,9 +516,24 @@ function BuildingRow({
       row.builtYear ? `opført ${row.builtYear}` : null,
       row.rebuiltYear ? `ombygget ${row.rebuiltYear}` : null,
       row.areaBuilt ? `${formatDecimal(row.areaBuilt)} m² bebygget` : null,
+      ydervaegTekst(row.wallMaterialCode),
+      tagTekst(row.roofMaterialCode),
     ]
       .filter(Boolean)
       .join(" · ") || "Ingen oplysninger";
+
+  /*
+   * Fibercement med asbest er kode 3 i BBR — bade for ydervaeg og for tag.
+   * Kode 10 er den samme plade uden asbest.
+   *
+   * Det staar her og ikke kun i den selektive beskrivelse, fordi det ikke
+   * handler om rapporten: det afgor hvad screeneren skal have med i bilen, og
+   * det gaelder lige sa meget en almindelig miljoscreening. BBR er ikke et
+   * bevis — pladen kan vaere skiftet uden at nogen har indberettet det — men en
+   * registrering der peger pa asbest skal ses for besoget og ikke bagefter.
+   */
+  const asbestmistanke =
+    row.wallMaterialCode === "3" || row.roofMaterialCode === "3";
 
   return (
     <div
@@ -372,6 +561,12 @@ function BuildingRow({
             )}
           </div>
           <div className="mt-0.5 text-sm text-muted">{summary}</div>
+          {asbestmistanke && (
+            <p className="mt-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs text-warning">
+              BBR angiver fibercement <strong>herunder asbest</strong> — tag
+              værnemidler med.
+            </p>
+          )}
         </div>
         <button
           type="button"

@@ -9,6 +9,7 @@ import { formatDate, formatDecimal } from "@/lib/format";
 import {
   ANALYSIS_FIELDS,
   PERIOD_LABEL,
+  REPORT_TYPE_LABEL,
   type Case,
   type CaseBuilding,
   type Sample,
@@ -96,8 +97,16 @@ export default async function CasePage({
               <StatusBadge status={sag.status} />
             </span>
           </div>
-          <p className="mt-1.5 text-sm text-muted">
-            Oprettet {formatDate(sag.created_at)}
+          {/* Rapporttypen staar kun, nar den ikke er den almindelige. Skrevet
+              pa hver sag ville den vaere stoj pa de ni ud af ti, hvor der ikke
+              er noget at bemaerke — og dermed ikke laest pa den tiende. */}
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+            <span>Oprettet {formatDate(sag.created_at)}</span>
+            {sag.report_type === "selektiv" && (
+              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
+                {REPORT_TYPE_LABEL.selektiv}
+              </span>
+            )}
           </p>
         </div>
 

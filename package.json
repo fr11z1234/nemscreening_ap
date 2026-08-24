@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "verify:eurofins": "tsx scripts/verify-eurofins.ts",
-    "verify:lab": "tsx scripts/verify-lab.ts"
+    "verify:lab": "tsx scripts/verify-lab.ts",
+    "verify:ressourcer": "tsx scripts/verify-ressourcer.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

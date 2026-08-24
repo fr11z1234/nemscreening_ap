@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Supabase-CLI'ens arbejdsmappe. `npx supabase start` lægger blandt andet
+    // en bundtet edge-runtime her, og den er hverken vores kode eller noget vi
+    // kan rette. Uden den her fejler `npm run lint` med snesevis af fejl i
+    // minificeret JavaScript, alt efter om den lokale stak er startet — og så
+    // holder kontrolkæden op med at sige noget om vores eget arbejde.
+    "supabase/.temp/**",
   ]),
 ]);
 

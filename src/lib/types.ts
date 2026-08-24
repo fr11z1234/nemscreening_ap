@@ -1,5 +1,26 @@
 export type UserRole = "screener" | "office" | "admin";
 
+/**
+ * Rollerne, og hvad de ma.
+ *
+ * Graenserne er RLS's egne: `office` og `admin` ma skrive labsvar og slette en
+ * sag, `admin` ma desuden aendre medlemskab. Teksten star her, sa brugersiden
+ * ikke opfinder sin egen beskrivelse af hvad et valg betyder.
+ */
+export const USER_ROLE_LABEL: Record<UserRole, string> = {
+  screener: "Screener",
+  office: "Kontor",
+  admin: "Administrator",
+};
+
+export const USER_ROLE_BESKRIVELSE: Record<UserRole, string> = {
+  screener: "Opretter sager og tager prøver. Kan ikke indlæse svar fra laboratoriet.",
+  office: "Alt det en screener kan, plus indlæse labsvar og slette sager.",
+  admin: "Som kontor, og kan desuden oprette og lukke brugere.",
+};
+
+export const USER_ROLES: UserRole[] = ["screener", "office", "admin"];
+
 export type CaseStatus =
   | "oprettet"
   | "under_screening"

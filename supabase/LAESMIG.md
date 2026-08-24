@@ -62,6 +62,23 @@ Sletter man branchen, er alt i den væk. Det er netop pointen, når man vil kunn
 starte forfra — men det betyder også, at intet i en branch må være det eneste
 sted, noget findes.
 
+## Miljøerne som de står nu
+
+| | Projekt-ref | Hvad der er i den |
+| --- | --- | --- |
+| Produktion | `mwityvqavrqxqaunvtdg` | Live. Deles med hjemmesiden. **Rør den ikke.** |
+| Branchen `fase-2` | `ezylaouiajlpxhrplqln` | Test-database bag Vercels preview. |
+| Lokal stak | — | `npx supabase start`, nulstilles med `db reset`. |
+
+Branchens API ligger på `https://ezylaouiajlpxhrplqln.supabase.co`. Dens
+publicerbare nøgle er ikke en hemmelighed — den ligger i browserens bundt i
+forvejen — og står i `.env.local.branch` på udviklerens maskine.
+
+Branchen er oprettet uden GitHub-integrationen, så den skal passes i hånden:
+migrationer anvendes med værktøj mod dens ref, og `seed.sql` køres manuelt.
+Kobles repoet en dag til integrationen, sker begge dele af sig selv — og så
+forsvinder også fælden nedenfor.
+
 ## To ting en ny branch ikke arver
 
 Begge fik appen til at se ødelagt ud på hver sin måde, og ingen af fejlene

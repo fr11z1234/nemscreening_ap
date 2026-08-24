@@ -10,6 +10,75 @@ Læs `README.md` først — den forklarer kæden fra sag til rapport, hvor tinge
 ligger, og hvordan databasen er skruet sammen. Herunder står kun det, der er
 let at bryde.
 
+## LÆS DETTE FØRST: fase 2 er i gang
+
+Der bygges en version 2 med brydende ændringer. Den skal kunne kasseres i sin
+helhed, og den må ikke kunne røre det, der er live. Derfor gælder følgende, og
+det vejer tungere end alt andet i denne fil.
+
+**Arbejd på grenen `fase-2`. Flet den ikke til `main`.** Vercel bygger `main`
+som produktion; ethvert push dertil går live med det samme. Afsnittet
+«Udrulning» nedenfor beskriver den normale rutine — den er sat ud af kraft,
+indtil fase 2 er færdig og nogen udtrykkeligt beder om at flette.
+
+**Databasen deles med hjemmesiden.** Samme Supabase-projekt huser
+nemscreening.dk: `public` indeholder websitets leads, bookinger og indlæg —
+rigtige forretningsdata, ikke testdata. Screening-appen bor i `screening`.
+
+> Rør aldrig `public`. Kør aldrig noget mod produktionsprojektet
+> `mwityvqavrqxqaunvtdg` — heller ikke læsninger, med mindre nogen beder om
+> det. Brug ikke Supabases «merge branch»-knap: den kører migrationer mod
+> produktionen og rammer dermed også websitet.
+
+De to skemaer kan skilles rent ad — ingen fremmednøgle går fra `screening` ind
+i `public` — men `auth` er **fælles**. En kunde, der logger ind på hjemmesiden,
+er allerede `authenticated` her. Gate derfor aldrig adgang på `authenticated`
+alene, altid på `screening.is_member()`, `is_office()` eller `is_admin()`.
+
+### Hvor du udvikler
+
+| Miljø | Hvornår |
+| --- | --- |
+| Lokal Docker-stak | Standard. Alt udviklingsarbejde og alle skemaændringer. |
+| Supabase-branchen `fase-2` | Når noget skal ses mod den delte test-database. |
+| Produktion | Aldrig. |
+
+Skift med `cp .env.local.lokal .env.local` eller `cp .env.local.branch
+.env.local` (filerne er gitignorerede og ligger kun på udviklerens maskine —
+findes de ikke, spørg efter dem frem for at gætte).
+
+Start den lokale stak med `npx supabase start`. Den bygger databasen op fra
+`supabase/migrations/` og fylder den med `supabase/seed.sql`.
+
+**Fortryd-knappen er `npx supabase db reset`.** Den river databasen ned og
+bygger den op igen fra migrationer og seed på få sekunder. Brug den frit — det
+er hele grunden til, at fase 2 kan laves uden risiko.
+
+### Skemaændringer
+
+Skemaet kommer fra filerne i `supabase/migrations/`, aldrig omvendt. Skriv en
+ny migrationsfil, afprøv den med `db reset` lokalt, og anvend den derefter på
+`fase-2`-branchen.
+
+**Ret aldrig skemaet direkte i dashboardet eller SQL-editoren.** Så driver
+filerne fra virkeligheden, og evnen til at bygge miljøet op igen forsvinder —
+det var netop det problem, `supabase/LAESMIG.md` beskriver, og det kostede en
+dags oprydning at komme ud af.
+
+### Test-login
+
+Begge brugere findes i den lokale stak og i `fase-2`-branchen, aldrig i
+produktionen. Adgangskode for begge: `fase2-test`.
+
+- `kontor@fase2.test` — admin, må alt
+- `screener@fase2.test` — screener, må ikke skrive i `lab_results`
+
+Brug den sidste til at efterprøve, at rolleadskillelsen holder.
+
+Læs `supabase/LAESMIG.md` før du rører databasen. Den forklarer, hvordan
+migrationerne blev til, hvad en Supabase-branch faktisk er, og de to fælder en
+ny branch falder i.
+
 ## Sprog og form
 
 - Alt brugeren ser er **dansk** med æøå.
@@ -265,6 +334,10 @@ Sagerne i Supabase er **testdata** pr. juli 2026 og slettes inden go-live.
 Uoverensstemmelser i dem er ikke fejl der skal migreres væk.
 
 ## Udrulning
+
+> **Sat ud af kraft, mens fase 2 bygges.** Flet ikke til `main` uden at nogen
+> udtrykkeligt beder om det — se afsnittet øverst i filen. Resten her beskriver
+> den normale rutine, som gælder igen bagefter.
 
 Arbejd på en gren, flet til `main`, push. Vercel bygger `main` som produktion.
 

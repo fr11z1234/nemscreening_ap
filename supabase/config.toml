@@ -10,7 +10,12 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public"]
+# screening SKAL staa her. Hele appen laeser og skriver i det skema, og uden
+# det svarer API'et «Invalid schema: screening» paa hver eneste forespoergsel.
+# Produktionen har det sat i dashboardet; standardvaerdien fra `supabase init`
+# har det ikke, saa et nyt miljo bygget paa denne fil ville se ud som om
+# databasen var tom.
+schemas = ["public", "graphql_public", "screening"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size

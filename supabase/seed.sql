@@ -46,11 +46,18 @@ end $$;
 -- opret brugerne i dashboardet under Authentication med PRAECIS de id'er der
 -- staar nedenfor — resten af filen haenger paa dem.
 --
+-- De fire tomme token-kolonner er ikke pynt. GoTrue laeser dem ind i Go-strenge
+-- der ikke kan rumme NULL, og de har ingen standardvaerdi i tabellen. Udelader
+-- man dem, oprettes brugeren fint, men ethvert login svarer 500 «Database error
+-- querying schema» — fejlen naevner ikke seed'en med et ord. De ovrige
+-- token-kolonner har '' som standard og klarer sig selv.
+--
 -- Adgangskode for begge: fase2-test
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
-  raw_app_meta_data, raw_user_meta_data
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change
 )
 values
   ('00000000-0000-0000-0000-000000000000',
@@ -59,14 +66,16 @@ values
    extensions.crypt('fase2-test', extensions.gen_salt('bf')),
    now(), now(), now(),
    '{"provider":"email","providers":["email"]}'::jsonb,
-   '{"full_name":"Test Kontor"}'::jsonb),
+   '{"full_name":"Test Kontor"}'::jsonb,
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000',
    '22222222-2222-4222-8222-222222222222',
    'authenticated', 'authenticated', 'screener@fase2.test',
    extensions.crypt('fase2-test', extensions.gen_salt('bf')),
    now(), now(), now(),
    '{"provider":"email","providers":["email"]}'::jsonb,
-   '{"full_name":"Test Screener"}'::jsonb)
+   '{"full_name":"Test Screener"}'::jsonb,
+   '', '', '', '')
 on conflict (id) do nothing;
 
 -- Uden en identity kan GoTrue ikke logge brugeren ind med e-mail.

@@ -267,3 +267,27 @@ Uoverensstemmelser i dem er ikke fejl der skal migreres væk.
 ## Udrulning
 
 Arbejd på en gren, flet til `main`, push. Vercel bygger `main` som produktion.
+
+### Preview mod en test-database
+
+Enhver anden gren end `main` bygges af Vercel som Preview. Preview har sit
+**eget sæt miljøvariabler**, adskilt fra Production, så en preview kan pege på
+en anden database uden at røre den live. `fase-2` peger på Supabase-branchen
+af samme navn; se `supabase/LAESMIG.md`.
+
+To ting koster tid, hvis man ikke kender dem:
+
+**`NEXT_PUBLIC_*` bages ind i buildet.** Ændrer du dem i Vercel, gælder det
+først for *næste* deployment — den eksisterende har de gamle værdier indeni.
+Symptomet er, at appen stædigt taler med den forkerte database, uanset hvad
+dashboardet viser. Der skal bygges igen.
+
+**Vercel afviser `NEXT_PUBLIC_*` som «Sensitive»** på Preview og Production.
+Ældre variabler kan stå som Sensitive fra dengang det var tilladt, men et
+forsøg på at rette dem fejler — og fejlen er let at overse, så man tror at
+værdien er gemt. De skal tilføjes med `--no-sensitive`. Det er der ingen skade
+i: en `NEXT_PUBLIC_`-variabel ligger i browserens bundt i forvejen.
+
+Sådan afgøres det, hvilken database en preview faktisk bruger: log ind og se
+på sagslisten. Test-databasen har **én** sag, Nørrebrogade 12, med prøverne
+P1, P2, 3, P4, P5. Produktionen har snesevis. De kan ikke forveksles.

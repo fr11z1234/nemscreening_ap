@@ -1,0 +1,5 @@
+# Migrationerne er kontrolleret mod databasens egen md5 af den SQL, der blev
+# koert. Med core.autocrlf=true ville Windows faa CRLF i arbejdskopien, og saa
+# passer den kontrol ikke laengere. Postgres er ligeglad med linjeskiftet —
+# det er verifikationen i LAESMIG.md der ikke er.
+*.sql text eol=lf

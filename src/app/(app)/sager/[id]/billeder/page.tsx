@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { PHOTO_BUCKET } from "@/lib/offline/sync";
 import type { Case, Sample } from "@/lib/types";
 
@@ -79,7 +78,6 @@ export default async function PhotosPage({
 
   return (
     <>
-      <AppHeader />
       <main className="flex flex-1 flex-col px-4 pb-12">
         <div className="pt-4">
           <Link

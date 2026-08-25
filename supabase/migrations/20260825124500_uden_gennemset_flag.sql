@@ -1,0 +1,14 @@
+-- `sentences_reviewed` ud igen.
+--
+-- Flaget var tilfojet, sa panelet kunne vise hvilke af skabelonens saetninger
+-- der var seedet med et gaet om handteringen. Men det kostede et flueben, en
+-- forklaring under fluebenet, en advarsel over listen og en prik ved hvert
+-- materiale — fire ting pa en side, der skal kunne overskues.
+--
+-- Panelet er nu ryddet, og flaget har intet at gore der. Kundens ord til de seks
+-- materialer, der ikke kunne seedes entydigt, staar stadig som kommentar i
+-- 20260825120500_saetninger_fra_skabelonen.sql, sa oplysningen er ikke tabt.
+--
+-- Kolonnen droppes frem for at blive liggende ubrugt: en kolonne ingen skriver i
+-- er en kolonne, den naeste laeser tror betyder noget.
+alter table screening.materials drop column sentences_reviewed;

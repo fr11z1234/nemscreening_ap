@@ -1,344 +1,49 @@
 import { formatHeltal } from "@/lib/format";
-import type { LabLevel } from "@/lib/lab/parametre";
+import { worstLevel, type LabLevel } from "@/lib/lab/parametre";
 import {
-  BUILDING_PARTS,
   conditionLabel,
+  faktiskHandtering,
+  SENTENCE_FIELD,
   type BuildingPart,
+  type Material,
   type ResourceHandling,
 } from "@/lib/types";
 
 /**
  * Ressourcescreeningen: hvilke materialer der kan genbruges, og hvor meget.
  *
- * Hele pointen med denne fil er, at rapporten kun skriver det ud, der faktisk
- * er registreret pa sagen. I Word-skabelonen star alle fyrre linjer altid, og
- * den der laver rapporten skal slette de tredive, der ikke passer. Det er
- * arbejde, en maskine kan lave, og det er arbejde, hvor en glemt sletning
- * bliver en pastand om et materiale, der ikke findes i bygningen.
+ * Hele pointen er, at rapporten kun skriver det ud, der faktisk er registreret
+ * pa sagen. I Word-skabelonen star alle fyrre linjer altid, og den der laver
+ * rapporten skal slette de tredive, der ikke passer. Det er arbejde, en maskine
+ * kan lave, og det er arbejde hvor en glemt sletning bliver en pastand om et
+ * materiale, der ikke findes i bygningen.
  *
- * Teksterne er ikke vores. De star ordret som i skabelonen — kun standen er
- * taget ud af saetningerne, fordi den nu er et felt screeneren udfylder frem
- * for et ord i en skabelon. Ret dem ikke for at gore dem paenere.
+ * Teksten star IKKE her. Den ligger pa materialerne i databasen og rettes i
+ * materialepanelet — det er kontoret der ved, hvad kommunen skal laese. Denne
+ * fil samler linjerne, laegger maengderne sammen og deler siderne op; den
+ * bestemmer intet om ordene.
  */
 
-/**
- * Indledningen til afsnittet.
- *
- * Ordlyden er planens og ikke den gamle Word-skabelons: skabelonen skriver
- * «genbrugsvaerdi» og «genbrugspotentiale i henhold til principperne for
- * selektiv nedrivning og den cirkulaere okonomi», hvor planen har udvidet
- * begge til ogsa at daekke genanvendelse og anden nyttiggorelse. Planen er
- * det nyeste, nogen har besluttet. Skriv den ikke tilbage.
- */
 export const RESSOURCE_INDLEDNING = [
   "I forbindelse med den selektive nedrivning er der foretaget en systematisk vurdering af de væsentligste materialer identificeret gennem miljøscreeningen. Beskrivelsen har til formål at skabe et overskueligt overblik over de ressourcer, der vurderes at have en genbrugs- eller genanvendelsesværdi, og som dermed kan indgå i den videre planlægning af nedrivningen.",
   "Der er i vurderingen lagt vægt på estimerede mængder, materialernes stand, eventuelle miljøproblematiske stoffer samt materialernes potentiale for genbrug, genanvendelse eller anden nyttiggørelse.",
 ];
 
 /**
- * Overskrifterne i rapporten.
+ * Indledningen til forureningsafsnittet.
  *
- * `facade` og `vaegge` deler overskrift med vilje: skabelonen har bade
- * udvendigt og indvendigt teglmurvaerk under «Facader og vaegge», men giver dem
- * hver sin skaebne. De er to bygningsdele og en overskrift.
+ * Skabelonen begynder afsnittet med «Jordforureningsattesten for ejendommen er
+ * vedlagt rapporten og kan findes pa de sidste sider». Den saetning star IKKE
+ * her: appen kan ikke laegge en jordforureningsattest op, og en rapport der
+ * henviser til et bilag, der ikke findes, er vaerre end en der ikke naevner det.
+ * Skal saetningen med, skal attesten forst kunne vedhaeftes.
  */
-const OVERSKRIFT: Record<BuildingPart, string> = {
-  fundament: "Fundament og sokkel",
-  baerende: "Bærende konstruktioner",
-  facade: "Facader og vægge",
-  vaegge: "Facader og vægge",
-  vinduer_doere: "Vinduer og døre",
-  indvendige_overflader: "Indvendige overflader",
-  tag: "Tag",
-  oevrige: "Øvrige ressourcer",
-};
-
-export type RessourceKatalogLinje = {
-  part: BuildingPart;
-  /** Materialets navn i `screening.materials`, ordret. */
-  material: string;
-  /** Navnet linjen har i rapporten. */
-  navn: string;
-  /**
-   * Det der star efter maengden. Slutter med punktum.
-   *
-   * Null nar skabelonen ikke siger noget om materialet. Sa skriver rapporten
-   * navn og maengde og intet mere — en manglende saetning er en linje uden sin
-   * anden halvdel, men en opdigtet saetning er en fagligt begrundet pastand,
-   * som ingen fagperson har staet bag. Kun den forste kan rettes bagefter
-   * uden at nogen har handlet pa den.
-   */
-  saetning: string | null;
-};
-
-/**
- * Linjerne fra skabelonen, en pr. bygningsdel og materiale.
- *
- * Parret (bygningsdel, materiale) er nogle, og det er derfor bygningsdelen
- * betyder noget: `Trae` bliver spaertrae i den baerende konstruktion,
- * facadebeklaedning pa facaden, en dor i dorhullet, et traegulv indenfor og en
- * tagkonstruktion oppe. Samme materiale, fem forskellige skaebner.
- *
- * Parret skal vaere entydigt. `npm run verify:ressourcer` fejler, hvis to
- * linjer far det samme, sa en ny linje ikke kan skygge for en gammel i
- * tavshed.
- *
- * Skabelonen har en linje, der ikke er med: «Rustiklofter» ville dele parret
- * (indvendige overflader, Trae) med traegulve, og traegulve er det almindelige.
- *
- * En saetning ma genbruges ordret for det SAMME materiale i en anden
- * bygningsdel — beton knuses ens, om den sad i fundamentet eller i en baerende
- * vaeg. Den ma ikke lanes til et andet materiale: sa er det en ny faglig
- * pastand, og den skal komme fra Nemscreening og ikke herfra. Derfor star
- * planens materialer uden saetning, hvor skabelonen ikke naevner dem.
- */
-export const RESSOURCE_KATALOG: RessourceKatalogLinje[] = [
-  {
-    part: "fundament",
-    material: "Beton (undtagen, gasbeton, letbeton)",
-    navn: "Beton",
-    saetning:
-      "egnet til nedknusning og genanvendelse i bygge- og anlægsprojekter.",
-  },
-  {
-    part: "fundament",
-    material: "Natursten, fx granit og flint",
-    navn: "Fundamentsten",
-    saetning: null,
-  },
-
-  {
-    part: "baerende",
-    material: "Træ",
-    navn: "Konstruktions- og spærtræ",
-    saetning:
-      "ubehandlet træ har et højt genbrugspotentiale, alternativt kan det energiudnyttes.",
-  },
-  {
-    part: "baerende",
-    material: "Jern og metal",
-    navn: "Jern og Metal",
-    saetning:
-      "med højt genbrugspotentiale gennem omsmeltning og recirkulering.",
-  },
-  {
-    part: "baerende",
-    material: "Beton (undtagen, gasbeton, letbeton)",
-    navn: "Beton",
-    saetning:
-      "egnet til nedknusning og genanvendelse i bygge- og anlægsprojekter.",
-  },
-
-  {
-    part: "facade",
-    material: "Mursten",
-    navn: "Udvendigt teglmurværk",
-    saetning:
-      "kan genbruges som hele sten eller nedknuses til sekundært råmateriale.",
-  },
-  {
-    part: "facade",
-    material: "Letbeton",
-    navn: "Letbeton",
-    saetning:
-      "kan knuses og genanvendes som fyldmateriale eller bruges i produktionen af nye byggematerialer.",
-  },
-  {
-    part: "facade",
-    material: "Puds",
-    navn: "Puds og kalklag",
-    saetning: "kan genanvendes som fyldmateriale.",
-  },
-  {
-    part: "facade",
-    material: "Træ",
-    navn: "Træfacader / beklædning",
-    saetning: "har genbrugspotentiale afhængigt af overfladebehandling.",
-  },
-  {
-    part: "facade",
-    material: "Eternit, asbestfri",
-    navn: "Facadeplader",
-    saetning:
-      "kan knuses og genanvendes som fyldmateriale eller indgå i produktionen af nye byggematerialer.",
-  },
-
-  {
-    part: "vaegge",
-    material: "Mursten",
-    navn: "Indvendigt teglmurværk",
-    saetning: "kan nyttiggøres ved nedknusning og genanvendelse.",
-  },
-  {
-    part: "vaegge",
-    material: "Letbeton",
-    navn: "Letbeton",
-    saetning:
-      "kan knuses og genanvendes som fyldmateriale eller bruges i produktionen af nye byggematerialer.",
-  },
-  {
-    part: "vaegge",
-    material: "Puds",
-    navn: "Puds og kalklag",
-    saetning: "kan genanvendes som fyldmateriale.",
-  },
-
-  {
-    part: "vinduer_doere",
-    material: "Glas",
-    navn: "Vinduesglas",
-    saetning: "kan genbruges eller anvendes i ny glasproduktion.",
-  },
-  {
-    part: "vinduer_doere",
-    material: "Vinduer",
-    navn: "Vinduesrammer (træ/metal)",
-    saetning:
-      "med potentiale for genbrug, afhængigt af stand og eventuelle forurenende stoffer.",
-  },
-  {
-    part: "vinduer_doere",
-    material: "Træ",
-    navn: "Døre, gerigter og fodlister",
-    saetning: "velegnet til genbrug.",
-  },
-
-  {
-    part: "indvendige_overflader",
-    material: "Gips",
-    navn: "Gipsplader/lofter",
-    saetning: "kan genanvendes, hvis korrekt frasorteret.",
-  },
-  {
-    part: "indvendige_overflader",
-    material: "Træ",
-    navn: "Trægulve",
-    saetning: "vurderes egnede til genbrug eller energiudnyttelse.",
-  },
-  {
-    part: "indvendige_overflader",
-    material: "Tæppe",
-    navn: "Tæpper",
-    saetning:
-      "begrænset genbrugspotentiale, men kan i nogle tilfælde materialegenanvendes.",
-  },
-  {
-    part: "indvendige_overflader",
-    material: "Glasseret tegl / Fliser / Klinker",
-    navn: "Klinker/fliser/glaseret tegl",
-    saetning:
-      "kan genbruges ved sortering og knusning til sekundære råmaterialer, f.eks. stabilgrus eller til vej- og anlægsprojekter.",
-  },
-  {
-    part: "indvendige_overflader",
-    material: "Fugemasse",
-    navn: "Fugemasse",
-    saetning:
-      "kan typisk genanvendes som mineralholdigt materiale efter behandling.",
-  },
-  {
-    part: "indvendige_overflader",
-    material: "Tapet",
-    navn: "Tapet",
-    saetning:
-      "kan genanvendes og bruges til nye produkter, f.eks. papirprodukter.",
-  },
-
-  {
-    part: "tag",
-    material: "Træ",
-    navn: "Tagkonstruktion af træ",
-    saetning: "kan genbruges eller energiudnyttes.",
-  },
-  {
-    part: "tag",
-    material: "Tagpap",
-    navn: "Tagpap",
-    saetning:
-      "begrænset genbrugspotentiale, primært til energiudnyttelse.",
-  },
-  {
-    part: "tag",
-    material: "Jern og metal",
-    navn: "Profilerede stålplader",
-    saetning: "har højt genbrugspotentiale gennem omsmeltning.",
-  },
-  {
-    part: "tag",
-    material: "PVC",
-    navn: "PVC-tagdækning",
-    saetning: "kan genanvendes, hvis ubehandlet.",
-  },
-  {
-    part: "tag",
-    material: "Uglaseret tegl (mur- og tagsten)",
-    navn: "Teglsten (tag)",
-    saetning:
-      "kan genbruges som hele sten eller nedknuses til sekundært råmateriale.",
-  },
-  {
-    part: "tag",
-    material: "Eternit, asbestfri",
-    navn: "Eternit",
-    saetning:
-      "kan knuses og genanvendes som fyldmateriale eller indgå i produktionen af nye byggematerialer.",
-  },
-
-  {
-    part: "oevrige",
-    material: "Jern og metal",
-    navn: "Jern og metal",
-    saetning:
-      "med højt genbrugspotentiale gennem omsmeltning og recirkulering.",
-  },
-  {
-    part: "oevrige",
-    material: "Glas",
-    navn: "Glas (uden for vinduer, fx glaspartier)",
-    saetning: "kan genbruges eller indgå i glasproduktion.",
-  },
-  {
-    part: "oevrige",
-    material: "Letbeton",
-    navn: "Troldtekt / letbetonplader",
-    saetning: "kan nyttiggøres gennem genanvendelse.",
-  },
-  {
-    part: "oevrige",
-    material: "PVC",
-    navn: "PVC",
-    saetning:
-      "kan genanvendes og bruges til fremstilling af nye plastprodukter.",
-  },
-  {
-    part: "oevrige",
-    material: "Plast",
-    navn: "Plast",
-    saetning: null,
-  },
-  {
-    part: "oevrige",
-    material: "Isolering",
-    navn: "Isolering",
-    saetning:
-      "kan genanvendes og bruges til fremstilling af ny isolering eller andre byggematerialer.",
-  },
-  {
-    part: "oevrige",
-    material: "Sanitet",
-    navn: "Sanitetsudstyr",
-    saetning: null,
-  },
+export const FORURENING_INDLEDNING = [
+  "I forbindelse med nedrivningen er der foretaget en vurdering af registrerede materialer og stoffer, som kræver særlig håndtering i forbindelse med nedrivningsarbejdet.",
 ];
 
-/**
- * Nogle for et par af bygningsdel og materiale.
- *
- * Nultegnet som skilletegn, sa et materialenavn med bindestreg eller skrastreg
- * i sig ikke kan komme til at danne den samme nogle som et andet par.
- */
-const katalogNoegle = (part: BuildingPart, material: string) =>
-  `${part}\u0000${material}`;
+export const FORURENING_SPORGSMAAL =
+  "Er der potentielle materialer, som kan skabe risiko for forurening ved nedrivningsarbejdet?";
 
 /**
  * En prove, som ressourcescreeningen har brug for at se den.
@@ -350,7 +55,7 @@ export type RessourceProve = {
   /** "P3" eller "3". Bruges til at pege tilbage pa registreringen. */
   label: string;
   material: string | null;
-  building_part: BuildingPart | null;
+  building_part_id: string | null;
   material_condition: number | null;
   resource_handling: ResourceHandling | null;
   estimated_tons: number | null;
@@ -366,9 +71,11 @@ export type RessourceLinje = {
   kg: number | null;
   /** Daarligste stand blandt proverne bag linjen. */
   condition: number | null;
-  /** Handteringen, nar proverne er enige om den. Ellers null. */
   handling: ResourceHandling | null;
+  /** Materialets saetning for den handtering. Null nar den ikke er skrevet. */
   saetning: string | null;
+  /** Vaerste niveau blandt proverne. Null nar der ikke er malt noget. */
+  niveau: LabLevel | null;
   /** Provenumrene bag linjen, sa den kan spores tilbage. */
   labels: string[];
 };
@@ -379,113 +86,188 @@ export type RessourceGruppe = {
 };
 
 export type Ressourceoversigt = {
-  grupper: RessourceGruppe[];
+  /** Rene materialer, der skal genbruges eller genanvendes. */
+  ressourcer: RessourceGruppe[];
+  /**
+   * Alt der ikke er en ressource: forurenet og farligt affald, plus det rene,
+   * der alligevel bortskaffes. Linjerne baerer materialets bortskaffelsestekst.
+   */
+  forureninger: RessourceGruppe[];
   /**
    * Prover med bygningsdel, der stadig venter pa laboratoriet.
    *
-   * De er holdt ude: for svaret er der, kan rapporten ikke vide om materialet
-   * er en ressource eller forurenet affald. Tallet siges hojt frem for at
-   * afsnittet bare bliver kortere end det burde.
+   * De er holdt ude af begge afsnit: for svaret er der, kan rapporten ikke vide
+   * om materialet er en ressource eller forurenet affald. Tallet siges hojt frem
+   * for at afsnittene bare bliver kortere end de burde.
    */
   afventer: number;
   /** Prover med bygningsdel men uden materiale — de kan ikke navngives. */
   udenMateriale: number;
 };
 
-/**
- * Om proven er et rent materiale, der kan indga som ressource.
- *
- * En prove uden analyser er kun kortlagt, og der kommer aldrig et svar pa den
- * — den er ren i den forstand, at intet har vist andet. Er der bestilt
- * analyser, skal svaret vaere kommet og vaere rent. Forurenet og farligt
- * affald er ikke ressourcer, og rapporten ma ikke love at de kan genbruges.
- */
-function erRen(p: RessourceProve): boolean {
-  if (!p.isLabSample) return true;
-  return p.level === "rent";
-}
+const noegle = (...dele: string[]) => dele.join("\u0000");
 
-/** Bygger afsnittets grupper og linjer af sagens prover. */
+type Post = {
+  part: BuildingPart;
+  material: string;
+  handling: ResourceHandling | null;
+  proever: RessourceProve[];
+};
+
+/**
+ * Bygger rapportens to afsnit af sagens prover.
+ *
+ * SVARET FRA LABORATORIET AFGOR, HVOR EN LINJE LANDER — ikke hvad screeneren
+ * troede i marken. Kommer en prove tilbage som forurenet eller farligt affald,
+ * flytter den til forureningsafsnittet og far materialets
+ * bortskaffelsestekst, ogsa selvom der stod genbrug pa den. Det er hele
+ * pointen: analysen validerer vurderingen, og en optimistisk screener kan ikke
+ * komme til at love kommunen, at forurenet beton kan genbruges.
+ *
+ * Vaelger screeneren selv bortskaffelse, flytter proven ogsa — et materiale, der
+ * skal bortskaffes, er ikke en ressource, uanset hvad analysen siger.
+ *
+ * En prove uden analyser bliver aldrig flyttet: der kommer intet svar, og intet
+ * har vist andet end at den er ren.
+ *
+ * `materialer` og `bygningsdele` kommer fra databasen; de er panelets indhold.
+ * Kender vi ikke et materiale — det kan vaere lukket eller omdobt siden proven
+ * blev taget — bruges provens egen tekst som navn, og linjen far ingen saetning.
+ * Sa forsvinder en registreret maengde ikke ud af rapporten, fordi nogen rettede
+ * i listen.
+ */
 export function ressourceoversigt(
   proever: RessourceProve[],
+  materialer: Material[],
+  bygningsdele: BuildingPart[],
 ): Ressourceoversigt {
+  const materialeVedNavn = new Map(materialer.map((m) => [m.name, m]));
+  const delVedId = new Map(bygningsdele.map((b) => [b.id, b]));
+
   let afventer = 0;
   let udenMateriale = 0;
 
-  // Nogle er bygningsdel og materiale. Bygningsdelen og ikke overskriften:
-  // udvendigt og indvendigt teglmurvaerk deler overskrift men er to linjer.
-  const samlet = new Map<
-    string,
-    { part: BuildingPart; material: string; proever: RessourceProve[] }
-  >();
+  const rene = new Map<string, Post>();
+  const urene = new Map<string, Post>();
 
   for (const p of proever) {
-    if (!p.building_part) continue;
+    if (!p.building_part_id) continue;
+    const del = delVedId.get(p.building_part_id);
+    if (!del) continue;
 
     if (p.isLabSample && p.level === null) {
       afventer++;
       continue;
     }
-    if (!erRen(p)) continue;
-    if (!p.material) {
+    const materiale = p.material;
+    if (!materiale) {
       udenMateriale++;
       continue;
     }
 
-    const noegle = katalogNoegle(p.building_part, p.material);
-    const post = samlet.get(noegle);
-    if (post) post.proever.push(p);
-    else
-      samlet.set(noegle, {
-        part: p.building_part,
-        material: p.material,
-        proever: [p],
-      });
+    // Den samme funktion som analyseskemaets kolonne bruger: er svaret gult
+    // eller rodt, er handteringen bortskaffelse, uanset hvad screeneren valgte.
+    const handling = faktiskHandtering(p.resource_handling, p.level);
+
+    if (handling === "bortskaffelse") {
+      // Niveauet er med i noglen og ikke handteringen: teksten er den samme for
+      // dem alle, men gult og rodt ma ikke laegges sammen til en linje — maerket
+      // ved siden af skal betyde noget.
+      laegTil(
+        urene,
+        noegle(del.id, materiale, p.level ?? ""),
+        del,
+        materiale,
+        p,
+        "bortskaffelse",
+      );
+    } else {
+      // Her vaelger handteringen saetningen: er halvdelen af betonen til genbrug
+      // og halvdelen til genanvendelse, er det to linjer med hver sin skaebne.
+      laegTil(
+        rene,
+        noegle(del.id, materiale, handling ?? ""),
+        del,
+        materiale,
+        p,
+        handling,
+      );
+    }
   }
+
+  return {
+    ressourcer: byggGrupper(rene, bygningsdele, materialeVedNavn, false),
+    forureninger: byggGrupper(urene, bygningsdele, materialeVedNavn, true),
+    afventer,
+    udenMateriale,
+  };
+}
+
+function laegTil(
+  kort: Map<string, Post>,
+  k: string,
+  part: BuildingPart,
+  material: string,
+  p: RessourceProve,
+  handling: ResourceHandling | null,
+) {
+  const post = kort.get(k);
+  if (post) post.proever.push(p);
+  else kort.set(k, { part, material, handling, proever: [p] });
+}
+
+function byggGrupper(
+  poster: Map<string, Post>,
+  bygningsdele: BuildingPart[],
+  materialeVedNavn: Map<string, Material>,
+  bortskaffelse: boolean,
+): RessourceGruppe[] {
+  // Grupperne folger bygningsdelenes egen raekkefolge. Den staar i databasen og
+  // rettes i panelet, sa afsnittene kan flyttes uden en udrulning.
+  const dele = [...bygningsdele].sort(
+    (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "da"),
+  );
 
   const grupper: RessourceGruppe[] = [];
 
-  for (const { key: part } of BUILDING_PARTS) {
-    const linjer: RessourceLinje[] = [];
+  for (const del of dele) {
+    const iDelen = [...poster.values()]
+      .filter((p) => p.part.id === del.id)
+      // Materialelistens egen raekkefolge, som kontoret kender den fra
+      // regnearket. Ukendte materialer laegges bagest, alfabetisk.
+      .sort((a, b) => {
+        const oa = materialeVedNavn.get(a.material)?.sort_order ?? Number.MAX_SAFE_INTEGER;
+        const ob = materialeVedNavn.get(b.material)?.sort_order ?? Number.MAX_SAFE_INTEGER;
+        return oa - ob || a.material.localeCompare(b.material, "da");
+      });
 
-    // Katalogets raekkefolge forst, sa rapporten laeser som skabelonen. Det der
-    // ikke star i kataloget kommer bagefter, alfabetisk.
-    const iKatalog = RESSOURCE_KATALOG.filter((l) => l.part === part);
-    const brugt = new Set<string>();
+    const linjer = iDelen.map((post) => {
+      const m = materialeVedNavn.get(post.material);
+      const saetning = m
+        ? bortskaffelse
+          ? m.sentence_bortskaffelse
+          : post.handling
+            ? m[SENTENCE_FIELD[post.handling]]
+            : null
+        : null;
 
-    for (const l of iKatalog) {
-      const post = samlet.get(katalogNoegle(part, l.material));
-      if (!post) continue;
-      brugt.add(l.material);
-      linjer.push(byggLinje(l.navn, l.saetning, post.proever));
-    }
+      return byggLinje(
+        m?.report_name?.trim() || post.material,
+        post.handling,
+        saetning ?? null,
+        post.proever,
+      );
+    });
 
-    const udenLinje = [...samlet.values()]
-      .filter((p) => p.part === part && !brugt.has(p.material))
-      .sort((a, b) => a.material.localeCompare(b.material, "da"));
-
-    for (const post of udenLinje) {
-      // Uden en linje i kataloget kan materialet ikke fa en saetning, men
-      // maengden er registreret og skal med. Ellers forsvinder et materiale
-      // ud af rapporten, fordi kataloget mangler en raekke — og det er
-      // vaerre end en linje uden sin sidste halvdel.
-      linjer.push(byggLinje(post.material, null, post.proever));
-    }
-
-    if (linjer.length === 0) continue;
-
-    // Bygningsdele der deler overskrift laegges i samme gruppe.
-    const overskrift = OVERSKRIFT[part];
-    const sidste = grupper[grupper.length - 1];
-    if (sidste?.overskrift === overskrift) sidste.linjer.push(...linjer);
-    else grupper.push({ overskrift, linjer });
+    if (linjer.length > 0) grupper.push({ overskrift: del.name, linjer });
   }
 
-  return { grupper, afventer, udenMateriale };
+  return grupper;
 }
 
 function byggLinje(
   navn: string,
+  handling: ResourceHandling | null,
   saetning: string | null,
   proever: RessourceProve[],
 ): RessourceLinje {
@@ -497,22 +279,19 @@ function byggLinje(
     .filter((g): g is number => g != null);
 
   // Daarligste stand og ikke et gennemsnit. Laegges to prover sammen til en
-  // linje, ma rapporten ikke love den bedste af dem.
+  // linje, ma rapporten ikke love den bedste af dem. Samme regel for niveauet.
   const condition = grader.length ? Math.max(...grader) : null;
-
-  const handlinger = new Set(
-    proever.map((p) => p.resource_handling).filter((h) => h != null),
-  );
 
   return {
     navn,
     // Ton til kilo. Screeneren taster ton — det er den enhed, en prove og en
-    // laesning i marken haenger sammen i — og rapporten skriver kilo, fordi
+    // aflaesning i marken haenger sammen i — og rapporten skriver kilo, fordi
     // det er sadan kunden kender den.
     kg: medMaengde.length ? Math.round(ton * 1000) : null,
     condition,
-    handling: handlinger.size === 1 ? [...handlinger][0]! : null,
-    saetning,
+    handling,
+    saetning: saetning?.trim() || null,
+    niveau: worstLevel(proever.map((p) => p.level)),
     labels: proever.map((p) => p.label),
   };
 }
@@ -551,17 +330,15 @@ export function ressourceLinjeTekst(linje: RessourceLinje): string {
  * arket bliver ikke braekket paent — den bliver braekket af browseren et
  * tilfaeldigt sted eller klippet. Derfor deles listen her, praecis som
  * metodeteksten er delt i RAPPORT_SIDER, og af samme grund: hver side skal
- * baere maerket i hovedet, og en sektion der lober over efterlader den naeste
- * uden.
+ * baere maerket i hovedet.
  *
  * Regnestykket: arket er 297 mm, polstringen tager 24, sa der er 273. Deraf
  * gaar 14 til sidehovedet. Forste side mister yderligere 9 til
- * afsnitsoverskriften og 46 til de to indledende afsnit — 340 anslag pa 186 mm
- * bliver fire linjer, det naeste tre, og linjeafstanden er 6 mm.
+ * afsnitsoverskriften og 46 til de to indledende afsnit.
  *
  * En linje saettes til 13 mm, altsa to tekstlinjer plus luft. De fleste
  * saetninger er lange nok til at brakke om; de korte giver bare lidt luft
- * nederst, og luft nederst er billigere end en linje der ryger ud over kanten.
+ * nederst, og luft nederst er billigere end en linje der lober ud over kanten.
  */
 const HOEJDE = { overskrift: 10, linje: 13 };
 const SIDEPLADS = { foerste: 204, senere: 259 };

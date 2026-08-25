@@ -102,11 +102,13 @@ med `db: { schema: "screening" }`, så `.from("samples")` rammer
 | --- | --- |
 | `cases` | Sagen. `status` styrer hvad appen viser; `report_type` om rapporten er en almindelig miljøscreening eller en selektiv nedrivning. |
 | `case_buildings` | Bygninger, typisk hentet fra BBR. `wall_material_code`, `roof_material_code` og `heating_code` er BBR-koder; ordlyden slås op i `src/lib/bbr/map.ts`. De tre `*_note`-felter skrives i hånden. |
-| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. `building_ids` er bygningerne prøven dækker; `building_id` er den første af dem. `building_part`, `material_condition` og `resource_handling` udfyldes kun på en selektiv nedrivning. |
+| `samples` | Prøver. `label` og `is_lab_sample` er genererede kolonner. `building_ids` er bygningerne prøven dækker; `building_id` er den første af dem. `building_part_id`, `material_condition` og `resource_handling` udfyldes kun på en selektiv nedrivning. |
+| `building_parts` | Rapportens fede overskrifter, og de knapper screeneren vælger imellem. `sort_order` er afsnittenes rækkefølge. Rettes på `/materialer`. |
 | `sample_photos` | Fotos. Filerne ligger i storage-bucket'en `screening-photos`, som er privat. |
 | `exports` | Log over genererede Eurofins-filer. |
 | `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |
 | `case_files` | Rapportens bilag: forsidebillede, plantegning og et vilkårligt antal Eurofins-PDF'er. Filerne ligger i bucket'en `screening-rapport`, som er privat. |
+| `materials` | Materialelisten, plus `report_name` og en sætning pr. håndtering. Det er rapportens ord, og de rettes på `/materialer`. |
 | `app_users` | Medlemskab og rolle: `screener`, `office`, `admin`. |
 
 RLS er slået til overalt. Læsning kræver `screening.is_member()`. Skrivning

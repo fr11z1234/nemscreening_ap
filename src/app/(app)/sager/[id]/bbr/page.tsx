@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { BbrError, hentBygninger } from "@/lib/bbr/datafordeler";
 import {
   mapBuildings,
@@ -85,7 +84,6 @@ export default async function BbrPage({
 
   return (
     <>
-      <AppHeader />
       <main className="flex flex-1 flex-col">
         <div className="px-4 pt-4 pb-5">
           <Link

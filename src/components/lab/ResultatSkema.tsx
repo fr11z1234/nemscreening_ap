@@ -10,6 +10,7 @@ import {
   type LabParameterKey,
 } from "@/lib/lab/parametre";
 import {
+  faktiskHandtering,
   RESOURCE_HANDLING_LABEL,
   type ResourceHandling,
 } from "@/lib/types";
@@ -40,8 +41,14 @@ export type SkemaSample = {
 /** Resultatraekken som den ligger i databasen: en tekst pr. parameter. */
 export type SkemaResult = Partial<Record<LabParameterKey, string | null>>;
 
-/** Tailwind skal kunne se klassenavnene, sa de star ordret. */
-const LEVEL_CLASS: Record<LabLevel, string> = {
+/**
+ * Tailwind skal kunne se klassenavnene, sa de star ordret.
+ *
+ * Eksporteret, sa rapportens forureningsafsnit kan bruge de samme tre farver som
+ * skemaet. To steder med hver sin gule nuance ville betyde, at farven holdt op
+ * med at vaere et facit.
+ */
+export const LEVEL_CLASS: Record<LabLevel, string> = {
   rent: "level-rent",
   forurenet: "level-forurenet",
   farligt: "level-farligt",
@@ -219,6 +226,19 @@ export function ResultatSkema({
         <tbody>
           {samples.map((sample) => {
             const result = results.get(sample.id);
+            /*
+             * Handteringen som den gaelder efter laboratoriets svar.
+             *
+             * Screeneren kan have skrevet genbrug pa proven, for der var et
+             * svar. Er svaret gult eller rodt, staar der bortskaffelse her — den
+             * samme regel som flytter linjen til forureningsafsnittet i
+             * rapporten. Ellers ville skemaet og afsnittet sige hver sit om den
+             * samme prove, og laeseren ville ikke vide hvem der havde ret.
+             */
+            const handling = faktiskHandtering(
+              sample.resource_handling ?? null,
+              levelOfSample(result),
+            );
             return (
               <tr key={sample.id}>
                 <td className="tabular font-semibold">{sample.label}</td>
@@ -231,9 +251,7 @@ export function ResultatSkema({
                       {sample.material_condition ?? "—"}
                     </td>
                     <td className="text-muted">
-                      {sample.resource_handling
-                        ? RESOURCE_HANDLING_LABEL[sample.resource_handling]
-                        : "—"}
+                      {handling ? RESOURCE_HANDLING_LABEL[handling] : "—"}
                     </td>
                   </>
                 )}

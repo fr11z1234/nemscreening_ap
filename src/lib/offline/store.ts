@@ -1,9 +1,5 @@
 import { createStore, del, entries, set } from "idb-keyval";
-import type {
-  BuildingPart,
-  BuildingPeriod,
-  ResourceHandling,
-} from "@/lib/types";
+import type { BuildingPeriod, ResourceHandling } from "@/lib/types";
 
 /**
  * Lokalt lager for prover og fotos der endnu ikke er landet i Supabase.
@@ -31,7 +27,7 @@ export type PendingSample = {
   estimated_tons: number | null;
   period: BuildingPeriod | null;
   /** De selektive felter. Null pa en almindelig miljoscreening. */
-  building_part: BuildingPart | null;
+  building_part_id: string | null;
   material_condition: number | null;
   resource_handling: ResourceHandling | null;
   analysis_pcb: boolean;
@@ -79,7 +75,7 @@ function normaliser(row: PendingSample & { building_id?: string | null }) {
     ...row,
     building_ids:
       row.building_ids ?? (row.building_id ? [row.building_id] : []),
-    building_part: row.building_part ?? null,
+    building_part_id: row.building_part_id ?? null,
     material_condition: row.material_condition ?? null,
     resource_handling: row.resource_handling ?? null,
   };

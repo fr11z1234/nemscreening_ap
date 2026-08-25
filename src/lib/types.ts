@@ -1,3 +1,5 @@
+import type { LabLevel } from "@/lib/lab/parametre";
+
 export type UserRole = "screener" | "office" | "admin";
 
 export type CaseStatus =
@@ -39,51 +41,24 @@ export const PERIOD_LABEL: Record<BuildingPeriod, string> = {
 };
 
 /**
- * Hvor i bygningen materialet sidder.
+ * Hvor i bygningen materialet sidder — og dermed hvilken fed overskrift det
+ * havner under i ressourcescreeningen.
  *
- * Ikke det samme som `building_ids`, der siger hvilke bygninger proven daekker.
- * Bygningsdelen afgor hvilken overskrift materialet havner under i
- * ressourcescreeningen, og det er ogsa den, der skiller to prover af samme
- * materiale fra hinanden: trae i taget er en tagkonstruktion, trae pa gulvet er
- * et traegulv, og de har hver sin skaebne i rapporten.
+ * Ikke det samme som `building_ids`, der siger hvilke BYGNINGER proven daekker.
+ * Bygningsdelen siger hvor i huset: fundament, baerende konstruktion, facade,
+ * tag.
+ *
+ * Listen ligger i databasen og styres i materialepanelet. Den var en enum i
+ * koden, men en enum kan ikke rettes uden en udrulning, og overskrifterne skal
+ * kunne rettes af dem der skriver rapporten. `sort_order` ER afsnittenes
+ * raekkefolge i rapporten.
  */
-export type BuildingPart =
-  | "fundament"
-  | "baerende"
-  | "facade"
-  | "vaegge"
-  | "vinduer_doere"
-  | "indvendige_overflader"
-  | "tag"
-  | "oevrige";
-
-/**
- * Bygningsdelene i den raekkefolge de vaelges — og vises i rapporten.
- *
- * Nedefra og op gennem bygningen, som en nedrivning laeses. Raekkefolgen her ER
- * afsnittenes raekkefolge; ressourcescreeningen henter den herfra frem for at
- * have sin egen.
- *
- * `facade` og `vaegge` deler overskrift i rapporten, men star hver for sig,
- * fordi udvendigt og indvendigt teglmurvaerk ikke kan det samme: det udvendige
- * kan genbruges som hele sten, det indvendige kun nyttiggores ved nedknusning.
- */
-export const BUILDING_PARTS: { key: BuildingPart; label: string }[] = [
-  { key: "fundament", label: "Fundament og sokkel" },
-  { key: "baerende", label: "Bærende konstruktioner" },
-  { key: "facade", label: "Facade (udvendig)" },
-  { key: "vaegge", label: "Vægge (indvendig)" },
-  { key: "vinduer_doere", label: "Vinduer og døre" },
-  { key: "indvendige_overflader", label: "Indvendige overflader" },
-  { key: "tag", label: "Tag" },
-  { key: "oevrige", label: "Øvrige" },
-];
-
-export const BUILDING_PART_LABEL: Record<BuildingPart, string> =
-  Object.fromEntries(BUILDING_PARTS.map((p) => [p.key, p.label])) as Record<
-    BuildingPart,
-    string
-  >;
+export type BuildingPart = {
+  id: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+};
 
 /** Screenerens vurdering af hvad der skal ske med materialet. */
 export type ResourceHandling = "genbrug" | "genanvendelse" | "bortskaffelse";
@@ -231,7 +206,7 @@ export type Sample = {
    * De tre selektive felter. Null pa en almindelig miljoscreening, hvor de
    * hverken vises eller bruges.
    */
-  building_part: BuildingPart | null;
+  building_part_id: string | null;
   /** 1-5, hvor 1 er bedst. Se MATERIAL_CONDITIONS. */
   material_condition: number | null;
   resource_handling: ResourceHandling | null;
@@ -305,6 +280,57 @@ export type LookupItem = {
   sort_order: number;
   active: boolean;
 };
+
+/**
+ * Et materiale, som materialepanelet og rapporten kender det.
+ *
+ * `name` er det screeneren vaelger i marken — affaldsfraktionens navn.
+ * `report_name` er det kunden laeser: screeneren vaelger «Beton (undtagen,
+ * gasbeton, letbeton)», men rapporten skriver «Beton». Er feltet tomt, bruges
+ * navnet.
+ *
+ * De tre saetninger printes efter maengden, en pr. handtering. Screeneren
+ * vaelger handteringen pa proven, og rapporten henter den saetning. Er den tom,
+ * skriver rapporten navn og maengde og lover ingenting.
+ */
+export type Material = LookupItem & {
+  report_name: string | null;
+  sentence_genbrug: string | null;
+  sentence_genanvendelse: string | null;
+  sentence_bortskaffelse: string | null;
+};
+
+/** Feltet pa `Material` der baerer saetningen for en given handtering. */
+export const SENTENCE_FIELD = {
+  genbrug: "sentence_genbrug",
+  genanvendelse: "sentence_genanvendelse",
+  bortskaffelse: "sentence_bortskaffelse",
+} as const satisfies Record<ResourceHandling, keyof Material>;
+
+/**
+ * Handteringen som den GAELDER, nar laboratoriet har svaret.
+ *
+ * Screeneren vaelger i marken, for der er et svar. Kommer proven tilbage som
+ * forurenet eller farligt affald, gaelder screenerens vurdering ikke laengere:
+ * materialet skal bortskaffes, uanset at der stod genbrug pa den. Det er hele
+ * pointen i at analysere — vurderingen bliver efterproevet.
+ *
+ * Reglen star HER og ikke to steder. Bade analyseskemaets kolonne og rapportens
+ * afsnit spoerger den samme funktion, sa skemaet ikke kan komme til at sige
+ * genbrug pa en linje, forureningsafsnittet har skrevet bortskaffelse pa.
+ *
+ * Den gemte vaerdi paa proven roeres ikke. Screenerens oprindelige vurdering er
+ * vaerd at kunne se — den fortaeller, at analysen fangede noget — og et svar der
+ * bliver rettet senere skal kunne flytte linjen tilbage. Havde vi overskrevet
+ * feltet, var begge dele vaek.
+ */
+export function faktiskHandtering(
+  valgt: ResourceHandling | null,
+  niveau: LabLevel | null,
+): ResourceHandling | null {
+  if (niveau === "forurenet" || niveau === "farligt") return "bortskaffelse";
+  return valgt;
+}
 
 /** De fire analysevalg screeneren ser i felten. */
 export const ANALYSIS_FIELDS = [

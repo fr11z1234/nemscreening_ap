@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SletSagKnap } from "@/components/SletSagKnap";
 import { getMember } from "@/lib/auth";
@@ -21,6 +20,16 @@ const FILTERS: { key: string; label: string; statuses?: CaseStatus[] }[] = [
   { key: "afsluttet", label: "Afsluttet", statuses: ["afsluttet"] },
 ];
 
+/**
+ * Sagslisten.
+ *
+ * Ligger i (bred) og ikke i (app), selvom resten af sagsforlobet er bygget til
+ * en telefon. Listen bliver moedt pa en pc lige sa ofte som i marken, og
+ * hundrede sager i en kolonne pa 36 rem er spild af et bord: pa en skaerm
+ * staar provetal, dato og status i deres egne spalter, sa oje't kan lobe lodret
+ * ned gennem dem. Pa en telefon falder de sammen til det kort, de altid har
+ * vaeret.
+ */
 export default async function SagerPage({
   searchParams,
 }: {
@@ -50,20 +59,21 @@ export default async function SagerPage({
   const cases = data ?? [];
 
   return (
-    <>
-      <AppHeader />
-      <main className="flex flex-1 flex-col">
-        <div className="flex items-center gap-3 px-4 pt-5 pb-4">
-          <h1 className="text-[26px] font-semibold leading-none">Sager</h1>
-          <Link
-            href="/sager/ny"
-            className="tap ml-auto inline-flex items-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
-          >
-            Ny sag
-          </Link>
-        </div>
+    <main className="flex flex-1 flex-col px-4 pb-12 pt-5 sm:px-6">
+      <div className="flex items-center gap-3">
+        <h1 className="text-[26px] font-semibold leading-none">Sager</h1>
+        <Link
+          href="/sager/ny"
+          className="tap ml-auto inline-flex items-center rounded-xl bg-primary px-4 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
+        >
+          Ny sag
+        </Link>
+      </div>
 
-        <form className="px-4">
+      {/* Sog og filtre pa samme linje, nar der er plads. Pa en telefon under
+          hinanden, som de altid har staet. */}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <form className="sm:max-w-sm sm:flex-1">
           <input
             type="search"
             name="q"
@@ -74,7 +84,7 @@ export default async function SagerPage({
           <input type="hidden" name="filter" value={active.key} />
         </form>
 
-        <nav className="flex gap-1.5 overflow-x-auto px-4 py-3">
+        <nav className="flex gap-1.5 overflow-x-auto">
           {FILTERS.map((f) => {
             const params = new URLSearchParams();
             if (q) params.set("q", q);
@@ -96,28 +106,50 @@ export default async function SagerPage({
           })}
         </nav>
 
-        {error ? (
-          <p className="mx-4 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
-            Kunne ikke hente sager: {error.message}
+        <span className="text-sm text-muted sm:ml-auto">
+          {cases.length} {cases.length === 1 ? "sag" : "sager"}
+        </span>
+      </div>
+
+      {error ? (
+        <p className="mt-4 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
+          Kunne ikke hente sager: {error.message}
+        </p>
+      ) : cases.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center px-8 pb-16 text-center">
+          <p className="text-muted">
+            {q ? `Ingen sager matcher "${q}".` : "Der er ingen sager her endnu."}
           </p>
-        ) : cases.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-8 pb-16 text-center">
-            <p className="text-muted">
-              {q ? `Ingen sager matcher "${q}".` : "Der er ingen sager her endnu."}
-            </p>
-            {!q && (
-              <Link
-                href="/sager/ny"
-                className="tap mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline"
-              >
-                Opret den første sag →
-              </Link>
-            )}
+          {!q && (
+            <Link
+              href="/sager/ny"
+              className="tap mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline"
+            >
+              Opret den første sag →
+            </Link>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Spaltehovedet findes kun, hvor spalterne gor. */}
+          <div className="label-xs mt-6 hidden gap-4 px-3.5 pb-1 lg:grid lg:grid-cols-[1fr_7rem_8rem_10rem_4rem]">
+            <span>Adresse</span>
+            <span>Prøver</span>
+            <span>Oprettet</span>
+            <span>Status</span>
+            <span />
           </div>
-        ) : (
-          <ul className="flex flex-col gap-1.5 px-4 pb-10">
+
+          <ul className="mt-1.5 flex flex-col gap-1.5">
             {cases.map((c) => {
               const count = c.samples?.[0]?.count ?? 0;
+              const proever =
+                count === 0
+                  ? "Ingen prøver"
+                  : count === 1
+                    ? "1 prøve"
+                    : `${count} prøver`;
+
               return (
                 // Sletteknappen ligger ved siden af linket og ikke inde i det:
                 // en knap inden i et link er hverken gyldigt markup eller til
@@ -127,25 +159,36 @@ export default async function SagerPage({
                 <li key={c.id} className="relative">
                   <Link
                     href={`/sager/${c.id}`}
-                    className="card block p-3.5 pr-16 transition-shadow hover:shadow-raised active:shadow-raised"
+                    className="card block p-3.5 pr-16 transition-shadow hover:shadow-raised active:shadow-raised lg:grid lg:grid-cols-[1fr_7rem_8rem_10rem_4rem] lg:items-center lg:gap-4 lg:pr-3.5"
                   >
-                    <div className="flex items-start gap-3">
+                    <span className="flex items-start gap-3 lg:block">
                       <span className="font-medium leading-snug">
                         {c.case_name}
                       </span>
-                      <span className="ml-auto">
+                      {/* Pa en telefon staar maerket ved navnet, fordi der
+                          ikke er en spalte at laegge det i. */}
+                      <span className="ml-auto lg:hidden">
                         <StatusBadge status={c.status} />
                       </span>
-                    </div>
-                    <div className="tabular mt-1 text-[13px] text-muted">
-                      {count === 0
-                        ? "Ingen prøver"
-                        : count === 1
-                          ? "1 prøve"
-                          : `${count} prøver`}
-                      {" · "}
+                    </span>
+
+                    <span className="tabular mt-1 text-[13px] text-muted lg:mt-0 lg:text-sm">
+                      {proever}
+                      <span className="lg:hidden">
+                        {" · "}
+                        {formatDate(c.created_at)}
+                      </span>
+                    </span>
+
+                    <span className="tabular hidden text-sm text-muted lg:block">
                       {formatDate(c.created_at)}
-                    </div>
+                    </span>
+
+                    <span className="hidden lg:block">
+                      <StatusBadge status={c.status} />
+                    </span>
+
+                    <span />
                   </Link>
 
                   {maaSlette && (
@@ -161,8 +204,8 @@ export default async function SagerPage({
               );
             })}
           </ul>
-        )}
-      </main>
-    </>
+        </>
+      )}
+    </main>
   );
 }

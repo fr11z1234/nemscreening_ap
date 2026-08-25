@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SletSagKnap } from "@/components/SletSagKnap";
 import { getMember } from "@/lib/auth";
@@ -82,7 +81,6 @@ export default async function CasePage({
 
   return (
     <>
-      <AppHeader />
       <main className="flex flex-1 flex-col pb-32">
         <div className="px-4 pt-4">
           <Link href="/sager" className="tap -ml-2 inline-flex items-center px-2 text-sm text-muted hover:text-fg">

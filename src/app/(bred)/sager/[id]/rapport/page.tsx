@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/offline/sync";
 import {
+  LEVEL_CLASS,
   LevelBadge,
   ResultatSkema,
   SkemaForklaring,
@@ -11,6 +12,7 @@ import {
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
+import { LEVEL_LABEL, type LabLevel } from "@/lib/lab/parametre";
 import { TilpasBredde } from "@/components/lab/TilpasBredde";
 import { Graensevaerdier } from "@/components/lab/Graensevaerdier";
 import { Logo } from "@/components/Logo";
@@ -25,19 +27,24 @@ import {
   RAPPORT_SIDER,
 } from "@/lib/rapport/tekst";
 import {
+  FORURENING_INDLEDNING,
+  FORURENING_SPORGSMAAL,
   RESSOURCE_INDLEDNING,
   ressourceLinjeHale,
   ressourceSider,
   ressourceoversigt,
+  type RessourceGruppe,
 } from "@/lib/rapport/ressourcer";
 import { bygningsBlok, bygningsSider } from "@/lib/rapport/bygninger";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
 import {
   PERIOD_LABEL,
+  type BuildingPart,
   type Case,
   type CaseBuilding,
   type CaseFile,
+  type Material,
   type Sample,
 } from "@/lib/types";
 
@@ -163,22 +170,49 @@ export default async function RapportPage({
       ? bygningsSider(buildings.map(bygningsBlok))
       : [];
 
-  const ressourcer = erSelektiv
-      ? ressourceoversigt(
-          samples.map((s) => ({
-            label: s.label,
-            material: s.material,
-            building_part: s.building_part,
-            material_condition: s.material_condition,
-            resource_handling: s.resource_handling,
-            estimated_tons: s.estimated_tons,
-            level: levelOfSample(results.get(s.id)),
-            isLabSample: s.is_lab_sample,
-          })),
-        )
-      : null;
+  /*
+   * Materialerne og bygningsdelene hentes kun til en selektiv rapport.
+   *
+   * Teksten star pa materialerne og rettes i materialepanelet — rapporten
+   * bestemmer ikke ordene, den samler dem. Bade lukkede materialer og lukkede
+   * bygningsdele hentes med: en prove taget for nogen lukkede et materiale skal
+   * stadig kunne skrives ud med sit navn og sin saetning.
+   */
+  const [materialerRes, delerRes] = erSelektiv
+    ? await Promise.all([
+        supabase.from("materials").select("*").returns<Material[]>(),
+        supabase
+          .from("building_parts")
+          .select("*")
+          .order("sort_order")
+          .returns<BuildingPart[]>(),
+      ])
+    : [{ data: [] as Material[] }, { data: [] as BuildingPart[] }];
 
-  const ressourceSiderListe = ressourcer ? ressourceSider(ressourcer.grupper) : [];
+  const ressourcer = erSelektiv
+    ? ressourceoversigt(
+        samples.map((s) => ({
+          label: s.label,
+          material: s.material,
+          building_part_id: s.building_part_id,
+          material_condition: s.material_condition,
+          resource_handling: s.resource_handling,
+          estimated_tons: s.estimated_tons,
+          level: levelOfSample(results.get(s.id)),
+          isLabSample: s.is_lab_sample,
+        })),
+        materialerRes.data ?? [],
+        delerRes.data ?? [],
+      )
+    : null;
+
+  const ressourceSiderListe = ressourcer
+    ? ressourceSider(ressourcer.ressourcer)
+    : [];
+  const forureningSiderListe = ressourcer
+    ? ressourceSider(ressourcer.forureninger)
+    : [];
+
   const ressourceNoter = ressourcer
     ? [
         ressourcer.afventer > 0
@@ -199,6 +233,12 @@ export default async function RapportPage({
   const ressourceSiderTilVisning = ressourceSiderListe.length
     ? ressourceSiderListe
     : [[]];
+
+  // Forureningsafsnittet staar ogsa nar der ingen fund er: spoergsmalet skal
+  // besvares, og et «Nej» er et svar. Det er kommunen der laeser det.
+  const forureningSiderTilVisning: RessourceGruppe[][] =
+    forureningSiderListe.length ? forureningSiderListe : [[]];
+  const harForureninger = (ressourcer?.forureninger.length ?? 0) > 0;
 
   const skemaSamples: SkemaSample[] = samples.map((s) => ({
     id: s.id,
@@ -456,17 +496,7 @@ export default async function RapportPage({
             )}
 
             {sideGrupper.map((gruppe) => (
-              <div key={gruppe.overskrift} className="mt-5">
-                <h3 className="font-semibold">{gruppe.overskrift}</h3>
-                <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
-                  {gruppe.linjer.map((linje) => (
-                    <li key={linje.navn} className="mt-1 first:mt-0">
-                      <span className="font-medium">{linje.navn}</span>{" "}
-                      {ressourceLinjeHale(linje)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Linjegruppe key={gruppe.overskrift} gruppe={gruppe} />
             ))}
 
             {/* Noterne staar pa den sidste side: de handler om hele
@@ -481,6 +511,58 @@ export default async function RapportPage({
                   ))}
                 </div>
               )}
+          </section>
+        ))}
+
+      {/*
+        Forureninger.
+ 
+        Star efter ressourcescreeningen og for analyseskemaet, som i skabelonen.
+        Her lander alt det, der IKKE er en ressource: forurenet og farligt
+        affald, plus det rene der alligevel skal bortskaffes. Linjerne baerer
+        materialets bortskaffelsestekst — ogsa hvis screeneren skrev genbrug pa
+        proven. Det er laboratoriesvaret der bestemmer, og det er meningen: en
+        optimistisk vurdering i marken bliver rettet af analysen frem for at ende
+        i en rapport til en kommune.
+ 
+        Afsnittet staar ogsa nar der ingen fund er. Spoergsmalet skal besvares,
+        og «Nej» er et svar.
+      */}
+      {erSelektiv &&
+        forureningSiderTilVisning.map((sideGrupper, nr) => (
+          <section key={nr} className="print-side mt-10 print:mt-0">
+            {sidehoved}
+            {nr === 0 ? (
+              <>
+                <Overskrift>Forureninger</Overskrift>
+                <div className="mt-2 text-sm leading-relaxed">
+                  {FORURENING_INDLEDNING.map((afsnit) => (
+                    <p key={afsnit} className="mt-2 first:mt-0">
+                      {afsnit}
+                    </p>
+                  ))}
+                  <p className="mt-4 font-semibold">{FORURENING_SPORGSMAAL}</p>
+                  {/* Afkrydsningen er skabelonens egen. Den er utvetydig pa
+                      papir, hvor et farvet maerke kan gaa tabt i en gra
+                      printer. */}
+                  <p className="tabular mt-1">
+                    {harForureninger ? "☒ Ja \u00a0\u00a0 ☐ Nej" : "☐ Ja \u00a0\u00a0 ☒ Nej"}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <Overskrift>Forureninger, fortsat</Overskrift>
+            )}
+
+            {sideGrupper.map((gruppe) => (
+              <Linjegruppe key={gruppe.overskrift} gruppe={gruppe} />
+            ))}
+
+            {nr === 0 && !harForureninger && (
+              <p className="mt-5 text-sm leading-relaxed text-muted">
+                Der er ikke registreret materialer, som kræver særlig håndtering.
+              </p>
+            )}
           </section>
         ))}
 
@@ -692,6 +774,48 @@ export default async function RapportPage({
         </section>
       ))}
     </main>
+  );
+}
+
+/**
+ * En bygningsdel med sine linjer — den samme opbygning i begge afsnit.
+ *
+ * Kunden genkender formen fra siden for: den fede overskrift, og under den de
+ * materialer der hoerer til. Forskellen er niveaumaerket, som kun de urene
+ * linjer baerer.
+ */
+function Linjegruppe({ gruppe }: { gruppe: RessourceGruppe }) {
+  return (
+    <div className="mt-5">
+      <h3 className="font-semibold">{gruppe.overskrift}</h3>
+      <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
+        {gruppe.linjer.map((linje) => (
+          <li key={`${linje.navn}-${linje.niveau ?? ""}`} className="mt-1 first:mt-0">
+            <span className="font-medium">{linje.navn}</span>
+            <Niveaumaerke niveau={linje.niveau} /> {ressourceLinjeHale(linje)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Gult eller rodt maerke pa linjen.
+ *
+ * Kun nar der er malt noget, og kun for det der ikke er rent: i
+ * ressourceafsnittet er alt gront, og et gront maerke pa hver linje ville
+ * betyde ingenting. Farverne er skemaets egne, sa de to steder ikke kan komme
+ * til at sige hver sit.
+ */
+function Niveaumaerke({ niveau }: { niveau: LabLevel | null }) {
+  if (!niveau || niveau === "rent") return null;
+  return (
+    <span
+      className={`ml-1.5 rounded px-1.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide ${LEVEL_CLASS[niveau]}`}
+    >
+      {LEVEL_LABEL[niveau]}
+    </span>
   );
 }
 

@@ -170,7 +170,7 @@ insert into screening.samples (
   id, case_id, seq, material, sample_type, building_id, building_ids,
   location_note, estimated_tons, period,
   analysis_pcb, analysis_asbestos, analysis_metals, analysis_pah,
-  building_part, material_condition, resource_handling,
+  material_condition, resource_handling,
   comment, created_by
 ) values
   ('5a3b0001-0000-4000-8000-000000000001',
@@ -180,7 +180,7 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Fuger omkring vinduer, gadeside', 0.4, 'foer_1990',
    true, false, true, false,
-   'facade', 3, 'bortskaffelse',
+   3, 'bortskaffelse',
    'Elastisk fuge, blød', '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0002-0000-4000-8000-000000000002',
@@ -191,7 +191,12 @@ insert into screening.samples (
          'b0110002-0000-4000-8000-000000000002']::uuid[],
    'Facademaling, samme på begge bygninger', 1.2, 'foer_1990',
    false, false, true, false,
-   'facade', 3, 'bortskaffelse',
+   -- GENBRUG med vilje, selvom svaret er bly 1800 mg/kg og dermed forurenet.
+   -- Den prove viser reglen: screeneren vurderede at malingen kunne genbruges,
+   -- analysen sagde noget andet, og rapporten flytter linjen til
+   -- forureningsafsnittet med bortskaffelsesteksten. Aendrer man den til
+   -- bortskaffelse, holder seed'en op med at vise det.
+   3, 'genbrug',
    null, '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0003-0000-4000-8000-000000000003',
@@ -201,7 +206,7 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Bærende vægge, kælder', 42, 'foer_1990',
    false, false, false, false,
-   'fundament', 2, 'genanvendelse',
+   2, 'genanvendelse',
    'Kun kortlagt — ingen analyse bestilt',
    '22222222-2222-4222-8222-222222222222'),
 
@@ -212,7 +217,7 @@ insert into screening.samples (
    array['b0110002-0000-4000-8000-000000000002']::uuid[],
    'Tagplader på garage', 2.8, 'foer_1990',
    false, true, false, false,
-   'tag', 4, 'bortskaffelse',
+   4, 'bortskaffelse',
    null, '22222222-2222-4222-8222-222222222222'),
 
   ('5a3b0005-0000-4000-8000-000000000005',
@@ -222,8 +227,22 @@ insert into screening.samples (
    array['b0110001-0000-4000-8000-000000000001']::uuid[],
    'Gulvbrædder, tilbygning fra 2004', 3.5, 'efter_1990',
    false, false, true, true,
-   'indvendige_overflader', 2, 'genbrug',
+   2, 'genbrug',
    null, '22222222-2222-4222-8222-222222222222');
+
+-- Bygningsdelen saettes ved navn og ikke ved id: raekkerne i building_parts far
+-- et nyt uuid ved hver opbygning, sa der er intet fast id at skrive her.
+update screening.samples s
+set building_part_id = bp.id
+from screening.building_parts bp
+where s.case_id = 'ca5e0001-0000-4000-8000-000000000001'
+  and bp.name = case s.seq
+    when 1 then 'Facade (udvendig)'
+    when 2 then 'Facade (udvendig)'
+    when 3 then 'Fundament og sokkel'
+    when 4 then 'Tag'
+    when 5 then 'Indvendige overflader'
+  end;
 
 -- ---------------------------------------------------------------------------
 -- Labsvar

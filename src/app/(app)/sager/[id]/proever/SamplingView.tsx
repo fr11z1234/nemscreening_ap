@@ -19,13 +19,13 @@ import {
 import { formatDecimal, parseDecimal } from "@/lib/format";
 import {
   ANALYSIS_FIELDS,
-  BUILDING_PARTS,
   MATERIAL_CONDITIONS,
   PERIOD_LABEL,
   RESOURCE_HANDLINGS,
   RESOURCE_HANDLING_LABEL,
   analysesForPeriod,
   analysisApplies,
+  type BuildingPart,
   type BuildingPeriod,
   type CaseBuilding,
   type ReportType,
@@ -89,7 +89,7 @@ function nextDraft(caseId: string, seq: number, userId: string, from?: Draft): D
     period: null,
     location_note: null,
     estimated_tons: null,
-    building_part: from?.building_part ?? null,
+    building_part_id: from?.building_part_id ?? null,
     material_condition: null,
     resource_handling: null,
     analysis_pcb: false,
@@ -116,7 +116,7 @@ function toDraft(s: Sample, userId: string, kendteBygninger: Set<string>): Draft
     location_note: s.location_note,
     estimated_tons: s.estimated_tons,
     period: s.period,
-    building_part: s.building_part,
+    building_part_id: s.building_part_id,
     material_condition: s.material_condition,
     resource_handling: s.resource_handling,
     analysis_pcb: s.analysis_pcb,
@@ -161,6 +161,7 @@ export function SamplingView({
   buildings,
   materials,
   sampleTypes,
+  buildingParts,
   reportType,
   initialSamples,
   initialPhotos,
@@ -172,7 +173,12 @@ export function SamplingView({
   buildings: CaseBuilding[];
   materials: string[];
   sampleTypes: string[];
-  /** Selektiv nedrivning giver tre felter mere. Se BUILDING_PARTS. */
+  /**
+   * Overskrifterne i rapporten, i deres egen raekkefolge. Kommer fra databasen
+   * og styres i materialepanelet.
+   */
+  buildingParts: BuildingPart[];
+  /** Selektiv nedrivning giver tre felter mere. */
   reportType: ReportType;
   initialSamples: Sample[];
   initialPhotos: InitialPhoto[];
@@ -886,18 +892,18 @@ export function SamplingView({
         {/* Bygningsdelen staar hos lokaliteten, fordi den svarer pa det samme
             sporgsmal: hvor staar screeneren. Den afgor hvilken overskrift
             materialet havner under i ressourcescreeningen. */}
-        {erSelektiv && (
+        {erSelektiv && buildingParts.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span className="label-xs">Bygningsdel</span>
             <div className="grid grid-cols-2 gap-2">
-              {BUILDING_PARTS.map((p) => {
-                const valgt = draft.building_part === p.key;
+              {buildingParts.map((p) => {
+                const valgt = draft.building_part_id === p.id;
                 return (
                   <button
-                    key={p.key}
+                    key={p.id}
                     type="button"
                     onClick={() =>
-                      update({ building_part: valgt ? null : p.key })
+                      update({ building_part_id: valgt ? null : p.id })
                     }
                     aria-pressed={valgt}
                     className={`tap rounded-xl px-3 text-left text-sm transition-colors ${
@@ -906,12 +912,12 @@ export function SamplingView({
                         : "bg-surface shadow-card hover:bg-surface-2"
                     }`}
                   >
-                    {p.label}
+                    {p.name}
                   </button>
                 );
               })}
             </div>
-            {!draft.building_part && (
+            {!draft.building_part_id && (
               <p className="text-xs leading-relaxed text-muted">
                 Uden bygningsdel kommer materialet ikke med i
                 ressourcescreeningen — rapporten ved ikke hvor det hører hjemme.

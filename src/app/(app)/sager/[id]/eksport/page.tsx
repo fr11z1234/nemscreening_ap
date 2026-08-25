@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { formatDate } from "@/lib/format";
 import {
   validateForExport,
@@ -69,7 +68,6 @@ export default async function ExportPage({
 
   return (
     <>
-      <AppHeader />
       <main className="flex flex-1 flex-col px-4 pb-12">
         <div className="pt-4 pb-4">
           <Link href={`/sager/${id}`} className="tap -ml-2 inline-block px-2 text-muted hover:text-fg">

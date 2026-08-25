@@ -1,4 +1,4 @@
-import { HeaderShell, Skeleton } from "@/components/Skeleton";
+import { Skeleton } from "@/components/Skeleton";
 
 /**
  * BBR-siden er den langsomste i appen: den venter pa Datafordeleren for den
@@ -8,7 +8,6 @@ import { HeaderShell, Skeleton } from "@/components/Skeleton";
 export default function Loading() {
   return (
     <>
-      <HeaderShell />
       <main className="flex flex-1 flex-col">
         <div className="px-4 pt-4 pb-5">
           <Skeleton className="h-4 w-48" />

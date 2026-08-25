@@ -1,30 +1,39 @@
 /**
  * Kontrollerer ressourcescreeningen. Koeres med: npm run verify:ressourcer
  *
- * To slags fejl er dyre her, og ingen af dem raaber op af sig selv.
+ * Teksten i rapporten ligger nu i databasen og rettes i materialepanelet, sa
+ * den kan ikke proves her. Til gengaeld kan alt det proves, som IKKE ma kunne
+ * rettes ved et uheld:
  *
- * Den forste er et materialenavn i kataloget, der ikke findes i
- * `screening.materials`. Linjen bliver aldrig fundet, materialet havner i
- * rapporten uden sin saetning, og det ser ud som om kataloget mangler en
- * raekke — ikke som om der er en tastefejl. Derfor slaas hvert navn op i
- * migrationen, der seeder listen.
+ *   - hvad der bliver en ressource, og hvad der holdes ude
+ *   - maengderne, der laegges sammen og regnes fra ton til kilo
+ *   - raekkefolgen af overskrifter og linjer
+ *   - sideopdelingen, sa hver side baerer maerket
+ *   - analyseskemaets bredde, sa atten kolonner stadig kan vaere paa et A4
+ *   - BBR's kodelister, hvor kode 3 betyder asbest og kode 10 ikke gor
  *
- * Den anden er maengden. Screeneren taster ton, rapporten skriver kilo, og
- * flere prover af samme materiale laegges sammen til en linje. Et forkert tal
- * dér er en pastand om hvor meget beton der kommer ud af en bygning.
+ * Derudover kontrolleres migrationen, der seeder saetningerne, mod den der
+ * seeder materialelisten: et materialenavn stavet forkert dér giver ikke en
+ * fejl, men en rapport hvor et materiale mangler sin saetning.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   RESSOURCE_INDLEDNING,
-  RESSOURCE_KATALOG,
   ressourceLinjeTekst,
   ressourceSider,
   ressourceoversigt,
+  type RessourceGruppe,
   type RessourceProve,
 } from "../src/lib/rapport/ressourcer";
-import { BUILDING_PARTS, MATERIAL_CONDITIONS } from "../src/lib/types";
+import {
+  faktiskHandtering,
+  MATERIAL_CONDITIONS,
+  SENTENCE_FIELD,
+  type BuildingPart,
+  type Material,
+} from "../src/lib/types";
 import { LAB_PARAMETERS } from "../src/lib/lab/parametre";
 import {
   analysekolonne,
@@ -47,105 +56,279 @@ const check = (ok: boolean, msg: string) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// 1. Kataloget
-// ---------------------------------------------------------------------------
-const noegler = RESSOURCE_KATALOG.map((l) => `${l.part}/${l.material}`);
-for (const n of new Set(noegler)) {
-  const antal = noegler.filter((k) => k === n).length;
-  check(antal === 1, `${n} star ${antal} gange i kataloget — den anden bliver aldrig brugt`);
-}
-
-const kendteDele = new Set(BUILDING_PARTS.map((p) => p.key));
-for (const l of RESSOURCE_KATALOG) {
-  check(kendteDele.has(l.part), `${l.navn} peger pa bygningsdelen "${l.part}", som ikke findes`);
-  check(l.navn.trim() !== "", `en katalograekke for ${l.material} mangler navn`);
-  check(
-    l.saetning === null || l.saetning.endsWith("."),
-    `saetningen for "${l.navn}" slutter ikke med punktum`,
-  );
-  check(
-    l.saetning === null || !/^[A-ZÆØÅ]/.test(l.saetning),
-    `saetningen for "${l.navn}" begynder med stort — den skal laene sig pa maengden`,
-  );
-}
-
-// Materialenavnene skal findes ordret i den liste, appen faktisk viser.
 const here = dirname(fileURLToPath(import.meta.url));
-const seedSql = readFileSync(
-  join(here, "..", "supabase", "migrations", "20260725173227_screening_seed_lookups.sql"),
-  "utf8",
-);
-const materialBlok = seedSql.slice(
-  seedSql.indexOf("screening.materials"),
-  seedSql.indexOf("screening.sample_types"),
-);
-const kendteMaterialer = new Set(
-  [...materialBlok.matchAll(/'([^']+)'/g)].map((m) => m[1]),
-);
-check(
-  kendteMaterialer.size > 40,
-  `fandt kun ${kendteMaterialer.size} materialer i migrationen — er filen flyttet?`,
-);
-for (const l of RESSOURCE_KATALOG) {
-  check(
-    kendteMaterialer.has(l.material),
-    `"${l.material}" (${l.navn}) findes ikke i screening.materials — linjen kan aldrig rammes`,
-  );
-}
-
-check(RESSOURCE_INDLEDNING.length === 2, "indledningen skulle vaere to afsnit");
+const migration = (navn: string) =>
+  readFileSync(join(here, "..", "supabase", "migrations", navn), "utf8");
 
 // ---------------------------------------------------------------------------
-// 2. Hvad der er en ressource, og hvad der ikke er
+// Prøveopstilling
 // ---------------------------------------------------------------------------
+// Bygningsdelene og materialerne kommer fra databasen i appen. Her bygges de i
+// hand, sa udregningen kan proves uden en database.
+const del = (navn: string, orden: number): BuildingPart => ({
+  id: `del-${orden}`,
+  name: navn,
+  sort_order: orden,
+  active: true,
+});
+
+const FUNDAMENT = del("Fundament og sokkel", 1);
+const FACADE = del("Facade (udvendig)", 3);
+const TAG = del("Tag", 7);
+const DELE = [FUNDAMENT, FACADE, TAG];
+
+const materiale = (m: Partial<Material> & { name: string }): Material => ({
+  id: `mat-${m.name}`,
+  sort_order: 0,
+  active: true,
+  report_name: null,
+  sentence_genbrug: null,
+  sentence_genanvendelse: null,
+  sentence_bortskaffelse: null,
+  ...m,
+});
+
+const BETON = materiale({
+  name: "Beton (undtagen, gasbeton, letbeton)",
+  report_name: "Beton",
+  sort_order: 3,
+  sentence_genanvendelse: "egnet til nedknusning og genanvendelse.",
+  sentence_genbrug: "kan genbruges som hele elementer.",
+  sentence_bortskaffelse: "bortskaffes efter gældende regler.",
+});
+const TRAE = materiale({
+  name: "Træ",
+  sort_order: 24,
+  sentence_genbrug: "har et højt genbrugspotentiale.",
+});
+const TAGPAP = materiale({ name: "Tagpap", sort_order: 22 });
+const MATERIALER = [BETON, TRAE, TAGPAP];
+
 const prove = (p: Partial<RessourceProve>): RessourceProve => ({
   label: "1",
-  material: "Beton (undtagen, gasbeton, letbeton)",
-  building_part: "fundament",
+  material: BETON.name,
+  building_part_id: FUNDAMENT.id,
   material_condition: null,
-  resource_handling: null,
+  resource_handling: "genanvendelse",
   estimated_tons: 1,
   level: null,
   isLabSample: false,
   ...p,
 });
 
+const oversigt = (proever: RessourceProve[]) =>
+  ressourceoversigt(proever, MATERIALER, DELE);
 const linjer = (proever: RessourceProve[]) =>
-  ressourceoversigt(proever).grupper.flatMap((g) => g.linjer);
+  oversigt(proever).ressourcer.flatMap((g) => g.linjer);
+const urene = (proever: RessourceProve[]) =>
+  oversigt(proever).forureninger.flatMap((g) => g.linjer);
 
-// Kortlagt uden analyse: der kommer aldrig et svar, og intet har vist andet.
+check(RESSOURCE_INDLEDNING.length === 2, "indledningen skulle vaere to afsnit");
+
+// ---------------------------------------------------------------------------
+// 1. Hvad der er en ressource, og hvad der ikke er
+// ---------------------------------------------------------------------------
 check(linjer([prove({})]).length === 1, "en kortlagt prove blev ikke en ressource");
-
-// Analyseret og ren.
 check(
   linjer([prove({ isLabSample: true, level: "rent" })]).length === 1,
   "en ren prove blev ikke en ressource",
 );
 
-// Forurenet og farligt er ikke ressourcer. Rapporten ma ikke love at de kan
-// genbruges — det er den fejl, der koster noget udenfor skaermen.
+/*
+ * Laboratoriesvaret afgor, hvor linjen lander.
+ *
+ * Det er den vigtigste regel i hele filen. En screener kan skrive genbrug pa en
+ * prove i god tro, og hvis analysen kommer tilbage forurenet, SKAL linjen flytte
+ * til forureningsafsnittet og baere bortskaffelsesteksten. Ellers loeber en
+ * optimistisk vurdering hele vejen ud i et dokument til en kommune.
+ */
 for (const level of ["forurenet", "farligt"] as const) {
+  const p = prove({ isLabSample: true, level, resource_handling: "genbrug" });
   check(
-    linjer([prove({ isLabSample: true, level })]).length === 0,
+    linjer([p]).length === 0,
     `en ${level} prove kom med i ressourcescreeningen`,
   );
+  const u = urene([p]);
+  check(u.length === 1, `en ${level} prove kom ikke i forureningsafsnittet`);
+  check(
+    u[0]?.saetning === "bortskaffes efter gældende regler.",
+    `en ${level} prove med genbrug valgt fik saetningen "${u[0]?.saetning}" — den skal bortskaffes`,
+  );
+  check(u[0]?.niveau === level, `niveauet pa linjen blev "${u[0]?.niveau}"`);
 }
 
-// Bestilt, men intet svar endnu: holdes ude og taelles.
-const venter = ressourceoversigt([prove({ isLabSample: true, level: null })]);
-check(venter.grupper.length === 0, "en prove uden svar kom med som ressource");
+// Rent svar, men screeneren valgte bortskaffelse: et materiale der skal
+// bortskaffes er ikke en ressource, uanset hvad analysen siger.
+const rentMenBortskaffes = prove({
+  isLabSample: true,
+  level: "rent",
+  resource_handling: "bortskaffelse",
+});
+check(
+  linjer([rentMenBortskaffes]).length === 0,
+  "en ren prove med bortskaffelse blev en ressource",
+);
+check(
+  urene([rentMenBortskaffes])[0]?.saetning === "bortskaffes efter gældende regler.",
+  "en ren prove med bortskaffelse fik ikke bortskaffelsesteksten",
+);
+// Gront maerke i forureningsafsnittet ville forvirre — niveauet er rent, og
+// rapporten viser kun gult og rodt.
+check(
+  urene([rentMenBortskaffes])[0]?.niveau === "rent",
+  "niveauet skulle stadig staa som rent i dataen",
+);
+
+// Gult og rodt af samme materiale ma ikke laegges sammen: maerket skal betyde
+// noget.
+const gulOgRoed = urene([
+  prove({ label: "1", isLabSample: true, level: "forurenet", estimated_tons: 4 }),
+  prove({ label: "2", isLabSample: true, level: "farligt", estimated_tons: 6 }),
+]);
+check(gulOgRoed.length === 2, `gult og rodt gav ${gulOgRoed.length} linjer`);
+check(
+  gulOgRoed.map((l) => l.niveau).join(",") === "forurenet,farligt",
+  `niveauerne blev ${gulOgRoed.map((l) => l.niveau).join(",")}`,
+);
+
+// Ressourcelinjer baerer intet maerke at vise: alt i afsnittet er gront.
+check(
+  linjer([prove({ isLabSample: true, level: "rent" })])[0]?.niveau === "rent",
+  "en ren ressource mistede sit niveau i dataen",
+);
+
+/*
+ * Reglen bag bade analyseskemaets kolonne og rapportens afsnit.
+ *
+ * De to laeser den samme funktion, og det er meningen: sagde skemaet «Genbrug»
+ * pa en linje, som forureningsafsnittet havde skrevet bortskaffelse pa, ville
+ * laeseren ikke vide hvem der havde ret.
+ */
+check(
+  faktiskHandtering("genbrug", "forurenet") === "bortskaffelse",
+  "et gult svar aendrede ikke handteringen til bortskaffelse",
+);
+check(
+  faktiskHandtering("genbrug", "farligt") === "bortskaffelse",
+  "et rodt svar aendrede ikke handteringen til bortskaffelse",
+);
+check(
+  faktiskHandtering("genanvendelse", "forurenet") === "bortskaffelse",
+  "genanvendelse blev ikke overstyret af et gult svar",
+);
+// Rent svar rorer ikke vurderingen — det er kun det gule og rode, der overstyrer.
+check(
+  faktiskHandtering("genbrug", "rent") === "genbrug",
+  "et rent svar aendrede screenerens vurdering",
+);
+// Ingen analyse betyder intet svar, og sa staar vurderingen.
+check(
+  faktiskHandtering("genanvendelse", null) === "genanvendelse",
+  "en prove uden svar mistede sin handtering",
+);
+check(
+  faktiskHandtering(null, "farligt") === "bortskaffelse",
+  "en prove uden valgt handtering fik ikke bortskaffelse af et rodt svar",
+);
+check(
+  faktiskHandtering(null, null) === null,
+  "uden valg og uden svar skal der ikke staa noget",
+);
+
+// Og reglen skal give det SAMME som rapportens fordeling. En prove der efter
+// funktionen skal bortskaffes, ma ikke kunne ende i ressourceafsnittet.
+for (const niveau of ["rent", "forurenet", "farligt", null] as const) {
+  for (const valgt of ["genbrug", "genanvendelse", "bortskaffelse", null] as const) {
+    const p = prove({
+      isLabSample: niveau !== null,
+      level: niveau,
+      resource_handling: valgt,
+    });
+    const forventetIForureninger =
+      faktiskHandtering(valgt, niveau) === "bortskaffelse";
+    check(
+      (urene([p]).length === 1) === forventetIForureninger,
+      `${valgt ?? "intet valg"} + ${niveau ?? "intet svar"} landede i det forkerte afsnit`,
+    );
+    check(
+      (linjer([p]).length === 1) === !forventetIForureninger,
+      `${valgt ?? "intet valg"} + ${niveau ?? "intet svar"} landede i begge eller ingen afsnit`,
+    );
+  }
+}
+
+const venter = oversigt([prove({ isLabSample: true, level: null })]);
+check(venter.ressourcer.length === 0, "en prove uden svar kom med som ressource");
+check(
+  venter.forureninger.length === 0,
+  "en prove uden svar kom med i forureningsafsnittet",
+);
 check(venter.afventer === 1, `afventer blev ${venter.afventer}, forventede 1`);
 
-// Uden bygningsdel kan materialet ikke placeres under en overskrift.
-const udenDel = ressourceoversigt([prove({ building_part: null })]);
-check(udenDel.grupper.length === 0, "en prove uden bygningsdel kom med");
+const udenDel = oversigt([prove({ building_part_id: null })]);
+check(udenDel.ressourcer.length === 0, "en prove uden bygningsdel kom med");
 check(udenDel.afventer === 0, "en prove uden bygningsdel blev talt som afventende");
 
-// Uden materiale kan linjen ikke navngives — men det skal siges hojt.
-const udenMat = ressourceoversigt([prove({ material: null })]);
-check(udenMat.grupper.length === 0, "en prove uden materiale kom med");
+// En bygningsdel der er slettet i panelet: proven bliver, men den kan ikke
+// placeres under en overskrift.
+const ukendtDel = oversigt([prove({ building_part_id: "findes-ikke" })]);
+check(ukendtDel.ressourcer.length === 0, "en ukendt bygningsdel gav en gruppe");
+
+const udenMat = oversigt([prove({ material: null })]);
+check(udenMat.ressourcer.length === 0, "en prove uden materiale kom med");
 check(udenMat.udenMateriale === 1, `udenMateriale blev ${udenMat.udenMateriale}`);
+
+// ---------------------------------------------------------------------------
+// 2. Navn og saetning kommer fra materialet
+// ---------------------------------------------------------------------------
+const betonLinje = linjer([prove({})])[0]!;
+check(
+  betonLinje.navn === "Beton",
+  `rapportnavnet blev "${betonLinje.navn}" — parentesen skal ikke med ud til kunden`,
+);
+check(
+  betonLinje.saetning === "egnet til nedknusning og genanvendelse.",
+  `saetningen blev "${betonLinje.saetning}"`,
+);
+
+// Handteringen vaelger saetningen. Samme materiale, to udfald.
+check(
+  linjer([prove({ resource_handling: "genbrug" })])[0]?.saetning ===
+    "kan genbruges som hele elementer.",
+  "genbrug hentede ikke sin egen saetning",
+);
+
+// Uden handtering er der intet at vaelge imellem, og sa loves der ingenting.
+check(
+  linjer([prove({ resource_handling: null })])[0]?.saetning === null,
+  "en prove uden handtering fik en saetning",
+);
+
+// Er saetningen ikke skrevet i panelet, skal linjen stadig med — maengden er
+// registreret. En manglende saetning er en halv linje; en forsvundet linje er
+// et materiale, kommunen ikke hoerer om.
+const utekstet = linjer([
+  prove({ material: TAGPAP.name, building_part_id: TAG.id }),
+]);
+check(utekstet.length === 1, "et materiale uden saetning forsvandt");
+check(utekstet[0]?.navn === "Tagpap", `navnet blev "${utekstet[0]?.navn}"`);
+check(utekstet[0]?.saetning === null, "et materiale uden saetning fik en");
+
+// Et materiale der er lukket eller omdobt siden proven blev taget: provens egen
+// tekst bruges som navn, sa maengden ikke falder ud af rapporten.
+const fremmed = linjer([prove({ material: "Findes ikke længere" })]);
+check(fremmed.length === 1, "et ukendt materiale forsvandt ud af rapporten");
+check(
+  fremmed[0]?.navn === "Findes ikke længere",
+  `et ukendt materiale blev navngivet "${fremmed[0]?.navn}"`,
+);
+check(fremmed[0]?.saetning === null, "et ukendt materiale fik en saetning");
+
+// Feltnavnene skal passe pa Material. Rammer de ved siden af, bliver hver
+// saetning tavst null, og rapporten ser bare tom ud.
+for (const [handling, felt] of Object.entries(SENTENCE_FIELD)) {
+  check(felt in BETON, `${handling} peger pa feltet "${felt}", som ikke findes`);
+}
 
 // ---------------------------------------------------------------------------
 // 3. Sammenlaegning
@@ -154,125 +337,71 @@ const samlet = linjer([
   prove({ label: "1", estimated_tons: 12, material_condition: 2 }),
   prove({ label: "2", estimated_tons: 30, material_condition: 4 }),
 ]);
-check(samlet.length === 1, `to prover af samme materiale gav ${samlet.length} linjer`);
-check(samlet[0]?.kg === 42000, `12 + 30 ton blev ${samlet[0]?.kg} kg, forventede 42000`);
+check(samlet.length === 1, `to ens prover gav ${samlet.length} linjer`);
+check(samlet[0]?.kg === 42000, `12 + 30 ton blev ${samlet[0]?.kg} kg`);
 // Daarligste stand og ikke gennemsnittet: rapporten ma ikke love den bedste.
+check(samlet[0]?.condition === 4, `standen blev ${samlet[0]?.condition}, forventede 4`);
+check(samlet[0]?.labels.join(",") === "1,2", "linjen pegede ikke pa begge prover");
+
+// Forskellig handtering er forskellig skaebne, og dermed to linjer.
+const toUdfald = linjer([
+  prove({ label: "1", resource_handling: "genbrug", estimated_tons: 5 }),
+  prove({ label: "2", resource_handling: "genanvendelse", estimated_tons: 7 }),
+]);
+check(toUdfald.length === 2, `to handteringer gav ${toUdfald.length} linjer`);
 check(
-  samlet[0]?.condition === 4,
-  `standen blev ${samlet[0]?.condition}, forventede 4 (den daarligste)`,
-);
-check(
-  samlet[0]?.labels.join(",") === "1,2",
-  `linjen peger pa ${samlet[0]?.labels.join(",")}, forventede begge prover`,
+  toUdfald.map((l) => l.kg).join("+") === "5000+7000",
+  `maengderne blev ${toUdfald.map((l) => l.kg).join("+")} — de ma ikke blandes`,
 );
 
-// Handteringen star kun, nar proverne er enige om den.
-const enige = linjer([
-  prove({ resource_handling: "genbrug" }),
-  prove({ label: "2", resource_handling: "genbrug" }),
-]);
-check(enige[0]?.handling === "genbrug", "to enige prover mistede handteringen");
-const uenige = linjer([
-  prove({ resource_handling: "genbrug" }),
-  prove({ label: "2", resource_handling: "bortskaffelse" }),
-]);
+// En prove uden maengde ma ikke gore linjen til nul kilo.
 check(
-  uenige[0]?.handling === null,
-  `to uenige prover gav handteringen "${uenige[0]?.handling}"`,
+  linjer([prove({ estimated_tons: null })])[0]?.kg === null,
+  "en prove uden maengde gav nul kilo",
+);
+check(
+  linjer([
+    prove({ estimated_tons: null }),
+    prove({ label: "2", estimated_tons: 5 }),
+  ])[0]?.kg === 5000,
+  "en tom og en pa 5 ton gav ikke 5000 kg",
 );
 
-// En prove uden maengde ma ikke gore linjen til nul kilo — det ville laese som
-// om der ikke er noget af materialet.
-const udenTon = linjer([prove({ estimated_tons: null })]);
-check(udenTon[0]?.kg === null, `en prove uden maengde gav ${udenTon[0]?.kg} kg`);
-const delvis = linjer([
-  prove({ estimated_tons: null }),
-  prove({ label: "2", estimated_tons: 5 }),
-]);
-check(delvis[0]?.kg === 5000, `en tom og en pa 5 ton gav ${delvis[0]?.kg} kg`);
-
-// Decimaler. 0,4 ton er 400 kg, ikke 400,00000001.
-check(
-  linjer([prove({ estimated_tons: 0.4 })])[0]?.kg === 400,
-  "0,4 ton blev ikke 400 kg",
-);
-check(
-  linjer([prove({ estimated_tons: 2.8 })])[0]?.kg === 2800,
-  "2,8 ton blev ikke 2800 kg",
-);
+// Decimaler. 0,4 ton er 400 kg.
+check(linjer([prove({ estimated_tons: 0.4 })])[0]?.kg === 400, "0,4 ton blev ikke 400 kg");
+check(linjer([prove({ estimated_tons: 2.8 })])[0]?.kg === 2800, "2,8 ton blev ikke 2800 kg");
 
 // ---------------------------------------------------------------------------
-// 4. Overskrifter og raekkefolge
+// 4. Raekkefolge
 // ---------------------------------------------------------------------------
-// Udvendigt og indvendigt teglmurvaerk deler overskrift, men er to linjer med
-// hver sin skaebne. Det er hele grunden til at facade og vaegge er to
-// bygningsdele.
-const murvaerk = ressourceoversigt([
-  prove({ label: "1", building_part: "facade", material: "Mursten", estimated_tons: 10 }),
-  prove({ label: "2", building_part: "vaegge", material: "Mursten", estimated_tons: 4 }),
+// Overskrifterne folger bygningsdelenes sort_order — den staar i databasen og
+// rettes i panelet, sa afsnittene kan flyttes uden en udrulning.
+const raekkefolge = oversigt([
+  prove({ label: "1", building_part_id: TAG.id, material: TAGPAP.name }),
+  prove({ label: "2", building_part_id: FUNDAMENT.id }),
+  prove({ label: "3", building_part_id: FACADE.id, material: TRAE.name, resource_handling: "genbrug" }),
 ]);
 check(
-  murvaerk.grupper.length === 1,
-  `facade og vaegge gav ${murvaerk.grupper.length} grupper, forventede en delt overskrift`,
-);
-check(
-  murvaerk.grupper[0]?.overskrift === "Facader og vægge",
-  `overskriften blev "${murvaerk.grupper[0]?.overskrift}"`,
-);
-check(
-  murvaerk.grupper[0]?.linjer.length === 2,
-  "udvendigt og indvendigt murvaerk blev lagt sammen til en linje",
-);
-check(
-  murvaerk.grupper[0]?.linjer[0]?.navn === "Udvendigt teglmurværk",
-  `forste linje blev "${murvaerk.grupper[0]?.linjer[0]?.navn}"`,
-);
-check(
-  murvaerk.grupper[0]?.linjer[1]?.navn === "Indvendigt teglmurværk",
-  `anden linje blev "${murvaerk.grupper[0]?.linjer[1]?.navn}"`,
+  raekkefolge.ressourcer.map((g) => g.overskrift).join(" | ") ===
+    "Fundament og sokkel | Facade (udvendig) | Tag",
+  `raekkefolgen blev "${raekkefolge.ressourcer.map((g) => g.overskrift).join(" | ")}"`,
 );
 
-// Samme materiale, forskellig bygningsdel, forskellig skaebne.
-const trae = ressourceoversigt([
-  prove({ label: "1", building_part: "baerende", material: "Træ" }),
-  prove({ label: "2", building_part: "tag", material: "Træ" }),
-  prove({ label: "3", building_part: "indvendige_overflader", material: "Træ" }),
+// Samme materiale i to bygningsdele bliver to linjer under hver sin overskrift.
+const toSteder = oversigt([
+  prove({ label: "1", building_part_id: FUNDAMENT.id }),
+  prove({ label: "2", building_part_id: FACADE.id }),
 ]);
-const traeNavne = trae.grupper.flatMap((g) => g.linjer.map((l) => l.navn));
-check(
-  traeNavne.join(" | ") ===
-    "Konstruktions- og spærtræ | Trægulve | Tagkonstruktion af træ",
-  `trae blev "${traeNavne.join(" | ")}"`,
-);
+check(toSteder.ressourcer.length === 2, "samme materiale to steder blev lagt sammen");
 
-// Grupperne folger bygningen nedefra og op, som BUILDING_PARTS staar.
-const raekkefolge = ressourceoversigt([
-  prove({ label: "1", building_part: "tag", material: "Tagpap" }),
-  prove({ label: "2", building_part: "fundament" }),
-  prove({ label: "3", building_part: "vinduer_doere", material: "Vinduer" }),
+// Inden for en gruppe folger linjerne materialelistens egen orden.
+const indenfor = oversigt([
+  prove({ label: "1", building_part_id: TAG.id, material: TRAE.name, resource_handling: "genbrug" }),
+  prove({ label: "2", building_part_id: TAG.id, material: TAGPAP.name }),
 ]);
 check(
-  raekkefolge.grupper.map((g) => g.overskrift).join(" | ") ===
-    "Fundament og sokkel | Vinduer og døre | Tag",
-  `raekkefolgen blev "${raekkefolge.grupper.map((g) => g.overskrift).join(" | ")}"`,
-);
-
-// Et materiale uden katalograekke skal stadig med. Ellers forsvinder en
-// registreret maengde ud af rapporten, fordi kataloget mangler noget.
-const ukendt = linjer([prove({ material: "Flamingo", building_part: "oevrige" })]);
-check(ukendt.length === 1, "et materiale uden katalograekke forsvandt");
-check(ukendt[0]?.navn === "Flamingo", `linjen blev navngivet "${ukendt[0]?.navn}"`);
-check(ukendt[0]?.saetning === null, "et materiale uden katalograekke fik en saetning");
-
-// Katalogets linjer kommer for de ukendte, sa afsnittet laeser som skabelonen.
-const blandet = ressourceoversigt([
-  prove({ label: "1", building_part: "oevrige", material: "Flamingo" }),
-  prove({ label: "2", building_part: "oevrige", material: "Jern og metal" }),
-]);
-check(
-  blandet.grupper[0]?.linjer.map((l) => l.navn).join(" | ") ===
-    "Jern og metal | Flamingo",
-  `blandet raekkefolge blev "${blandet.grupper[0]?.linjer.map((l) => l.navn).join(" | ")}"`,
+  indenfor.ressourcer[0]?.linjer.map((l) => l.navn).join(" | ") === "Tagpap | Træ",
+  `linjerne blev "${indenfor.ressourcer[0]?.linjer.map((l) => l.navn).join(" | ")}"`,
 );
 
 // ---------------------------------------------------------------------------
@@ -282,100 +411,51 @@ const tekst = (proever: RessourceProve[]) => ressourceLinjeTekst(linjer(proever)
 
 // Med stand: maengde, stand, komma, saetning — praecis som skabelonen.
 check(
-  tekst([
-    prove({ building_part: "facade", material: "Mursten", estimated_tons: 12, material_condition: 2 }),
-  ]) ===
-    "Udvendigt teglmurværk – 12.000 kg i god stand, kan genbruges som hele sten eller nedknuses til sekundært råmateriale.",
-  `linjen med stand blev: ${tekst([prove({ building_part: "facade", material: "Mursten", estimated_tons: 12, material_condition: 2 })])}`,
+  tekst([prove({ estimated_tons: 42, material_condition: 2 })]) ===
+    "Beton – 42.000 kg i god stand, egnet til nedknusning og genanvendelse.",
+  `linjen med stand blev: ${tekst([prove({ estimated_tons: 42, material_condition: 2 })])}`,
 );
 
 // Uden stand laener saetningen sig direkte pa maengden, ogsa som skabelonen.
 check(
   tekst([prove({ estimated_tons: 42 })]) ===
-    "Beton – 42.000 kg egnet til nedknusning og genanvendelse i bygge- og anlægsprojekter.",
+    "Beton – 42.000 kg egnet til nedknusning og genanvendelse.",
   `linjen uden stand blev: ${tekst([prove({ estimated_tons: 42 })])}`,
 );
 
-// Tusindtalsskilletegnet er dansk. 42000 og 4200 skal kunne skelnes.
+// Dansk tusindtalsskilletegn. 42000 og 4200 skal kunne skelnes.
 check(
   tekst([prove({ estimated_tons: 4.2 })]).includes("4.200 kg"),
   `4,2 ton blev skrevet som: ${tekst([prove({ estimated_tons: 4.2 })])}`,
 );
 
-// Uden maengde skrives det, frem for at linjen viser nul kilo.
 check(
   tekst([prove({ estimated_tons: null })]).includes("mængde ikke opgjort"),
-  `en linje uden maengde blev: ${tekst([prove({ estimated_tons: null })])}`,
+  "en linje uden maengde sagde det ikke",
 );
 
 // Et materiale uden saetning slutter efter maengden og lover ingenting.
 check(
-  tekst([prove({ material: "Flamingo", building_part: "oevrige", estimated_tons: 1 })]) ===
-    "Flamingo – 1.000 kg",
-  `linjen uden saetning blev: ${tekst([prove({ material: "Flamingo", building_part: "oevrige", estimated_tons: 1 })])}`,
+  tekst([prove({ material: TAGPAP.name, building_part_id: TAG.id, estimated_tons: 1 })]) ===
+    "Tagpap – 1.000 kg",
+  `linjen uden saetning blev: ${tekst([prove({ material: TAGPAP.name, building_part_id: TAG.id, estimated_tons: 1 })])}`,
 );
 
-// Alle fem standsgrader skal kunne skrives ud.
 for (const c of MATERIAL_CONDITIONS) {
   const t = tekst([prove({ estimated_tons: 1, material_condition: c.grade })]);
-  check(
-    t.includes(`i ${c.label.toLowerCase()},`),
-    `stand ${c.grade} blev skrevet som: ${t}`,
-  );
+  check(t.includes(`i ${c.label.toLowerCase()},`), `stand ${c.grade} blev: ${t}`);
 }
 
 // ---------------------------------------------------------------------------
 // 6. Sideopdelingen
 // ---------------------------------------------------------------------------
-// Afsnittet skal kunne braekke over flere ark uden at miste maerket i hovedet.
-// Ingen linje ma forsvinde undervejs, og ingen overskrift ma staa alene.
-const enSide = ressourceSider([
-  { overskrift: "Fundament og sokkel", linjer: linjer([prove({})]) },
-]);
-check(enSide.length === 1, `en enkelt linje gav ${enSide.length} sider`);
-
-// En sag med alt registreret. Kataloget er 35 linjer, og de kan ikke vaere pa
-// et ark — sa skal de fordeles, ikke klippes.
-const alt = RESSOURCE_KATALOG.map((l, i) =>
-  prove({
-    label: String(i + 1),
-    building_part: l.part,
-    material: l.material,
-    estimated_tons: 1,
-  }),
-);
-const fuld = ressourceoversigt(alt);
-const fuldeLinjer = fuld.grupper.reduce((n, g) => n + g.linjer.length, 0);
+check(ressourceSider([]).length === 0, "ingen grupper skulle give ingen sider");
 check(
-  fuldeLinjer === RESSOURCE_KATALOG.length,
-  `hele kataloget gav ${fuldeLinjer} linjer, forventede ${RESSOURCE_KATALOG.length}`,
+  ressourceSider([{ overskrift: "Tag", linjer: linjer([prove({})]) }]).length === 1,
+  "en enkelt linje gav mere end en side",
 );
 
-const sider = ressourceSider(fuld.grupper);
-check(sider.length > 1, "hele kataloget blev presset ned pa en enkelt side");
-
-// Ingen linje tabt, ingen linje dobbelt.
-const paaSider = sider.reduce(
-  (n, s) => n + s.reduce((m, g) => m + g.linjer.length, 0),
-  0,
-);
-check(
-  paaSider === fuldeLinjer,
-  `sideopdelingen gav ${paaSider} linjer af ${fuldeLinjer}`,
-);
-
-for (const [nr, s] of sider.entries()) {
-  for (const g of s) {
-    check(
-      g.linjer.length > 0,
-      `side ${nr + 1} har overskriften "${g.overskrift}" uden linjer under`,
-    );
-  }
-}
-
-// En gruppe der braekkes far sin overskrift igen, sa laeseren ved hvor de
-// forste linjer pa siden hoerer til.
-const mange = ressourceSider([
+const mange: RessourceGruppe[] = [
   {
     overskrift: "Tag",
     linjer: Array.from({ length: 40 }, (_, i) => ({
@@ -384,37 +464,42 @@ const mange = ressourceSider([
       condition: null,
       handling: null,
       saetning: null,
+      niveau: null,
       labels: [String(i)],
     })),
   },
-]);
-check(mange.length > 1, "fyrre linjer blev ikke delt op");
+];
+const delt = ressourceSider(mange);
+check(delt.length > 1, "fyrre linjer blev ikke delt op");
 check(
-  mange[0]![0]!.overskrift === "Tag",
-  `forste side fik overskriften "${mange[0]![0]!.overskrift}"`,
+  delt.reduce((n, s) => n + s.reduce((m, g) => m + g.linjer.length, 0), 0) === 40,
+  "en linje forsvandt i sideopdelingen",
 );
+check(delt[0]![0]!.overskrift === "Tag", "forste side mistede sin overskrift");
 check(
-  mange[1]![0]!.overskrift === "Tag (fortsat)",
-  `anden side fik overskriften "${mange[1]![0]!.overskrift}"`,
+  delt[1]![0]!.overskrift === "Tag (fortsat)",
+  `anden side fik overskriften "${delt[1]![0]!.overskrift}"`,
 );
-
-check(ressourceSider([]).length === 0, "ingen grupper skulle give ingen sider");
+for (const [nr, s] of delt.entries()) {
+  for (const g of s) {
+    check(g.linjer.length > 0, `side ${nr + 1} har en overskrift uden linjer under`);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 7. Analyseskemaets bredde
 // ---------------------------------------------------------------------------
-// Det selektive skema har to kolonner mere, men det samme ark. Pladsen tages
-// af cellernes sideluft og ikke af tallene, og det er den regning der
-// kontrolleres her: en analysekolonne skal have mindst lige saa mange pixel til
-// "< 2500" som det almindelige skema har i dag. Bliver den smallere, braekker
-// tallet i to linjer paa papiret — og det ses foerst, naar nogen printer.
-//
-// Sideluften laeses ud af globals.css, sa CSS'en bliver ved med at vaere det
-// ene sted den staar.
+// Det selektive skema har to kolonner mere, men det samme ark. Pladsen tages af
+// cellernes sideluft og ikke af tallene, og det er den regning der
+// kontrolleres: en analysekolonne skal have mindst lige saa mange pixel til
+// "< 2500" som det almindelige skema. Bliver den smallere, braekker tallet i to
+// linjer paa papiret — og det ses foerst, naar nogen printer.
 const css = readFileSync(join(here, "..", "src", "app", "globals.css"), "utf8");
 const sideluft = (selektor: string) => {
   const blok = css.slice(css.indexOf(`${selektor} {`));
-  const fundet = blok.slice(0, blok.indexOf("}")).match(/--skema-sideluft:\s*([\d.]+)rem/);
+  const fundet = blok
+    .slice(0, blok.indexOf("}"))
+    .match(/--skema-sideluft:\s*([\d.]+)rem/);
   return fundet ? Number(fundet[1]) : null;
 };
 
@@ -424,7 +509,6 @@ const luftSel = sideluft(".skema-selektiv");
 check(luftAlm !== null, "fandt ikke --skema-sideluft i .skema");
 check(luftSel !== null, "fandt ikke --skema-sideluft i .skema-selektiv");
 
-// Arket giver skemaet 186 mm, skriften er 10 px paa print, og en rem er 16 px.
 const PX_PR_MM = 96 / 25.4;
 const indholdPx = (navne: number[], luftRem: number) =>
   186 * (analysekolonne(navne) / 100) * PX_PR_MM - 2 * luftRem * 16;
@@ -436,15 +520,11 @@ if (luftAlm !== null && luftSel !== null) {
     sel >= alm - 0.05,
     `en analysekolonne har ${sel.toFixed(2)} px i det selektive skema mod ${alm.toFixed(2)} px i det almindelige — "< 2500" braekker`,
   );
-  // AGENTS.md: "< 2500" kraever de omkring 32,5 px der er i dag. Falder begge
-  // skemaer under, er det ikke laengere en sammenligning der redder printet.
   check(alm >= 32, `det almindelige skema er nede paa ${alm.toFixed(2)} px pr. analysekolonne`);
   check(sel >= 32, `det selektive skema er nede paa ${sel.toFixed(2)} px pr. analysekolonne`);
   bredder = `analysekolonne ${alm.toFixed(2)} px alm. / ${sel.toFixed(2)} px selektiv`;
 }
 
-// Kolonnerne skal give 100 % tilsammen, ellers skalerer browseren dem selv og
-// `table-layout: fixed` holder ikke laengere skemaet ens fra sag til sag.
 for (const [navn, navne] of [
   ["det almindelige", NAVNEKOLONNER],
   ["det selektive", NAVNEKOLONNER_SELEKTIV],
@@ -457,19 +537,17 @@ for (const [navn, navne] of [
   );
 }
 
-// De to nye kolonner skal staa mellem Lokalitet og Est. ton, som i regnearket.
 check(
   NAVNEKOLONNER_SELEKTIV.length === NAVNEKOLONNER.length + 2,
   `det selektive skema har ${NAVNEKOLONNER_SELEKTIV.length} navnekolonner, forventede ${NAVNEKOLONNER.length + 2}`,
 );
 
 // ---------------------------------------------------------------------------
-// 8. Bygningsoversigten
+// 8. BBR's kodelister
 // ---------------------------------------------------------------------------
-// BBR svarer med koder. Rammer en kode ikke sin liste, star der «Kode 14» i
-// rapporten frem for et materiale — synligt, men forkert. Og to koder betyder
-// noget ud over ordlyden: 3 er fibercement MED asbest, 10 er den samme plade
-// uden. Byttes de om, siger rapporten det modsatte af sandheden.
+// Kode 3 er fibercement MED asbest, kode 10 er den samme plade uden. Byttes de
+// om, siger rapporten det modsatte af sandheden — og screeneren tager de
+// forkerte vaernemidler med.
 check(
   BBR_KODELISTER.ydervaeg["3"] === "Fibercement herunder asbest",
   `ydervaeg kode 3 blev "${BBR_KODELISTER.ydervaeg["3"]}"`,
@@ -487,37 +565,23 @@ check(
   `tag kode 10 blev "${BBR_KODELISTER.tag["10"]}"`,
 );
 
-// Opslagene skal ramme listen, og en ukendt kode skal vises frem for at blive
-// tavs.
 check(ydervaegTekst("1") === "Mursten", `ydervaeg 1 blev "${ydervaegTekst("1")}"`);
 check(tagTekst("5") === "Tegl", `tag 5 blev "${tagTekst("5")}"`);
-check(
-  varmeTekst("1") === "Fjernvarme/blokvarme",
-  `varme 1 blev "${varmeTekst("1")}"`,
-);
+check(varmeTekst("1") === "Fjernvarme/blokvarme", `varme 1 blev "${varmeTekst("1")}"`);
 check(ydervaegTekst(null) === null, "en tom kode skulle give ingenting");
 check(ydervaegTekst("") === null, "en tom streng skulle give ingenting");
-check(
-  ydervaegTekst("14") === "Kode 14",
-  `en ukendt kode blev "${ydervaegTekst("14")}"`,
-);
+check(ydervaegTekst("14") === "Kode 14", `en ukendt kode blev "${ydervaegTekst("14")}"`);
 
 for (const [navn, liste] of Object.entries(BBR_KODELISTER)) {
-  const tekster = Object.values(liste);
   check(
-    tekster.every((t) => t.trim() !== ""),
+    Object.values(liste).every((t) => t.trim() !== ""),
     `kodelisten ${navn} har en tom tekst`,
   );
   for (const kode of Object.keys(liste)) {
-    check(
-      /^\d+$/.test(kode),
-      `kodelisten ${navn} har nøglen "${kode}", som ikke er et tal`,
-    );
+    check(/^\d+$/.test(kode), `kodelisten ${navn} har nøglen "${kode}", som ikke er et tal`);
   }
 }
 
-// Anvendelseskoderne skal daekke de koder, appen faktisk moder. Listen stod for
-// med elleve, og resten faldt ned i gruppen.
 for (const kode of ["120", "140", "321", "323", "910", "930", "222"]) {
   check(
     BBR_KODELISTER.anvendelse[kode] !== undefined,
@@ -525,8 +589,9 @@ for (const kode of ["120", "140", "321", "323", "910", "930", "222"]) {
   );
 }
 
-// Blokken tager kun det med, der er udfyldt. Skabelonens stjerner og «HUSK AT
-// SLETTE» er netop det, der skal vaek.
+// ---------------------------------------------------------------------------
+// 9. Bygningsoversigten
+// ---------------------------------------------------------------------------
 const tomBygning = {
   label: "Bygning 1",
   usage_text: null,
@@ -544,10 +609,7 @@ const tomBygning = {
 
 const tom = bygningsBlok(tomBygning);
 check(tom.fakta.length === 0, `en tom bygning gav ${tom.fakta.length} oplysninger`);
-check(
-  tom.noter.length === 0,
-  "en note med kun mellemrum kom med i rapporten",
-);
+check(tom.noter.length === 0, "en note med kun mellemrum kom med i rapporten");
 
 const heleBygning = bygningsBlok({
   ...tomBygning,
@@ -561,27 +623,16 @@ const heleBygning = bygningsBlok({
   construction_note: "Muret med tegltag.",
   plan_note: "Planlagt til nedrivning.",
 } as unknown as Parameters<typeof bygningsBlok>[0]);
-check(
-  heleBygning.fakta.length === 6,
-  `en fuld bygning gav ${heleBygning.fakta.length} oplysninger, forventede 6`,
-);
+check(heleBygning.fakta.length === 6, `en fuld bygning gav ${heleBygning.fakta.length} oplysninger`);
 check(
   heleBygning.fakta.map((f) => f.vaerdi).join(" | ") ===
     "1968 | 4 | 418 m² | Mursten | Tegl | Fjernvarme/blokvarme",
   `oplysningerne blev "${heleBygning.fakta.map((f) => f.vaerdi).join(" | ")}"`,
 );
-check(
-  heleBygning.noter.length === 3,
-  `en fuld bygning gav ${heleBygning.noter.length} noter`,
-);
+check(heleBygning.noter.length === 3, `en fuld bygning gav ${heleBygning.noter.length} noter`);
 
-// Tre bygninger med alle tre beskrivelser skal kunne vaere pa et ark, som i
-// skabelonen. Den fjerde skal flyttes hel og ikke braekkes.
 const blok = (n: number) => ({ ...heleBygning, label: `Bygning ${n}` });
-check(
-  bygningsSider([blok(1), blok(2), blok(3)]).length === 1,
-  `tre bygninger gav ${bygningsSider([blok(1), blok(2), blok(3)]).length} sider`,
-);
+check(bygningsSider([blok(1), blok(2), blok(3)]).length === 1, "tre bygninger fyldte mere end et ark");
 const fireSider = bygningsSider([blok(1), blok(2), blok(3), blok(4)]);
 check(fireSider.length === 2, `fire bygninger gav ${fireSider.length} sider`);
 check(
@@ -590,9 +641,47 @@ check(
 );
 check(bygningsSider([]).length === 0, "ingen bygninger skulle give ingen sider");
 
+// ---------------------------------------------------------------------------
+// 10. Migrationen der seeder saetningerne
+// ---------------------------------------------------------------------------
+// Rammer et materialenavn ikke listen, sker der ingenting — og resultatet er en
+// rapport, hvor et materiale mangler sin saetning. Det ser ud som om skabelonen
+// var ufuldstaendig, ikke som om der var en tastefejl. Migrationen taeller selv
+// efter, men den kores kun ved en opbygning; her fanges det i kontrolkaeden.
+const lookups = migration("20260725173227_screening_seed_lookups.sql");
+const kendteMaterialer = new Set(
+  [
+    ...lookups
+      .slice(
+        lookups.indexOf("screening.materials"),
+        lookups.indexOf("screening.sample_types"),
+      )
+      .matchAll(/'([^']+)'/g),
+  ].map((m) => m[1]),
+);
+check(
+  kendteMaterialer.size > 40,
+  `fandt kun ${kendteMaterialer.size} materialer i migrationen — er filen flyttet?`,
+);
+
+const saetninger = migration("20260825120500_saetninger_fra_skabelonen.sql");
+const brugte = [
+  ...saetninger.matchAll(/^\s*\('([^']+)',\s*$/gm),
+].map((m) => m[1]);
+check(
+  brugte.length === 12,
+  `fandt ${brugte.length} materialer i saetningsmigrationen, forventede 12`,
+);
+for (const navn of brugte) {
+  check(
+    kendteMaterialer.has(navn),
+    `"${navn}" i saetningsmigrationen findes ikke i screening.materials`,
+  );
+}
+
 console.log(
   failures === 0
-    ? `OK — ${RESSOURCE_KATALOG.length} katalogtekster, ${BUILDING_PARTS.length} bygningsdele, ${sider.length} sider ved fuldt katalog, ${bredder}`
+    ? `OK — ${kendteMaterialer.size} materialer, ${brugte.length} med seedet tekst, ${bredder}`
     : `${failures} fejl.`,
 );
 process.exit(failures === 0 ? 0 : 1);

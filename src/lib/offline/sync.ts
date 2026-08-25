@@ -31,7 +31,7 @@ function toRow(s: PendingSample) {
     location_note: s.location_note,
     estimated_tons: s.estimated_tons,
     period: s.period,
-    building_part: s.building_part,
+    building_part_id: s.building_part_id,
     material_condition: s.material_condition,
     resource_handling: s.resource_handling,
     analysis_pcb: s.analysis_pcb,

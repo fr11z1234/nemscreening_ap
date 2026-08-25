@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   LevelBadge,
@@ -159,7 +158,6 @@ export default async function ResultaterPage({
 
   return (
     <>
-      <AppHeader />
       <main className="flex flex-1 flex-col gap-6 px-6 pb-16 pt-5">
         <div>
           <Link

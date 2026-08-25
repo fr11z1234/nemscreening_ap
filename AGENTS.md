@@ -97,8 +97,15 @@ npm run verify:eurofins && npm run verify:lab && npm run verify:ressourcer && np
 
 De tre `verify`-scripts er den eneste rigtige testdækning. De kører uden
 database og uden browser. Rør du `src/lib/eurofins/`, `src/lib/lab/` eller
-`src/lib/rapport/ressourcer.ts`, skal de køre — og udvid dem, når du tilføjer
-noget.
+`src/lib/rapport/`, skal de køre — og udvid dem, når du tilføjer noget.
+
+`verify:ressourcer` kan ikke længere prøve rapportens tekst; den ligger i
+databasen. Den prøver til gengæld alt det, der ikke må kunne rettes ved et uheld:
+hvad der bliver en ressource, mængderne fra ton til kilo, rækkefølgen af
+overskrifter, sideopdelingen, analyseskemaets bredde og BBR's kodelister. Og den
+holder migrationen med sætningerne op mod den, der seeder materialelisten — et
+navn stavet forkert dér giver ikke en fejl, men en rapport hvor et materiale
+mangler sin sætning.
 
 Der er ingen automatiseret browsertest. Kan du ikke se ændringen i en browser,
 så **sig det** i stedet for at melde den færdig.
@@ -162,7 +169,7 @@ saneringsbeskrivelsen og regelmotoren mangler.
 fire analysefelter, og rapporttypen rører ingen af dem. En selektiv sag sender
 de samme prøver til laboratoriet.
 
-Selektiv slår tre felter til på prøven: `building_part`, `material_condition`
+Selektiv slår tre felter til på prøven: `building_part_id`, `material_condition`
 (1-5, hvor 1 er bedst) og `resource_handling`. Bygningsdelen arves til næste
 prøve som bygningen gør — står man på taget, tages der flere prøver på taget —
 men stand og håndtering gør ikke: de er vurderinger af netop dette materiale,
@@ -174,25 +181,98 @@ pointen. I Word-skabelonen står alle fyrre linjer altid, og den der laver
 rapporten skal slette de tredive der ikke passer — det er arbejde, hvor en
 glemt sletning bliver en påstand om et materiale, der ikke findes i bygningen.
 
-Kataloget ligger i `src/lib/rapport/ressourcer.ts` og er nøglet på **parret
-(bygningsdel, materiale)**. Det er derfor bygningsdelen betyder noget: `Træ`
-bliver spærtræ i den bærende konstruktion, facadebeklædning på facaden, en dør
-i dørhullet, et trægulv indenfor og en tagkonstruktion oppe. Samme materiale,
-fem forskellige skæbner. `facade` og `vaegge` deler overskrift i rapporten, men
-er to bygningsdele, fordi udvendigt og indvendigt teglmurværk ikke kan det
-samme.
+## Materialepanelet
 
-**Opfind ikke en sætning.** En sætning må genbruges ordret for det *samme*
-materiale i en anden bygningsdel — beton knuses ens, om den sad i fundamentet
-eller i en bærende væg. Den må ikke lånes til et andet materiale: så er det en
-ny faglig påstand, og den skal komme fra Nemscreening. Mangler sætningen,
-skriver rapporten navn og mængde og lover ingenting.
+**Rapportens ord står i databasen, ikke i koden.** De lå i et katalog i
+`src/lib/rapport/ressourcer.ts` og kunne kun rettes med en udrulning. Det er
+kontoret der ved, hvad kommunen skal læse, så de rettes nu på `/materialer` —
+åbent for `office` og `admin`, samme grænse som `materials_write` i RLS.
 
-**Kun rene materialer bliver ressourcer.** En prøve uden analyser er kun
-kortlagt, og der kommer aldrig et svar — den er ren i den forstand, at intet har
-vist andet. Er der bestilt analyser, skal svaret være kommet og være rent.
-Forurenet og farligt affald holdes ude, og prøver der stadig venter på
-laboratoriet tælles og siges højt under afsnittet frem for bare at mangle.
+Tre stykker data bærer det:
+
+- **`building_parts`** er rapportens fede overskrifter, og samtidig de knapper
+ screeneren vælger imellem på prøven. `sort_order` **er** afsnittenes rækkefølge
+ i rapporten. Var en enum; en enum kan ikke rettes uden en udrulning.
+- **`materials`** har `report_name` og tre sætninger, en pr. håndtering.
+- **prøven** binder dem sammen: materiale + bygningsdel + håndtering.
+
+Rapporten slår altså navnet op på materialet og sætningen på håndteringen, og
+overskriften kommer fra bygningsdelen. `src/lib/rapport/ressourcer.ts` samler
+linjerne og lægger mængderne sammen — den bestemmer intet om ordene.
+
+**Materialer slettes ikke, de lukkes.** Prøver gemmer materialets *navn* som
+tekst, så en sletning rører ikke historikken — men den tager sætningen med, og så
+bliver en to år gammel rapport stille kortere. Et lukket materiale forsvinder
+fra vælgeren i marken og bliver stående i de rapporter, der bruger det. Det
+samme gælder bygningsdele.
+
+**Seks materialer står med tomme sætninger med vilje.** Træ, Jern og metal,
+Letbeton, Glas, Mursten og PVC har hver *flere* forskellige sætninger i kundens
+skabelon, alt efter hvor materialet sad. Med sætningen på materialet er der kun
+plads til én pr. håndtering, og at vælge for kontoret ville være at træffe en
+faglig beslutning på deres vegne. Kundens ord til dem står som kommentar i
+`20260825120500_saetninger_fra_skabelonen.sql`, så de ikke skal findes frem
+igen. Skal flere af dem bruges samtidig, er svaret at oprette materialet præcist
+— «Trægulve» ved siden af «Træ» — for det er også hvad de er.
+
+**Opfind ikke en sætning i koden.** De 12 sætninger, der blev seedet fra
+skabelonen, står med kundens egne ord — men *hvilken håndtering* hver af dem
+hører til, er udledt af ordlyden: sætningen landede i den spalte, hvis ord står
+først i den. Det er et gæt, og det står i migrationens kommentar frem for i
+brugerfladen, fordi et flueben, en forklaring, en advarsel og en prik pr.
+materiale gjorde panelet uoverskueligt.
+
+Mangler sætningen, skriver rapporten navn og mængde og lover ingenting — det er
+det rigtige svar, ikke et hul der skal fyldes med noget der lyder godt.
+
+**Laboratoriesvaret afgør, hvor en linje lander — ikke screenerens vurdering.**
+Det er den vigtigste regel i hele afsnittet, og den er kundens egen:
+
+| Labsvar | Afsnit | Tekst |
+| --- | --- | --- |
+| Rent affald | Ressourcescreening, under sin bygningsdel | håndteringens sætning |
+| Forurenet affald | Forureninger | materialets **bortskaffelse** |
+| Farligt affald | Forureninger | materialets **bortskaffelse** |
+| Afventer svar | ingen af dem, men tælles | — |
+
+Håndteringen, screeneren valgte, bestemmer altså kun sætningen for de rene.
+Skriver hun «genbrug» på en prøve, og kommer svaret tilbage gult eller rødt,
+flytter linjen til Forureninger og får bortskaffelsesteksten. Det er meningen:
+analysen validerer vurderingen, så en optimistisk screener ikke kan komme til at
+love en kommune, at forurenet beton kan genbruges. Rør ikke den retning.
+
+**Reglen står ét sted: `faktiskHandtering` i `src/lib/types.ts`.** Både
+analyseskemaets kolonne «Ressourcehåndtering» og rapportens fordeling spørger
+den. Sagde skemaet «Genbrug» på en linje, som forureningsafsnittet havde skrevet
+bortskaffelse på, ville læseren ikke vide hvem der havde ret. Verifikationen
+kører alle seksten kombinationer af valg og svar igennem og kontrollerer, at de
+to er enige.
+
+**Den gemte værdi på prøven overskrives ikke.** Skemaet viser det, reglen giver;
+`samples.resource_handling` bliver ved med at være screenerens egen vurdering.
+Det er værd at kunne se — det fortæller, at analysen fangede noget — og bliver et
+labsvar rettet senere, flytter linjen tilbage af sig selv. Havde vi overskrevet
+feltet, var begge dele væk.
+
+**Vælger screeneren selv bortskaffelse, flytter prøven også** — et materiale der
+skal bortskaffes er ikke en ressource, uanset hvad analysen siger. Ellers ville
+en bortskaffelsessætning stå under en overskrift om materialer, der kan
+genbruges.
+
+**En prøve uden analyser flyttes aldrig.** Der kommer intet svar på den, og
+intet har vist andet end at den er ren. Prøver der stadig venter, tælles og
+siges højt under ressourceafsnittet frem for bare at mangle.
+
+Gult og rødt af samme materiale lægges **ikke** sammen til én linje: niveauet
+står som et mærke ved siden af navnet i skemaets egne farver, og to niveauer i
+én linje ville gøre mærket meningsløst. Ressourceafsnittet har ingen mærker —
+alt i det er grønt, og et grønt mærke på hver linje betyder ingenting.
+
+**Forureningsafsnittet står også, når der ingen fund er.** Skabelonens spørgsmål
+skal besvares, og «Nej» er et svar — det er en kommune, der læser det. Men
+sætningen om jordforureningsattesten er udeladt: appen kan ikke vedhæfte en
+attest, og en rapport der henviser til et bilag, der ikke findes, er værre end
+en der ikke nævner det.
 
 **Screeneren taster ton, rapporten skriver kilo.** Ton er den enhed, en prøve og
 en aflæsning i marken hænger sammen i; kilo er den enhed, kunden kender

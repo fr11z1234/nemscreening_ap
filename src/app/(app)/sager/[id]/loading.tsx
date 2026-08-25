@@ -1,9 +1,8 @@
-import { HeaderShell, Skeleton } from "@/components/Skeleton";
+import { Skeleton } from "@/components/Skeleton";
 
 export default function Loading() {
   return (
     <>
-      <HeaderShell />
       <main className="flex flex-1 flex-col pb-10">
         <div className="px-4 pt-4 pb-4">
           <Skeleton className="h-4 w-16" />

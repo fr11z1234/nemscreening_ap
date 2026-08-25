@@ -2,7 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/offline/sync";
 import { SamplingView, type InitialPhoto } from "./SamplingView";
-import type { Case, CaseBuilding, LookupItem, Sample } from "@/lib/types";
+import type {
+  BuildingPart,
+  Case,
+  CaseBuilding,
+  LookupItem,
+  Sample,
+} from "@/lib/types";
 
 export const metadata = { title: "Prøvetagning · Nemscreening" };
 
@@ -22,7 +28,7 @@ export default async function SamplingPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [caseRes, buildingsRes, samplesRes, materialsRes, typesRes] =
+  const [caseRes, buildingsRes, samplesRes, materialsRes, typesRes, partsRes] =
     await Promise.all([
       supabase.from("cases").select("*").eq("id", id).maybeSingle<Case>(),
       supabase
@@ -49,6 +55,14 @@ export default async function SamplingPage({
         .eq("active", true)
         .order("name")
         .returns<LookupItem[]>(),
+      // Bygningsdelene i deres egen raekkefolge — nedefra og op gennem
+      // bygningen. Den samme orden bruges som overskrifter i rapporten.
+      supabase
+        .from("building_parts")
+        .select("id, name, sort_order, active")
+        .eq("active", true)
+        .order("sort_order")
+        .returns<BuildingPart[]>(),
     ]);
 
   const sag = caseRes.data;
@@ -114,6 +128,7 @@ export default async function SamplingPage({
       buildings={buildingsRes.data ?? []}
       materials={(materialsRes.data ?? []).map((m) => m.name)}
       sampleTypes={(typesRes.data ?? []).map((t) => t.name)}
+      buildingParts={partsRes.data ?? []}
       reportType={sag.report_type}
       initialSamples={samples}
       initialPhotos={initialPhotos}

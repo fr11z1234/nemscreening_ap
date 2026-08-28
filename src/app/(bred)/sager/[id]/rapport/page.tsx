@@ -27,12 +27,14 @@ import {
   RAPPORT_SIDER,
 } from "@/lib/rapport/tekst";
 import {
+  FORURENING_HAANDTERING_SPORGSMAAL,
   FORURENING_INDLEDNING,
   FORURENING_SPORGSMAAL,
   RESSOURCE_INDLEDNING,
   ressourceLinjeHale,
   ressourceSider,
   ressourceoversigt,
+  tekstHoejde,
   type RessourceGruppe,
 } from "@/lib/rapport/ressourcer";
 import { bygningsBlok, bygningsSider } from "@/lib/rapport/bygninger";
@@ -209,8 +211,12 @@ export default async function RapportPage({
   const ressourceSiderListe = ressourcer
     ? ressourceSider(ressourcer.ressourcer)
     : [];
+  // Handteringsteksten staar pa den forste side af afsnittet og kan vaere lang.
+  // Sideopdelingen far dens hojde at vide, sa materialelinjerne ikke bliver lagt
+  // pa en side, der ikke har plads til dem.
+  const haandteringsnote = sag.contamination_handling_note?.trim() || null;
   const forureningSiderListe = ressourcer
-    ? ressourceSider(ressourcer.forureninger)
+    ? ressourceSider(ressourcer.forureninger, tekstHoejde(haandteringsnote))
     : [];
 
   const ressourceNoter = ressourcer
@@ -548,6 +554,23 @@ export default async function RapportPage({
                   <p className="tabular mt-1">
                     {harForureninger ? "☒ Ja \u00a0\u00a0 ☐ Nej" : "☐ Ja \u00a0\u00a0 ☒ Nej"}
                   </p>
+
+                  {/* Skabelonens andet sporgsmal. Skrevet i hand pa
+                      resultatsiden — rapporten kan ikke regne den ud. Er den
+                      ikke skrevet, springes sporgsmalet over frem for at
+                      efterlade en overskrift med ingenting under. */}
+                  {haandteringsnote && (
+                    <>
+                      <p className="mt-4 font-semibold">
+                        {FORURENING_HAANDTERING_SPORGSMAAL}
+                      </p>
+                      {/* Linjeskift som kontoret har skrevet dem: teksten er
+                          ofte flere afsnit om hvert sit materiale. */}
+                      <p className="mt-1 whitespace-pre-wrap">
+                        {haandteringsnote}
+                      </p>
+                    </>
+                  )}
                 </div>
               </>
             ) : (

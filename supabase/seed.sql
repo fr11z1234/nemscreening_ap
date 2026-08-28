@@ -103,10 +103,15 @@ on conflict (id) do nothing;
 -- Sagen er en SELEKTIV nedrivning, sa ressourcescreeningen kan ses uden at der
 -- forst skal oprettes en sag og tages prover i hand. Den almindelige
 -- miljoscreening er standardvaerdien og fas ved at oprette en ny sag.
+-- Handteringsteksten er hentet ORDRET fra Nemscreenings eget plandokument
+-- («Naeste udviklingsfase – Selektiv nedrivning»), afsnittet om saneringsregler.
+-- Den er ikke skrevet her: teksten gar til en kommune, og den slags ord skal
+-- komme fra en fagperson. Den daekker praecis de tre fund i sagen — PCB i fugen,
+-- bly i malingen og asbest i tagpladerne — sa afsnittet kan ses virke.
 insert into screening.cases (
   id, case_name, status, report_type, customer_name, customer_contact,
   customer_email, customer_phone, address_text, postnr, city, area_m2,
-  built_year, rebuilt_year, note, created_by
+  built_year, rebuilt_year, note, contamination_handling_note, created_by
 ) values (
   'ca5e0001-0000-4000-8000-000000000001',
   'Nørrebrogade 12, 2200 København N',
@@ -116,6 +121,11 @@ insert into screening.cases (
   'Nørrebrogade 12, 2200 København N', '2200', 'København N',
   418, 1968, 2004,
   'Seed-sag. Prøverne dækker grøn, gul og rød med vilje.',
+  'Asbestholdige materialer skal identificeres og udsorteres inden den øvrige nedrivning. Arbejdet skal udføres efter de gældende regler for asbestarbejde. Materialerne skal håndteres, emballeres, mærkes, transporteres og afleveres efter de gældende krav.
+
+PCB-holdige fuger udsorteres før den øvrige nedrivning. Der skal samtidig tages højde for risiko for sekundær forurening af tilstødende materialer som beton, tegl eller træ.
+
+Maling med forhøjede koncentrationer af bly eller andre tungmetaller registreres som en separat forureningskilde. Hvis malingen afrenses, skal afrensningsmateriale og støv opsamles særskilt.',
   '11111111-1111-4111-8111-111111111111'
 );
 

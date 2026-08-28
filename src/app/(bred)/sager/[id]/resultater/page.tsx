@@ -20,6 +20,7 @@ import { LEVEL_LABEL, type LabLevel } from "@/lib/lab/parametre";
 import type { Case, CaseBuilding, CaseFile, Sample } from "@/lib/types";
 import { ResultatUpload } from "./ResultatUpload";
 import { RapportFiler, type RapportFilerState } from "./RapportFiler";
+import { Forureningsnote } from "./Forureningsnote";
 
 export const metadata = { title: "Resultater · Nemscreening" };
 
@@ -230,6 +231,18 @@ export default async function ResultaterPage({
           canUploadLab={canUpload}
           state={rapportFiler}
         />
+
+        {/* Rapportens ene fritekst. Star kun pa en selektiv sag, fordi
+            forureningsafsnittet kun findes der. */}
+        {erSelektiv && (
+          <section className="card p-5">
+            <Forureningsnote
+              caseId={id}
+              gemt={sag.contamination_handling_note}
+              maaSkrive={canUpload}
+            />
+          </section>
+        )}
 
         {samples.length === 0 ? (
           <p className="text-sm text-muted">

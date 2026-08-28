@@ -46,6 +46,34 @@ export const FORURENING_SPORGSMAAL =
   "Er der potentielle materialer, som kan skabe risiko for forurening ved nedrivningsarbejdet?";
 
 /**
+ * Skabelonens andet sporgsmal. Svaret skrives i hand pa resultatsiden.
+ *
+ * Det forste sporgsmal svarer rapporten selv pa ud fra analyserne. Det her kan
+ * den ikke: svaret afhaenger af hvad der konkret er fundet, hvilke regler der
+ * gaelder for det, og hvordan entreprenoren skal gribe det an.
+ */
+export const FORURENING_HAANDTERING_SPORGSMAAL =
+  "Hvordan skal disse materialer håndteres i forbindelse med nedrivningen (fx asbestregler, korrekt emballering, bortskaffelse som farligt affald)?";
+
+/**
+ * Anslaaet hojde i millimeter af en fritekst pa rapportens bredde.
+ *
+ * Arket giver 186 mm, og ved den skriftstorrelse gar der omkring 95 anslag pa en
+ * linje a 6 mm. Bruges til at give sideopdelingen at vide, hvor meget af den
+ * forste side teksten har taget — ellers ville en lang handteringsbeskrivelse
+ * skubbe materialelinjerne ud over kanten, og `.print-side` braekker ikke af sig
+ * selv.
+ */
+export function tekstHoejde(tekst: string | null): number {
+  if (!tekst?.trim()) return 0;
+  const linjer = tekst
+    .split("\n")
+    .reduce((sum, afsnit) => sum + Math.max(1, Math.ceil(afsnit.length / 95)), 0);
+  // Otte til overskriften over teksten, seks pr. linje.
+  return 8 + linjer * 6;
+}
+
+/**
  * En prove, som ressourcescreeningen har brug for at se den.
  *
  * En flad form frem for `Sample` og `lab_results`, sa udregningen kan proves
@@ -353,11 +381,22 @@ const SIDEPLADS = { foerste: 204, senere: 259 };
  */
 export function ressourceSider(
   grupper: RessourceGruppe[],
+  /**
+   * Millimeter, der allerede er brugt paa den forste side.
+   *
+   * Forureningsafsnittet har en fritekst under sporgsmalet, og den kan vaere
+   * lang. Uden at trakke den fra ville linjerne blive lagt paa en side, der ikke
+   * havde plads til dem.
+   */
+  forbrugtPaaFoersteSide = 0,
 ): RessourceGruppe[][] {
   const sider: RessourceGruppe[][] = [];
   let side: RessourceGruppe[] = [];
   let hoejde = 0;
-  let plads = SIDEPLADS.foerste;
+  // Bliver teksten laengere end siden, er der intet tilbage til linjerne, og de
+  // begynder pa naeste ark. Nul og ikke et negativt tal, sa den forste linje
+  // ikke ryger paa en side for sig.
+  let plads = Math.max(0, SIDEPLADS.foerste - forbrugtPaaFoersteSide);
 
   for (const gruppe of grupper) {
     let paabegyndt = false;

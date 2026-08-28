@@ -145,6 +145,12 @@ export type Case = {
   rebuilt_year: number | null;
   source_booking_id: string | null;
   note: string | null;
+  /**
+   * Svaret pa skabelonens «Hvordan skal disse materialer handteres i forbindelse
+   * med nedrivningen?». Skrives i hand pa resultatsiden — rapporten kan ikke
+   * regne den ud, og den gar til en kommune.
+   */
+  contamination_handling_note: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

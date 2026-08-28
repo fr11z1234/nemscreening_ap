@@ -24,6 +24,7 @@ import {
   ressourceLinjeTekst,
   ressourceSider,
   ressourceoversigt,
+  tekstHoejde,
   type RessourceGruppe,
   type RessourceProve,
 } from "../src/lib/rapport/ressourcer";
@@ -450,6 +451,44 @@ for (const c of MATERIAL_CONDITIONS) {
 // 6. Sideopdelingen
 // ---------------------------------------------------------------------------
 check(ressourceSider([]).length === 0, "ingen grupper skulle give ingen sider");
+
+/*
+ * Handteringsteksten tager plads pa afsnittets forste side.
+ *
+ * Den skrives i hand og kan blive lang. Far sideopdelingen ikke dens hojde at
+ * vide, bliver materialelinjerne lagt pa en side, der ikke har plads — og
+ * `.print-side` braekker ikke af sig selv, sa de bliver klippet.
+ */
+check(tekstHoejde(null) === 0, "ingen tekst skulle tage ingen plads");
+check(tekstHoejde("   ") === 0, "kun mellemrum skulle tage ingen plads");
+check(tekstHoejde("Kort tekst.") === 14, `en linje blev ${tekstHoejde("Kort tekst.")} mm`);
+// Afsnit taeller hver for sig: to korte linjer fylder mere end deres anslag.
+check(
+  tekstHoejde("En linje.\nEn anden linje.") === 20,
+  `to afsnit blev ${tekstHoejde("En linje.\nEn anden linje.")} mm`,
+);
+check(
+  tekstHoejde("x".repeat(190)) === 20,
+  `190 anslag blev ${tekstHoejde("x".repeat(190))} mm, forventede to linjer`,
+);
+
+const enLinje: RessourceGruppe[] = [
+  { overskrift: "Tag", linjer: linjer([prove({})]) },
+];
+check(
+  ressourceSider(enLinje, 0).length === 1,
+  "en linje uden tekst over sig fyldte mere end en side",
+);
+// En tekst der fylder hele siden skubber linjen til naeste ark frem for at
+// presse den ud over kanten.
+check(
+  ressourceSider(enLinje, 300).length === 1,
+  "en meget lang tekst gav ikke plads til linjen pa naeste side",
+);
+check(
+  ressourceSider(enLinje, 300)[0]?.[0]?.linjer.length === 1,
+  "linjen forsvandt, da teksten fyldte siden",
+);
 check(
   ressourceSider([{ overskrift: "Tag", linjer: linjer([prove({})]) }]).length === 1,
   "en enkelt linje gav mere end en side",

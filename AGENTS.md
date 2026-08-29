@@ -314,6 +314,21 @@ bbr.dk/kodelister, så en rettet ordlyd gælder hver eksisterende sag med det
 samme og ikke kun de næste. `usage_code` og `usage_text` står begge, men de er
 ældre end denne beslutning.
 
+**BBR kan rettes, men kun til en anden kode.** Etager, ydervægge, tag og
+varmeforsyning kan ændres under «Ret» på hver bygning, fordi BBR ikke altid er
+ajour — en plade kan være skiftet uden at nogen har indberettet det.
+Materialefelterne er vælgere over kodelisten og ikke fri tekst: så bliver
+«Fibercement herunder asbest» ved med at kunne genkendes af advarslen om asbest,
+og rapporten skriver stadig BBR's egne ord. Mangler materialet i listen, er der
+«Andet materiale».
+
+**To af beskrivelserne forudfyldes af BBR.** «Bygningens anvendelse» får
+anvendelsesteksten ordret — «Fritliggende enfamiliehus» — og «Konstruktion og
+stand» får ydervæg og tag som «Ydervægge: Mursten. Tag: Tegl.». Screeneren retter
+dem til en sætning og skriver standen, som BBR ikke kan vide noget om. Kun tomme
+felter udfyldes: har nogen skrevet noget, røres det ikke — hverken når siden
+indlæses, eller når BBR hentes igen.
+
 **Kode 3 betyder asbest.** I både ydervæg og tagdækning hedder kode 3
 «Fibercement herunder asbest», og kode 10 er den samme plade uden. BBR fortæller
 altså før besøget, om der kan være asbest i facaden eller taget, og derfor står

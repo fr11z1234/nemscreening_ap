@@ -3,8 +3,12 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
+  konstruktionsForslag,
+  TAG_VALG,
   tagTekst,
+  VARME_VALG,
   varmeTekst,
+  YDERVAEG_VALG,
   ydervaegTekst,
   type BbrBuilding,
   type BygningsNoter,
@@ -20,9 +24,28 @@ type Row = Bygning & { key: string; selected: boolean; isManual?: boolean };
 const field =
   "tap w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted";
 
+/**
+ * Forudfylder de to beskrivelser, der KAN udledes af BBR.
+ *
+ * Anvendelsen staar der ordret — «Fritliggende enfamiliehus» — og konstruktionen
+ * kan bygges af ydervaeg og tag. Screeneren skal stadig rette dem til en
+ * saetning og skrive standen, som BBR ikke kan vide noget om; men det er
+ * hurtigere at rette to oplysninger end at slaa dem op igen.
+ *
+ * Kun tomme felter udfyldes. Har nogen skrevet noget, roeres det ikke — hverken
+ * nar siden indlaeses, eller nar BBR hentes igen.
+ */
+const medForslag = (b: Bygning): Bygning => ({
+  ...b,
+  usageNote: b.usageNote?.trim() ? b.usageNote : b.usageText,
+  constructionNote: b.constructionNote?.trim()
+    ? b.constructionNote
+    : konstruktionsForslag(b.wallMaterialCode, b.roofMaterialCode),
+});
+
 const asRows = (buildings: Bygning[]): Row[] =>
   buildings.map((b, i) => ({
-    ...b,
+    ...medForslag(b),
     key: b.bbrBuildingId ?? `bbr-${i}`,
     selected: true,
   }));
@@ -414,19 +437,16 @@ function Beskrivelse({
       <div className="mt-3 flex flex-col gap-3">
         <NoteFelt
           label="Bygningens anvendelse"
-          hint="Fx privat bolig, erhverv, lager, værksted, institution."
           value={row.usageNote}
           onChange={(v) => onChange({ usageNote: v })}
         />
         <NoteFelt
           label="Konstruktion og stand"
-          hint="Fx «opført som traditionel muret konstruktion med tegltag, fremstår i ældre stand»."
           value={row.constructionNote}
           onChange={(v) => onChange({ constructionNote: v })}
         />
         <NoteFelt
           label="Hvad skal der ske?"
-          hint="Fx «bygningen er planlagt til fuldstændig nedrivning»."
           value={row.planNote}
           onChange={(v) => onChange({ planNote: v })}
         />
@@ -437,12 +457,10 @@ function Beskrivelse({
 
 function NoteFelt({
   label,
-  hint,
   value,
   onChange,
 }: {
   label: string;
-  hint: string;
   value: string | null;
   onChange: (v: string | null) => void;
 }) {
@@ -455,7 +473,43 @@ function NoteFelt({
         onChange={(e) => onChange(e.target.value || null)}
         className="w-full rounded-xl bg-surface-2 px-3.5 py-2.5 outline-none"
       />
-      <span className="text-xs text-muted">{hint}</span>
+    </label>
+  );
+}
+
+/**
+ * Vaelger for en af BBR's kodelister.
+ *
+ * Vaerdien der gemmes er koden og ikke teksten. Ordlyden slas op i map.ts, sa en
+ * rettet ordlyd gaelder hver eksisterende sag — og sa kan koden stadig laeses af
+ * det, der advarer om asbest.
+ */
+function KodeValg({
+  label,
+  valg,
+  value,
+  onChange,
+}: {
+  label: string;
+  valg: { code: string; text: string }[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={field}
+      >
+        <option value="">Ikke oplyst</option>
+        {valg.map((v) => (
+          <option key={v.code} value={v.code}>
+            {v.text}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -637,6 +691,41 @@ function BuildingRow({
               />
             </label>
           </div>
+
+          {/*
+            BBR's egne oplysninger om konstruktionen.
+ 
+            De rettes ved at vaelge en anden KODE og ikke ved at skrive fri
+            tekst. Sa bliver «Fibercement herunder asbest» ved med at kunne
+            genkendes af advarslen om asbest, og rapporten skriver stadig BBR's
+            egne ord. Findes materialet ikke i listen, er der «Andet materiale».
+          */}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Etager</span>
+            <NumberInput
+              value={row.floors}
+              onChange={(v) => onChange({ floors: v })}
+            />
+          </label>
+
+          <KodeValg
+            label="Ydervægge"
+            valg={YDERVAEG_VALG}
+            value={row.wallMaterialCode}
+            onChange={(v) => onChange({ wallMaterialCode: v })}
+          />
+          <KodeValg
+            label="Tag"
+            valg={TAG_VALG}
+            value={row.roofMaterialCode}
+            onChange={(v) => onChange({ roofMaterialCode: v })}
+          />
+          <KodeValg
+            label="Varmeforsyning"
+            valg={VARME_VALG}
+            value={row.heatingCode}
+            onChange={(v) => onChange({ heatingCode: v })}
+          />
 
           <button
             type="button"

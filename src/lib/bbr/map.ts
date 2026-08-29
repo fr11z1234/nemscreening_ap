@@ -250,6 +250,43 @@ export const BBR_KODELISTER = {
   anvendelse: USAGE_EXACT,
 };
 
+/**
+ * De samme lister som valg, i BBR's egen raekkefolge.
+ *
+ * Screeneren skal kunne rette dem: BBR er ikke altid ajour, og en plade kan
+ * vaere skiftet uden at nogen har indberettet det. Rettelsen sker ved at vaelge
+ * en anden KODE og ikke ved at skrive fri tekst — sa bliver «Fibercement
+ * herunder asbest» ved med at kunne genkendes af det, der advarer om asbest, og
+ * rapporten skriver stadig BBR's egne ord.
+ */
+const somValg = (liste: Record<string, string>) =>
+  Object.entries(liste).map(([code, text]) => ({ code, text }));
+
+export const YDERVAEG_VALG = somValg(YDERVAEG);
+export const TAG_VALG = somValg(TAGDAEKNING);
+export const VARME_VALG = somValg(VARMEINSTALLATION);
+
+/**
+ * Forslag til «Konstruktion og stand», bygget af det BBR ved.
+ *
+ * Screeneren skal skrive en saetning — skabelonens eksempel er «opført som
+ * traditionel muret konstruktion med tegltag og fremstar i aeldre stand» — og
+ * det er hurtigere at rette to oplysninger til en saetning end at slaa dem op
+ * igen. Standen kan BBR ikke vide noget om; den skal skrives.
+ */
+export function konstruktionsForslag(
+  wallMaterialCode: string | null,
+  roofMaterialCode: string | null,
+): string | null {
+  const dele = [
+    ydervaegTekst(wallMaterialCode) &&
+      `Ydervægge: ${ydervaegTekst(wallMaterialCode)}`,
+    tagTekst(roofMaterialCode) && `Tag: ${tagTekst(roofMaterialCode)}`,
+  ].filter((d): d is string => !!d);
+
+  return dele.length ? `${dele.join(". ")}.` : null;
+}
+
 const USAGE_GROUP: [RegExp, string][] = [
   [/^1\d\d$/, "Beboelse"],
   [/^21\d$/, "Landbrugsbygning"],

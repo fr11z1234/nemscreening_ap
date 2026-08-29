@@ -43,8 +43,12 @@ import {
 } from "../src/components/lab/ResultatSkema";
 import {
   BBR_KODELISTER,
+  konstruktionsForslag,
+  TAG_VALG,
   tagTekst,
+  VARME_VALG,
   varmeTekst,
+  YDERVAEG_VALG,
   ydervaegTekst,
 } from "../src/lib/bbr/map";
 import { bygningsBlok, bygningsSider } from "../src/lib/rapport/bygninger";
@@ -627,6 +631,57 @@ for (const kode of ["120", "140", "321", "323", "910", "930", "222"]) {
     `anvendelseskode ${kode} mangler i listen`,
   );
 }
+
+// Valglisterne skal daekke de samme koder som opslagene. Manglede en kode i
+// vaelgeren, kunne screeneren ikke rette BBR til den rigtige vaerdi.
+for (const [navn, valg, liste] of [
+  ["ydervaeg", YDERVAEG_VALG, BBR_KODELISTER.ydervaeg],
+  ["tag", TAG_VALG, BBR_KODELISTER.tag],
+  ["varme", VARME_VALG, BBR_KODELISTER.varme],
+] as const) {
+  check(
+    valg.length === Object.keys(liste).length,
+    `vaelgeren for ${navn} har ${valg.length} valg mod ${Object.keys(liste).length} koder`,
+  );
+  for (const v of valg) {
+    check(
+      liste[v.code] === v.text,
+      `${navn}-valget "${v.text}" passer ikke med koden ${v.code}`,
+    );
+  }
+}
+
+// Asbestkoden skal kunne vaelges. Kan den ikke, kan screeneren ikke rette en
+// BBR-registrering, der er forkert netop dér — og det er den vigtigste af dem.
+for (const [navn, valg] of [
+  ["ydervaeg", YDERVAEG_VALG],
+  ["tag", TAG_VALG],
+] as const) {
+  check(
+    valg.some((v) => v.code === "3" && v.text === "Fibercement herunder asbest"),
+    `asbestkoden kan ikke vaelges under ${navn}`,
+  );
+}
+
+// Forslaget til «Konstruktion og stand» bygges af det, BBR ved.
+check(
+  konstruktionsForslag("1", "5") === "Ydervægge: Mursten. Tag: Tegl.",
+  `forslaget blev "${konstruktionsForslag("1", "5")}"`,
+);
+check(
+  konstruktionsForslag("1", null) === "Ydervægge: Mursten.",
+  `kun ydervaeg gav "${konstruktionsForslag("1", null)}"`,
+);
+check(
+  konstruktionsForslag(null, "5") === "Tag: Tegl.",
+  `kun tag gav "${konstruktionsForslag(null, "5")}"`,
+);
+// Ved BBR intet, foreslas intet — sa staar feltet tomt frem for med en tom
+// saetning, screeneren skal rydde op i.
+check(
+  konstruktionsForslag(null, null) === null,
+  "uden oplysninger skulle der ikke foreslaas noget",
+);
 
 // ---------------------------------------------------------------------------
 // 9. Bygningsoversigten

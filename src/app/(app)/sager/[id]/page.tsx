@@ -52,14 +52,6 @@ export default async function CasePage({
   const samples = samplesRes.data ?? [];
   const labCount = samples.filter((s) => s.is_lab_sample).length;
 
-  // Antallet af analyser er ikke antallet af prover: en prove kan baere alle
-  // fire. Det er analyserne laboratoriet tager sig betalt for, og de kunne
-  // ikke laeses nogen steder for.
-  const analysisCount = samples.reduce(
-    (sum, s) => sum + ANALYSIS_FIELDS.filter((a) => s[a.key]).length,
-    0,
-  );
-
   // Samme graense som RLS handhaever pa cases: kun kontoret sletter en sag.
   const member = await getMember();
   const maaSlette =
@@ -140,13 +132,23 @@ export default async function CasePage({
         <section className="mt-8 px-4">
           <h2 className="label-xs uppercase tracking-wide">Prøver</h2>
 
-          {/* Tre tal frem for en linje smaat over listen. De to forste stod
-              der for; det tredje er antallet af analyser, som er det
-              laboratoriet regner efter. */}
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <Tal label="Antal prøver" value={samples.length} />
-            <Tal label="Til lab" value={labCount} />
-            <Tal label="Antal analyser" value={analysisCount} />
+          {/*
+            Et tal pr. analysepakke frem for et samlet antal.
+ 
+            Her stod «antal prover», «til lab» og «antal analyser». De to forste
+            kan laeses af listen nedenfor, og det samlede antal analyser siger
+            ikke noget nyttigt: laboratoriet regner ikke i analyser, det regner i
+            PAKKER. Fire asbestprover og fire PAH-prover koster ikke det samme,
+            og det er de fire tal her, man skal kunne se for man sender.
+          */}
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {ANALYSIS_FIELDS.map((a) => (
+              <Tal
+                key={a.key}
+                label={a.label}
+                value={samples.filter((s) => s[a.key]).length}
+              />
+            ))}
           </div>
 
           {samples.length === 0 ? (

@@ -16,6 +16,30 @@ import type { CaseBuilding } from "@/lib/types";
  * det, der er.
  */
 
+/**
+ * En oplysning samlet paa tvaers af sagens bygninger.
+ *
+ * Oplysningsboksen paa rapportens side 2 handler om EJENDOMMEN, men ydervaeg,
+ * tag og varmeforsyning staar pa den enkelte bygning. Et enfamiliehus i mursten
+ * med tegltag og et udhus med metaltag har ikke ét svar paa «Tag».
+ *
+ * Derfor listes de forskellige vaerdier frem for at vise den forste: er begge
+ * bygninger i mursten, staar «Mursten» én gang; er de ikke, staar de begge. Sa
+ * kan boksen ikke komme til at skjule, at garagen har et andet tag — og
+ * detaljen pr. bygning staar alligevel paa naeste side.
+ */
+export function samletOplysning(
+  bygninger: CaseBuilding[],
+  vaelg: (b: CaseBuilding) => string | null,
+): string | null {
+  const vaerdier = new Set<string>();
+  for (const b of bygninger) {
+    const v = vaelg(b)?.trim();
+    if (v) vaerdier.add(v);
+  }
+  return vaerdier.size ? [...vaerdier].join(", ") : null;
+}
+
 export type BygningsBlok = {
   label: string;
   usageText: string | null;

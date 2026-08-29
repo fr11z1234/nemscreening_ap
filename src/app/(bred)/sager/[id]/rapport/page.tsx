@@ -37,7 +37,12 @@ import {
   tekstHoejde,
   type RessourceGruppe,
 } from "@/lib/rapport/ressourcer";
-import { bygningsBlok, bygningsSider } from "@/lib/rapport/bygninger";
+import {
+  bygningsBlok,
+  bygningsSider,
+  samletOplysning,
+} from "@/lib/rapport/bygninger";
+import { tagTekst, varmeTekst, ydervaegTekst } from "@/lib/bbr/map";
 import { PrintKnap } from "./PrintKnap";
 import { formatDate } from "@/lib/format";
 import {
@@ -306,6 +311,23 @@ export default async function RapportPage({
   // hovedbygningen — carporte og garager star efter den.
   const ejendomstype = buildings[0]?.usage_text ?? null;
 
+  /*
+   * Konstruktionen i oplysningsboksen.
+   *
+   * De tre kommer fra BBR pr. bygning, sa de listes pa tvaers: er begge
+   * bygninger i mursten, staar «Mursten» én gang. Linjerne udelades helt, nar
+   * der ikke er noget — en sag hvor BBR ikke er hentet siden felterne kom, skal
+   * ikke fa fire streger i boksen.
+   */
+  const etager = samletOplysning(buildings, (b) =>
+    b.floors != null ? String(b.floors) : null,
+  );
+  const ydervaegge = samletOplysning(buildings, (b) =>
+    ydervaegTekst(b.wall_material_code),
+  );
+  const tag = samletOplysning(buildings, (b) => tagTekst(b.roof_material_code));
+  const varme = samletOplysning(buildings, (b) => varmeTekst(b.heating_code));
+
   const udskrevet = formatDate(new Date().toISOString());
   const sidehoved = (
     <div className="sidehoved">
@@ -412,6 +434,13 @@ export default async function RapportPage({
               value={sag.area_m2 ? `${sag.area_m2} m²` : null}
             />
             <Linje label="Ombygningsår" value={sag.rebuilt_year} />
+
+            {/* Konstruktionen fra BBR. Kun de linjer der har noget at sige —
+                ellers ville en sag uden hentede felter fa fire streger. */}
+            {etager && <Linje label="Etager" value={etager} />}
+            {ydervaegge && <Linje label="Ydervægge" value={ydervaegge} />}
+            {tag && <Linje label="Tag" value={tag} />}
+            {varme && <Linje label="Varmeforsyning" value={varme} />}
           </dl>
 
           <dl className="rounded-xl bg-surface-2 px-7 py-6">

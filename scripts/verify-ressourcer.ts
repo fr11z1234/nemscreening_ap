@@ -51,7 +51,11 @@ import {
   YDERVAEG_VALG,
   ydervaegTekst,
 } from "../src/lib/bbr/map";
-import { bygningsBlok, bygningsSider } from "../src/lib/rapport/bygninger";
+import {
+  bygningsBlok,
+  bygningsSider,
+  samletOplysning,
+} from "../src/lib/rapport/bygninger";
 
 let failures = 0;
 const check = (ok: boolean, msg: string) => {
@@ -724,6 +728,35 @@ check(
   `oplysningerne blev "${heleBygning.fakta.map((f) => f.vaerdi).join(" | ")}"`,
 );
 check(heleBygning.noter.length === 3, `en fuld bygning gav ${heleBygning.noter.length} noter`);
+
+// Oplysningsboksen paa side 2 samler pa tvaers af bygningerne. Den ma ikke kunne
+// skjule, at garagen har et andet tag end huset.
+const bygning = (tag: string | null, vaeg: string | null) =>
+  ({ roof_material_code: tag, wall_material_code: vaeg }) as unknown as Parameters<
+    typeof samletOplysning
+  >[0][number];
+
+check(
+  samletOplysning([bygning("5", "1"), bygning("5", "1")], (b) =>
+    tagTekst(b.roof_material_code),
+  ) === "Tegl",
+  "to ens tage blev ikke lagt sammen til én værdi",
+);
+check(
+  samletOplysning([bygning("5", "1"), bygning("6", "1")], (b) =>
+    tagTekst(b.roof_material_code),
+  ) === "Tegl, Metal",
+  `to forskellige tage blev "${samletOplysning([bygning("5", "1"), bygning("6", "1")], (b) => tagTekst(b.roof_material_code))}"`,
+);
+check(
+  samletOplysning([bygning(null, null)], (b) => tagTekst(b.roof_material_code)) ===
+    null,
+  "en bygning uden tag skulle give ingenting, sa linjen kan udelades",
+);
+check(
+  samletOplysning([], (b) => tagTekst(b.roof_material_code)) === null,
+  "ingen bygninger skulle give ingenting",
+);
 
 const blok = (n: number) => ({ ...heleBygning, label: `Bygning ${n}` });
 check(bygningsSider([blok(1), blok(2), blok(3)]).length === 1, "tre bygninger fyldte mere end et ark");

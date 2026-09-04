@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   RESSOURCE_INDLEDNING,
+  ressourceLinjeHoved,
   ressourceLinjeTekst,
   ressourceSider,
   ressourceoversigt,
@@ -94,6 +95,8 @@ const materiale = (m: Partial<Material> & { name: string }): Material => ({
   sentence_genbrug: null,
   sentence_genanvendelse: null,
   sentence_bortskaffelse: null,
+  sentence_forurenet: null,
+  sentence_asbest: null,
   ...m,
 });
 
@@ -104,6 +107,8 @@ const BETON = materiale({
   sentence_genanvendelse: "egnet til nedknusning og genanvendelse.",
   sentence_genbrug: "kan genbruges som hele elementer.",
   sentence_bortskaffelse: "bortskaffes efter gældende regler.",
+  sentence_forurenet: "udsorteres som forurenet affald.",
+  sentence_asbest: "emballeres støvtæt og afleveres som asbestholdigt affald.",
 });
 const TRAE = materiale({
   name: "Træ",
@@ -121,6 +126,7 @@ const prove = (p: Partial<RessourceProve>): RessourceProve => ({
   resource_handling: "genanvendelse",
   estimated_tons: 1,
   level: null,
+  asbestPaavist: false,
   isLabSample: false,
   ...p,
 });
@@ -151,6 +157,13 @@ check(
  * til forureningsafsnittet og baere bortskaffelsesteksten. Ellers loeber en
  * optimistisk vurdering hele vejen ud i et dokument til en kommune.
  */
+// Saetningen er IKKE den samme for de to: forurenet affald skal udsorteres,
+// farligt affald skal til et godkendt modtageanlaeg. Se afsnit 1b nedenfor.
+const FORVENTET_SAETNING = {
+  forurenet: "udsorteres som forurenet affald.",
+  farligt: "bortskaffes efter gældende regler.",
+} as const;
+
 for (const level of ["forurenet", "farligt"] as const) {
   const p = prove({ isLabSample: true, level, resource_handling: "genbrug" });
   check(
@@ -160,8 +173,8 @@ for (const level of ["forurenet", "farligt"] as const) {
   const u = urene([p]);
   check(u.length === 1, `en ${level} prove kom ikke i forureningsafsnittet`);
   check(
-    u[0]?.saetning === "bortskaffes efter gældende regler.",
-    `en ${level} prove med genbrug valgt fik saetningen "${u[0]?.saetning}" — den skal bortskaffes`,
+    u[0]?.saetning === FORVENTET_SAETNING[level],
+    `en ${level} prove med genbrug valgt fik saetningen "${u[0]?.saetning}"`,
   );
   check(u[0]?.niveau === level, `niveauet pa linjen blev "${u[0]?.niveau}"`);
 }
@@ -204,6 +217,126 @@ check(
 check(
   linjer([prove({ isLabSample: true, level: "rent" })])[0]?.niveau === "rent",
   "en ren ressource mistede sit niveau i dataen",
+);
+
+// ---------------------------------------------------------------------------
+// 1b. Hvilken af de tre bortskaffelsestekster linjen far
+// ---------------------------------------------------------------------------
+/*
+ * Rangfolgen er kundens egen, og den er ikke til at gaette sig til af niveauet
+ * alene:
+ *
+ *   asbest pavist               -> asbestteksten, uanset alt andet
+ *   screeneren valgte bortskaf. -> bortskaffelsesteksten, uanset Eurofins
+ *   farligt affald              -> bortskaffelsesteksten (samme besked)
+ *   forurenet affald            -> forureningsteksten
+ *
+ * Reglen ligger i `bortskaffelsestekst` i types.ts. Her proves den gennem
+ * rapporten, sa det er den vej fra prove til faerdig saetning der kontrolleres
+ * — ikke bare funktionen for sig.
+ */
+const BORT = "bortskaffes efter gældende regler.";
+const FORUR = "udsorteres som forurenet affald.";
+const ASBEST = "emballeres støvtæt og afleveres som asbestholdigt affald.";
+
+const saetningFor = (p: Partial<RessourceProve>) =>
+  urene([prove({ isLabSample: true, ...p })])[0]?.saetning;
+
+const tekstTilfaelde: [string, Partial<RessourceProve>, string][] = [
+  [
+    "gult svar pa en prove sat til genanvendelse",
+    { level: "forurenet", resource_handling: "genanvendelse" },
+    FORUR,
+  ],
+  [
+    "rodt svar uden asbest",
+    { level: "farligt", resource_handling: "genbrug" },
+    BORT,
+  ],
+  [
+    "screeneren valgte bortskaffelse, svaret er gult",
+    { level: "forurenet", resource_handling: "bortskaffelse" },
+    BORT,
+  ],
+  [
+    "screeneren valgte bortskaffelse, svaret er rent",
+    { level: "rent", resource_handling: "bortskaffelse" },
+    BORT,
+  ],
+  [
+    "asbest pavist",
+    { level: "farligt", asbestPaavist: true, resource_handling: "genbrug" },
+    ASBEST,
+  ],
+  [
+    "asbest pavist, og screeneren valgte bortskaffelse",
+    {
+      level: "farligt",
+      asbestPaavist: true,
+      resource_handling: "bortskaffelse",
+    },
+    ASBEST,
+  ],
+];
+
+for (const [hvad, p, forventet] of tekstTilfaelde) {
+  const fik = saetningFor(p);
+  check(fik === forventet, `${hvad}: fik "${fik}", forventede "${forventet}"`);
+}
+
+/*
+ * To rode prover af samme materiale, hvor asbest kun er pavist i den ene.
+ *
+ * De ma IKKE laegges sammen til en linje. Niveauet er det samme, sa uden
+ * teksten i grupperingsnoglen ville de smelte sammen, og den ene af de to
+ * saetninger ville forsvinde ud af rapporten — den om asbest, hvis P2 kom
+ * forst. Maengderne skal blive hos hver sin.
+ */
+const roedMedOgUdenAsbest = urene([
+  prove({ label: "P1", isLabSample: true, level: "farligt", estimated_tons: 4 }),
+  prove({
+    label: "P2",
+    isLabSample: true,
+    level: "farligt",
+    asbestPaavist: true,
+    estimated_tons: 6,
+  }),
+]);
+check(
+  roedMedOgUdenAsbest.length === 2,
+  `rod med og uden asbest gav ${roedMedOgUdenAsbest.length} linjer, skulle give 2`,
+);
+check(
+  roedMedOgUdenAsbest.map((l) => l.saetning).sort().join(" | ") ===
+    [ASBEST, BORT].sort().join(" | "),
+  "de to rode linjer fik ikke hver sin saetning",
+);
+check(
+  roedMedOgUdenAsbest.find((l) => l.saetning === ASBEST)?.kg === 6000,
+  "asbestlinjen fik ikke sin egen maengde",
+);
+
+/*
+ * Forureningslinjen navngives med provenummeret, ikke materialet.
+ *
+ * Entreprenoren skal kunne slaa den enkelte prove op i analyseskemaet;
+ * «Glasseret tegl» siger ikke hvilket af tre stykker der var forurenet.
+ * Ressourceafsnittet beholder navnet — der er materialet hele pointen.
+ */
+const toGule = urene([
+  prove({ label: "P1", isLabSample: true, level: "forurenet", estimated_tons: 4 }),
+  prove({ label: "P2", isLabSample: true, level: "forurenet", estimated_tons: 6 }),
+]);
+check(toGule.length === 1, "to ens gule prover blev ikke lagt sammen til en linje");
+check(
+  ressourceLinjeHoved(toGule[0]!) === "P1, P2",
+  `forureningslinjens hoved blev "${ressourceLinjeHoved(toGule[0]!)}"`,
+);
+check(toGule[0]?.kg === 10000, "maengderne blev ikke lagt sammen");
+// Ressourceafsnittet gaar den anden vej: der staar materialets rapportnavn.
+check(
+  linjer([prove({ label: "P1" })])[0]?.navn === "Beton",
+  "ressourcelinjen mistede materialets rapportnavn",
 );
 
 /*

@@ -8,6 +8,7 @@ import {
   ResultatSkema,
   SkemaForklaring,
   SKEMA_BREDDE,
+  asbestPaavist,
   levelOfSample,
   type SkemaResult,
   type SkemaSample,
@@ -32,6 +33,7 @@ import {
   FORURENING_SPORGSMAAL,
   RESSOURCE_INDLEDNING,
   ressourceLinjeHale,
+  ressourceLinjeHoved,
   ressourceSider,
   ressourceoversigt,
   tekstHoejde,
@@ -206,6 +208,7 @@ export default async function RapportPage({
           resource_handling: s.resource_handling,
           estimated_tons: s.estimated_tons,
           level: levelOfSample(results.get(s.id)),
+          asbestPaavist: asbestPaavist(results.get(s.id)),
           isLabSample: s.is_lab_sample,
         })),
         materialerRes.data ?? [],
@@ -554,11 +557,16 @@ export default async function RapportPage({
  
         Star efter ressourcescreeningen og for analyseskemaet, som i skabelonen.
         Her lander alt det, der IKKE er en ressource: forurenet og farligt
-        affald, plus det rene der alligevel skal bortskaffes. Linjerne baerer
-        materialets bortskaffelsestekst — ogsa hvis screeneren skrev genbrug pa
-        proven. Det er laboratoriesvaret der bestemmer, og det er meningen: en
-        optimistisk vurdering i marken bliver rettet af analysen frem for at ende
-        i en rapport til en kommune.
+        affald, plus det rene der alligevel skal bortskaffes. Linjerne baerer en
+        af materialets tre bortskaffelsestekster — ogsa hvis screeneren skrev
+        genbrug pa proven. Det er laboratoriesvaret der bestemmer, og det er
+        meningen: en optimistisk vurdering i marken bliver rettet af analysen
+        frem for at ende i en rapport til en kommune.
+
+        Linjerne navngives med provenummeret og ikke materialet, sa
+        entreprenoren kan slaa den enkelte prove op i analyseskemaet. Hvilken af
+        de tre saetninger der staar, afgores af `bortskaffelsestekst` i
+        types.ts — asbest overruler alt.
  
         Afsnittet staar ogsa nar der ingen fund er. Spoergsmalet skal besvares,
         og «Nej» er et svar.
@@ -607,7 +615,11 @@ export default async function RapportPage({
             )}
 
             {sideGrupper.map((gruppe) => (
-              <Linjegruppe key={gruppe.overskrift} gruppe={gruppe} />
+              <Linjegruppe
+                key={gruppe.overskrift}
+                gruppe={gruppe}
+                visProvenumre
+              />
             ))}
 
             {nr === 0 && !harForureninger && (
@@ -836,14 +848,38 @@ export default async function RapportPage({
  * materialer der hoerer til. Forskellen er niveaumaerket, som kun de urene
  * linjer baerer.
  */
-function Linjegruppe({ gruppe }: { gruppe: RessourceGruppe }) {
+function Linjegruppe({
+  gruppe,
+  /**
+   * Om linjerne skal navngives med provenummeret frem for materialet.
+   *
+   * Sat i forureningsafsnittet. Der peger linjen paa en konkret prove, som
+   * entreprenoren skal kunne slaa op i analyseskemaet og se malingerne bag —
+   * materialenavnet siger ikke hvilket af tre stykker glasseret tegl der var
+   * forurenet. Ressourceafsnittet beholder navnene: det er et overblik over
+   * hvad bygningen indeholder, og der er navnet hele pointen.
+   */
+  visProvenumre = false,
+}: {
+  gruppe: RessourceGruppe;
+  visProvenumre?: boolean;
+}) {
   return (
     <div className="mt-5">
       <h3 className="font-semibold">{gruppe.overskrift}</h3>
       <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
         {gruppe.linjer.map((linje) => (
-          <li key={`${linje.navn}-${linje.niveau ?? ""}`} className="mt-1 first:mt-0">
-            <span className="font-medium">{linje.navn}</span>
+          <li
+            // Provenumrene er entydige: den samme prove kan kun ligge paa en
+            // linje. Navn og niveau alene er det ikke, nu hvor to rode linjer af
+            // samme materiale kan staa ved siden af hinanden med hver sin
+            // bortskaffelsestekst.
+            key={`${linje.navn}-${linje.niveau ?? ""}-${linje.labels.join(",")}`}
+            className="mt-1 first:mt-0"
+          >
+            <span className="font-medium">
+              {visProvenumre ? ressourceLinjeHoved(linje) : linje.navn}
+            </span>
             <Niveaumaerke niveau={linje.niveau} /> {ressourceLinjeHale(linje)}
           </li>
         ))}

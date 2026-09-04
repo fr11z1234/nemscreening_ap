@@ -1,9 +1,12 @@
 import { formatHeltal } from "@/lib/format";
 import { worstLevel, type LabLevel } from "@/lib/lab/parametre";
 import {
+  bortskaffelsestekst,
   conditionLabel,
+  DISPOSAL_SENTENCE_FIELD,
   faktiskHandtering,
   SENTENCE_FIELD,
+  type Bortskaffelsestekst,
   type BuildingPart,
   type Material,
   type ResourceHandling,
@@ -89,6 +92,14 @@ export type RessourceProve = {
   estimated_tons: number | null;
   /** Niveauet fra laboratoriet. Null nar der ikke er kommet et svar. */
   level: LabLevel | null;
+  /**
+   * Om asbest er pavist i netop denne prove.
+   *
+   * Star ved siden af `level` og ikke i den: pavist asbest gor proven rod, men
+   * en rod prove er ikke noedvendigvis asbest. Det er forskellen, der afgor
+   * hvilken bortskaffelsestekst linjen far.
+   */
+  asbestPaavist: boolean;
   /** Om der er bestilt analyser. En prove uden er kun kortlagt. */
   isLabSample: boolean;
 };
@@ -118,7 +129,11 @@ export type Ressourceoversigt = {
   ressourcer: RessourceGruppe[];
   /**
    * Alt der ikke er en ressource: forurenet og farligt affald, plus det rene,
-   * der alligevel bortskaffes. Linjerne baerer materialets bortskaffelsestekst.
+   * der alligevel bortskaffes.
+   *
+   * Linjerne baerer en af materialets TRE bortskaffelsestekster — hvilken, star
+   * i `bortskaffelsestekst` i types.ts. Og de navngives med provenummeret frem
+   * for materialet: se `ressourceLinjeHoved`.
    */
   forureninger: RessourceGruppe[];
   /**
@@ -139,6 +154,11 @@ type Post = {
   part: BuildingPart;
   material: string;
   handling: ResourceHandling | null;
+  /**
+   * Hvilken bortskaffelsestekst linjen skal baere. Null i ressourceafsnittet,
+   * hvor `handling` vaelger saetningen i stedet.
+   */
+  tekst: Bortskaffelsestekst | null;
   proever: RessourceProve[];
 };
 
@@ -198,16 +218,26 @@ export function ressourceoversigt(
     const handling = faktiskHandtering(p.resource_handling, p.level);
 
     if (handling === "bortskaffelse") {
-      // Niveauet er med i noglen og ikke handteringen: teksten er den samme for
-      // dem alle, men gult og rodt ma ikke laegges sammen til en linje — maerket
-      // ved siden af skal betyde noget.
+      // Niveauet er med i noglen og ikke handteringen: gult og rodt ma ikke
+      // laegges sammen til en linje — maerket ved siden af skal betyde noget.
+      //
+      // Teksten er med af samme grund, og den er ikke afledt af niveauet: to
+      // rode prover af samme materiale far hver sin saetning, hvis asbest kun er
+      // pavist i den ene. Uden den i noglen ville de to smelte sammen til en
+      // linje, og den ene af saetningerne ville forsvinde ud af rapporten.
+      const tekst = bortskaffelsestekst(
+        p.resource_handling,
+        p.level,
+        p.asbestPaavist,
+      );
       laegTil(
         urene,
-        noegle(del.id, materiale, p.level ?? ""),
+        noegle(del.id, materiale, p.level ?? "", tekst),
         del,
         materiale,
         p,
         "bortskaffelse",
+        tekst,
       );
     } else {
       // Her vaelger handteringen saetningen: er halvdelen af betonen til genbrug
@@ -219,13 +249,14 @@ export function ressourceoversigt(
         materiale,
         p,
         handling,
+        null,
       );
     }
   }
 
   return {
-    ressourcer: byggGrupper(rene, bygningsdele, materialeVedNavn, false),
-    forureninger: byggGrupper(urene, bygningsdele, materialeVedNavn, true),
+    ressourcer: byggGrupper(rene, bygningsdele, materialeVedNavn),
+    forureninger: byggGrupper(urene, bygningsdele, materialeVedNavn),
     afventer,
     udenMateriale,
   };
@@ -238,17 +269,17 @@ function laegTil(
   material: string,
   p: RessourceProve,
   handling: ResourceHandling | null,
+  tekst: Bortskaffelsestekst | null,
 ) {
   const post = kort.get(k);
   if (post) post.proever.push(p);
-  else kort.set(k, { part, material, handling, proever: [p] });
+  else kort.set(k, { part, material, handling, tekst, proever: [p] });
 }
 
 function byggGrupper(
   poster: Map<string, Post>,
   bygningsdele: BuildingPart[],
   materialeVedNavn: Map<string, Material>,
-  bortskaffelse: boolean,
 ): RessourceGruppe[] {
   // Grupperne folger bygningsdelenes egen raekkefolge. Den staar i databasen og
   // rettes i panelet, sa afsnittene kan flyttes uden en udrulning.
@@ -272,8 +303,8 @@ function byggGrupper(
     const linjer = iDelen.map((post) => {
       const m = materialeVedNavn.get(post.material);
       const saetning = m
-        ? bortskaffelse
-          ? m.sentence_bortskaffelse
+        ? post.tekst
+          ? m[DISPOSAL_SENTENCE_FIELD[post.tekst]]
           : post.handling
             ? m[SENTENCE_FIELD[post.handling]]
             : null
@@ -344,6 +375,22 @@ export function ressourceLinjeHale(linje: RessourceLinje): string {
   if (linje.saetning) dele.push(linje.saetning);
 
   return dele.join(" ");
+}
+
+/**
+ * Linjens forreste led: materialets navn, eller provenumrene.
+ *
+ * I ressourceafsnittet staar materialet — det er et overblik over hvad
+ * bygningen indeholder, og navnet er hele pointen.
+ *
+ * I forureningsafsnittet staar provenummeret i stedet. Der peger linjen paa en
+ * konkret prove, som entreprenoren skal kunne slaa op i analyseskemaet og finde
+ * malingerne bag; materialenavnet siger ikke hvilken af de tre stykker
+ * glasseret tegl der var forurenet. Er to prover af samme materiale lagt sammen
+ * til en linje, staar de begge: «P1, P2».
+ */
+export function ressourceLinjeHoved(linje: RessourceLinje): string {
+  return linje.labels.length ? linje.labels.join(", ") : linje.navn;
 }
 
 /** Hele linjen som den staar i rapporten. */

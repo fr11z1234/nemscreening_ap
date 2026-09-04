@@ -61,6 +61,18 @@ export function levelOfSample(result: SkemaResult | undefined): LabLevel | null 
   );
 }
 
+/**
+ * Om Eurofins har svaret «Pavist» pa asbest i netop denne prove.
+ *
+ * Ikke det samme som at proven er rod: bly over graensen gor den ogsa rod. Det
+ * er forskellen, der afgor om rapporten skriver asbestteksten, og den kan kun
+ * laeses af asbestcellen selv — se `bortskaffelsestekst` i types.ts.
+ */
+export function asbestPaavist(result: SkemaResult | undefined): boolean {
+  if (!result) return false;
+  return readValue(result.asbestos ?? null).state === "pavist";
+}
+
 export function LevelBadge({
   level,
   erLabprove = true,

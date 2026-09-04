@@ -52,7 +52,11 @@ export async function gemMateriale(
       report_name: tekst(formData, "report_name"),
       sentence_genbrug: tekst(formData, "sentence_genbrug"),
       sentence_genanvendelse: tekst(formData, "sentence_genanvendelse"),
+      // Tre bortskaffelsestekster, ikke en. Hvilken der bruges, afgores af
+      // `bortskaffelsestekst` i types.ts — asbest overruler de to andre.
       sentence_bortskaffelse: tekst(formData, "sentence_bortskaffelse"),
+      sentence_forurenet: tekst(formData, "sentence_forurenet"),
+      sentence_asbest: tekst(formData, "sentence_asbest"),
     })
     .eq("id", id)
     .select("id");

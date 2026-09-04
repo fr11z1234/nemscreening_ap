@@ -304,6 +304,8 @@ export type Material = LookupItem & {
   sentence_genbrug: string | null;
   sentence_genanvendelse: string | null;
   sentence_bortskaffelse: string | null;
+  sentence_forurenet: string | null;
+  sentence_asbest: string | null;
 };
 
 /** Feltet pa `Material` der baerer saetningen for en given handtering. */
@@ -312,6 +314,39 @@ export const SENTENCE_FIELD = {
   genanvendelse: "sentence_genanvendelse",
   bortskaffelse: "sentence_bortskaffelse",
 } as const satisfies Record<ResourceHandling, keyof Material>;
+
+/**
+ * Hvilken af de tre bortskaffelsestekster en linje skal baere.
+ *
+ * `bortskaffelse` er den oprindelige og daekker to tilfaelde, fordi de siger
+ * det samme til entreprenoren: screeneren valgte selv bortskaffelse, eller
+ * svaret kom tilbage rodt. Farligt affald og bortskaffelse er samme besked.
+ */
+export type Bortskaffelsestekst = "bortskaffelse" | "forurenet" | "asbest";
+
+export const DISPOSAL_SENTENCE_FIELD = {
+  bortskaffelse: "sentence_bortskaffelse",
+  forurenet: "sentence_forurenet",
+  asbest: "sentence_asbest",
+} as const satisfies Record<Bortskaffelsestekst, keyof Material>;
+
+export const DISPOSAL_SENTENCE_LABEL: Record<Bortskaffelsestekst, string> = {
+  bortskaffelse: "Bortskaffelse",
+  forurenet: "Forurenet affald",
+  asbest: "Asbest påvist",
+};
+
+/**
+ * Hvornar hver af de tre bruges. Vises i materialepanelet, sa kontoret ikke
+ * skal gaette hvilket felt der ender i hvilken rapport.
+ */
+export const DISPOSAL_SENTENCE_HINT: Record<Bortskaffelsestekst, string> = {
+  bortskaffelse:
+    "Screeneren valgte bortskaffelse, eller svaret er farligt affald.",
+  forurenet:
+    "Gult svar på en prøve, screeneren havde sat til genbrug eller genanvendelse.",
+  asbest: "Asbest påvist i prøven. Overruler de to andre.",
+};
 
 /**
  * Handteringen som den GAELDER, nar laboratoriet har svaret.
@@ -336,6 +371,42 @@ export function faktiskHandtering(
 ): ResourceHandling | null {
   if (niveau === "forurenet" || niveau === "farligt") return "bortskaffelse";
   return valgt;
+}
+
+/**
+ * HVILKEN bortskaffelsestekst linjen far. Soesterreglen til `faktiskHandtering`.
+ *
+ * `faktiskHandtering` afgor OM proven skal bortskaffes; den her afgor hvad der
+ * sa staar. De er delt, fordi de svarer pa hver sit sporgsmal — skemaets
+ * kolonne skal kun vide det forste.
+ *
+ * Rangfolgen, oppefra og ned:
+ *
+ *   1. Asbest pavist       — overruler alt, ogsa screenerens eget valg. Pavist
+ *                            asbest er farligt affald hver gang, og handteringen
+ *                            er en anden end for andet farligt affald: befugtes,
+ *                            emballeres stovtaet, holdes adskilt.
+ *   2. Screeneren valgte    — hun stod ved materialet. Sagde hun bortskaffelse,
+ *      bortskaffelse         gaelder det, uanset hvad Eurofins svarer.
+ *   3. Farligt affald       — samme besked som bortskaffelse, samme saetning.
+ *   4. Forurenet affald     — den eneste, der far sin egen nye tekst: her blev
+ *                             screenerens genbrug eller genanvendelse rettet af
+ *                             analysen, og materialet er hverken rent eller
+ *                             farligt.
+ *
+ * Kaldes kun for linjer, der ER endt i forureningsafsnittet. Er niveauet rent
+ * eller ukendt, og valgte screeneren ikke bortskaffelse, er proven en ressource
+ * og kommer aldrig herind — se `ressourceoversigt`.
+ */
+export function bortskaffelsestekst(
+  valgt: ResourceHandling | null,
+  niveau: LabLevel | null,
+  asbestPaavist: boolean,
+): Bortskaffelsestekst {
+  if (asbestPaavist) return "asbest";
+  if (valgt === "bortskaffelse") return "bortskaffelse";
+  if (niveau === "farligt") return "bortskaffelse";
+  return "forurenet";
 }
 
 /** De fire analysevalg screeneren ser i felten. */

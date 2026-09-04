@@ -193,7 +193,8 @@ Tre stykker data bærer det:
 - **`building_parts`** er rapportens fede overskrifter, og samtidig de knapper
  screeneren vælger imellem på prøven. `sort_order` **er** afsnittenes rækkefølge
  i rapporten. Var en enum; en enum kan ikke rettes uden en udrulning.
-- **`materials`** har `report_name` og tre sætninger, en pr. håndtering.
+- **`materials`** har `report_name` og fem sætninger: én for genbrug, én for
+  genanvendelse og **tre for bortskaffelse**. Se afsnittet nedenfor.
 - **prøven** binder dem sammen: materiale + bygningsdel + håndtering.
 
 Rapporten slår altså navnet op på materialet og sætningen på håndteringen, og
@@ -231,8 +232,9 @@ Det er den vigtigste regel i hele afsnittet, og den er kundens egen:
 | Labsvar | Afsnit | Tekst |
 | --- | --- | --- |
 | Rent affald | Ressourcescreening, under sin bygningsdel | håndteringens sætning |
-| Forurenet affald | Forureninger | materialets **bortskaffelse** |
+| Forurenet affald | Forureninger | materialets **forurenet** |
 | Farligt affald | Forureninger | materialets **bortskaffelse** |
+| Asbest påvist | Forureninger | materialets **asbest** |
 | Afventer svar | ingen af dem, men tælles | — |
 
 Håndteringen, screeneren valgte, bestemmer altså kun sætningen for de rene.
@@ -258,6 +260,46 @@ feltet, var begge dele væk.
 skal bortskaffes er ikke en ressource, uanset hvad analysen siger. Ellers ville
 en bortskaffelsessætning stå under en overskrift om materialer, der kan
 genbruges.
+
+**Bortskaffelsen har tre sætninger, ikke én.** De tre tilfælde kræver hver sit
+af entreprenøren: forurenet affald skal udsorteres, farligt affald skal til et
+godkendt modtageanlæg, og asbest skal befugtes, emballeres støvtæt og holdes
+adskilt fra alt andet. Én fælles sætning måtte enten love for lidt om asbesten
+eller for meget om det forurenede. Rangfølgen ligger i `bortskaffelsestekst` i
+`src/lib/types.ts`, ved siden af `faktiskHandtering`:
+
+| Situation | Felt |
+| --- | --- |
+| Asbest påvist | `sentence_asbest` |
+| Screeneren valgte bortskaffelse | `sentence_bortskaffelse` |
+| Farligt affald | `sentence_bortskaffelse` |
+| Forurenet affald | `sentence_forurenet` |
+
+Rækkefølgen **er** reglen, og de to øverste linjer er dem der overrasker.
+**Asbest overruler alt**, også screenerens eget valg og alt andet der er fundet
+i prøven — påvist asbest gør prøven rød, men en rød prøve er ikke nødvendigvis
+asbest, og de to skal ikke sige det samme. Og **screenerens `bortskaffelse`
+slår Eurofins**: hun stod ved materialet, og farligt affald og bortskaffelse er
+den samme besked, så de deler felt.
+
+`sentence_bortskaffelse` er den oprindelige og skiftede ikke betydning, da de to
+andre kom til. Derfor ændrede ingen eksisterende rapport ordlyd.
+
+Kontoret havde selv fundet en vej udenom, før felterne fandtes: asbestteksten
+lagt på de materialer, der *hedder* noget med asbest. Det virker kun, hvis
+screeneren ramte det rigtige navn i marken — svarer Eurofins «Påvist» på noget
+registreret som «Eternit, asbestfri», skal asbestteksten frem alligevel. Det er
+analysen der ved det, ikke navnet.
+
+**Teksten er med i grupperingsnøglen.** To røde prøver af samme materiale, hvor
+asbest kun er påvist i den ene, må ikke lægges sammen til én linje — så ville
+den ene af de to sætninger forsvinde ud af rapporten.
+
+**Forureningslinjen navngives med prøvenummeret, ikke materialet:** `P1, P2 –
+200 kg i ringe stand, …`. Entreprenøren skal kunne slå den enkelte prøve op i
+analyseskemaet og se målingerne bag; «Glasseret tegl» siger ikke hvilket af tre
+stykker der var forurenet. Ressourceafsnittet beholder materialenavnene — det er
+et overblik over hvad bygningen indeholder, og der er navnet hele pointen.
 
 **En prøve uden analyser flyttes aldrig.** Der kommer intet svar på den, og
 intet har vist andet end at den er ren. Prøver der stadig venter, tælles og

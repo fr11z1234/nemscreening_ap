@@ -2,10 +2,14 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ressourceLinjeTekst } from "@/lib/rapport/ressourcer";
+import { ressourceLinjeHale } from "@/lib/rapport/ressourcer";
 import {
-  RESOURCE_HANDLINGS,
+  DISPOSAL_SENTENCE_FIELD,
+  DISPOSAL_SENTENCE_HINT,
+  DISPOSAL_SENTENCE_LABEL,
   RESOURCE_HANDLING_LABEL,
+  SENTENCE_FIELD,
+  type Bortskaffelsestekst,
   type BuildingPart,
   type Material,
   type ResourceHandling,
@@ -140,6 +144,21 @@ export function MaterialePanel({
   );
 }
 
+/**
+ * De to handteringer, screeneren vaelger for et materiale, der ER en ressource.
+ *
+ * «Bortskaffelse» er ogsa et valg i marken, men dens saetning hoerer hjemme i
+ * gruppen nedenfor sammen med de to andre bortskaffelsestekster — det er den
+ * samme spalte i rapporten, og de tre skal kunne laeses op mod hinanden.
+ */
+const RESSOURCEHANDTERINGER: ResourceHandling[] = ["genbrug", "genanvendelse"];
+
+const BORTSKAFFELSESTEKSTER: Bortskaffelsestekst[] = [
+  "bortskaffelse",
+  "forurenet",
+  "asbest",
+];
+
 function MaterialeForm({ m }: { m: Material }) {
   const [state, formAction] = useActionState<PanelState, FormData>(
     gemMateriale,
@@ -148,15 +167,20 @@ function MaterialeForm({ m }: { m: Material }) {
 
   const [navn, setNavn] = useState(m.name);
   const [rapportnavn, setRapportnavn] = useState(m.report_name ?? "");
-  const [saetninger, setSaetninger] = useState<
-    Record<ResourceHandling, string>
-  >({
-    genbrug: m.sentence_genbrug ?? "",
-    genanvendelse: m.sentence_genanvendelse ?? "",
-    bortskaffelse: m.sentence_bortskaffelse ?? "",
+  // Nogle er feltnavnet i databasen, sa de fem tekstfelter kan deles om den
+  // samme tilstand uden at skulle oversaettes frem og tilbage.
+  const [saetninger, setSaetninger] = useState<Record<string, string>>({
+    sentence_genbrug: m.sentence_genbrug ?? "",
+    sentence_genanvendelse: m.sentence_genanvendelse ?? "",
+    sentence_bortskaffelse: m.sentence_bortskaffelse ?? "",
+    sentence_forurenet: m.sentence_forurenet ?? "",
+    sentence_asbest: m.sentence_asbest ?? "",
   });
 
   const linjenavn = rapportnavn.trim() || navn.trim() || "Materiale";
+
+  const saetFelt = (felt: string, vaerdi: string) =>
+    setSaetninger((s) => ({ ...s, [felt]: vaerdi }));
 
   return (
     <section className="flex min-w-0 flex-col gap-4">
@@ -188,39 +212,51 @@ function MaterialeForm({ m }: { m: Material }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          {RESOURCE_HANDLINGS.map((h) => (
-            <label key={h} className="flex flex-col gap-1.5">
-              <span className="label-xs">{RESOURCE_HANDLING_LABEL[h]}</span>
-              <textarea
-                name={`sentence_${h}`}
-                rows={2}
-                value={saetninger[h]}
-                onChange={(e) =>
-                  setSaetninger((s) => ({ ...s, [h]: e.target.value }))
-                }
-                className={felt}
-              />
-              {/* Linjen som kunden faar den at se. Den fanger det, en
-                  tekstboks ikke kan vise: at saetningen laener sig pa maengden,
-                  og at materialenavnet ikke skal gentages i den.
-                  Uden ramme og daempet: den er et ekko af feltet ovenfor, ikke
-                  et felt i sig selv, og skal ikke kappes om opmaerksomheden. */}
-              {saetninger[h].trim() && (
-                <span className="text-xs leading-relaxed text-muted opacity-70">
-                  {ressourceLinjeTekst({
-                    navn: linjenavn,
-                    kg: 12000,
-                    condition: 2,
-                    handling: h,
-                    saetning: saetninger[h].trim(),
-                    niveau: null,
-                    labels: [],
-                  })}
-                </span>
-              )}
-            </label>
+          {RESSOURCEHANDTERINGER.map((h) => (
+            <Saetningsfelt
+              key={h}
+              navn={SENTENCE_FIELD[h]}
+              overskrift={RESOURCE_HANDLING_LABEL[h]}
+              vaerdi={saetninger[SENTENCE_FIELD[h]]}
+              onChange={(v) => saetFelt(SENTENCE_FIELD[h], v)}
+              hoved={linjenavn}
+            />
           ))}
         </div>
+
+        {/*
+          Bortskaffelsen har tre tekster, og de skal staa samlet.
+
+          Det er den samme spalte i rapporten — hvilken af dem der bliver
+          skrevet, afgores af laboratoriesvaret og ikke af noget kontoret
+          vaelger her. Derfor staar hvornar-forklaringen ved hvert felt: uden
+          den er de tre kasser umulige at kende fra hinanden.
+        */}
+        <fieldset className="flex flex-col gap-3 rounded-xl bg-surface-2/50 p-4">
+          <legend className="label-xs px-1">Bortskaffelse</legend>
+
+          <p className="text-xs leading-relaxed text-muted">
+            Laboratoriesvaret vælger teksten. Er asbest påvist, bruges
+            asbestteksten — uanset hvad screeneren valgte, og uanset hvad der
+            ellers er fundet.
+          </p>
+
+          {BORTSKAFFELSESTEKSTER.map((t) => (
+            <Saetningsfelt
+              key={t}
+              navn={DISPOSAL_SENTENCE_FIELD[t]}
+              overskrift={DISPOSAL_SENTENCE_LABEL[t]}
+              hjaelp={DISPOSAL_SENTENCE_HINT[t]}
+              vaerdi={saetninger[DISPOSAL_SENTENCE_FIELD[t]]}
+              onChange={(v) => saetFelt(DISPOSAL_SENTENCE_FIELD[t], v)}
+              // Forureningsafsnittet navngiver linjen med provenummeret og ikke
+              // materialet. Eksemplet skal vise det, kunden faar — ellers
+              // skriver kontoret en saetning, der laener sig pa et navn, der
+              // ikke staar der.
+              hoved="P1"
+            />
+          ))}
+        </fieldset>
 
         <Besked state={state} />
 
@@ -243,6 +279,59 @@ function MaterialeForm({ m }: { m: Material }) {
         </button>
       </form>
     </section>
+  );
+}
+
+/**
+ * Et tekstfelt med et eksempel paa linjen, som kunden faar den at se.
+ *
+ * Eksemplet fanger det, en tom tekstboks ikke kan vise: at saetningen laener
+ * sig paa maengden og standen, og at den derfor hverken skal begynde med stort
+ * eller gentage det, der staar foran den. Uden ramme og daempet — den er et
+ * ekko af feltet ovenfor, ikke et felt i sig selv.
+ */
+function Saetningsfelt({
+  navn,
+  overskrift,
+  hjaelp,
+  vaerdi,
+  onChange,
+  hoved,
+}: {
+  navn: string;
+  overskrift: string;
+  hjaelp?: string;
+  vaerdi: string;
+  onChange: (v: string) => void;
+  /** Linjens forreste led i eksemplet: materialets navn eller «P1». */
+  hoved: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="label-xs">{overskrift}</span>
+      {hjaelp && <span className="text-xs text-muted">{hjaelp}</span>}
+      <textarea
+        name={navn}
+        rows={2}
+        value={vaerdi}
+        onChange={(e) => onChange(e.target.value)}
+        className={felt}
+      />
+      {vaerdi.trim() && (
+        <span className="text-xs leading-relaxed text-muted opacity-70">
+          {hoved}{" "}
+          {ressourceLinjeHale({
+            navn: hoved,
+            kg: 12000,
+            condition: 2,
+            handling: null,
+            saetning: vaerdi.trim(),
+            niveau: null,
+            labels: [],
+          })}
+        </span>
+      )}
+    </label>
   );
 }
 

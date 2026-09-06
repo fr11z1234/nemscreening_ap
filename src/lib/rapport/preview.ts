@@ -1,0 +1,154 @@
+import {
+  DISPOSAL_SENTENCE_FIELD,
+  DISPOSAL_SENTENCE_LABEL,
+  RESOURCE_HANDLING_LABEL,
+  SENTENCE_FIELD,
+  type BuildingPart,
+  type Material,
+  type ResourceHandling,
+} from "@/lib/types";
+import type { LabLevel } from "@/lib/lab/parametre";
+import {
+  ressourceoversigt,
+  type Ressourceoversigt,
+  type RessourceProve,
+} from "@/lib/rapport/ressourcer";
+
+/**
+ * Materialepanelets preview: materialets fem saetninger, som de kommer til at
+ * staa i rapporten.
+ *
+ * Der stod for et eksempel under hvert felt, sat sammen i hand. Det var forkert
+ * to gange: det fyldte panelet med gentagen tekst, og det var panelets egen
+ * gaetning paa hvad rapporten ville skrive. Her koeres saetningerne i stedet
+ * gennem `ressourceoversigt` — RAPPORTENS egen funktion — sa previewet ikke kan
+ * vise en genbrugssaetning paa en linje, rapporten havde flyttet til
+ * Forureninger.
+ *
+ * Reglen ligger her og ikke i panelet, saa `verify:ressourcer` kan naa den:
+ * panelet er en klientkomponent med serverhandlinger, og den kan et script uden
+ * browser ikke importere.
+ */
+
+/** Feltet paa `Material`, der baerer en af de fem saetninger. */
+export type Saetningsfelt =
+  | typeof SENTENCE_FIELD.genbrug
+  | typeof SENTENCE_FIELD.genanvendelse
+  | typeof DISPOSAL_SENTENCE_FIELD.bortskaffelse
+  | typeof DISPOSAL_SENTENCE_FIELD.forurenet
+  | typeof DISPOSAL_SENTENCE_FIELD.asbest;
+
+export type Previewraekke = {
+  felt: Saetningsfelt;
+  /** Feltets egen overskrift i panelet, saa previewet kan pege tilbage. */
+  navn: string;
+  label: string;
+  handling: ResourceHandling;
+  niveau: LabLevel;
+  asbest: boolean;
+};
+
+/**
+ * De fem situationer, der hver udloeser en af saetningerne.
+ *
+ * Valgene er ikke tilfaeldige — de er laest ud af `bortskaffelsestekst`:
+ *
+ *   P1, P2  rent svar, screenerens valg staar ved magt        -> ressource
+ *   P3      rodt svar overruler genbrug                       -> bortskaffelse
+ *   P4      gult svar overruler genbrug                       -> forurenet
+ *   P5      asbest pavist, som overruler bade valg og niveau  -> asbest
+ *
+ * P3 vises med det rode svar og ikke med screenerens eget valg af
+ * bortskaffelse. Feltet daekker begge veje, men kun den ene har en farve at
+ * vise — og hjaelpeteksten ved feltet siger allerede, at der er to.
+ */
+export const PREVIEWRAEKKER: Previewraekke[] = [
+  {
+    felt: SENTENCE_FIELD.genbrug,
+    navn: RESOURCE_HANDLING_LABEL.genbrug,
+    label: "P1",
+    handling: "genbrug",
+    niveau: "rent",
+    asbest: false,
+  },
+  {
+    felt: SENTENCE_FIELD.genanvendelse,
+    navn: RESOURCE_HANDLING_LABEL.genanvendelse,
+    label: "P2",
+    handling: "genanvendelse",
+    niveau: "rent",
+    asbest: false,
+  },
+  {
+    felt: DISPOSAL_SENTENCE_FIELD.bortskaffelse,
+    navn: DISPOSAL_SENTENCE_LABEL.bortskaffelse,
+    label: "P3",
+    handling: "genbrug",
+    niveau: "farligt",
+    asbest: false,
+  },
+  {
+    felt: DISPOSAL_SENTENCE_FIELD.forurenet,
+    navn: DISPOSAL_SENTENCE_LABEL.forurenet,
+    label: "P4",
+    handling: "genbrug",
+    niveau: "forurenet",
+    asbest: false,
+  },
+  {
+    felt: DISPOSAL_SENTENCE_FIELD.asbest,
+    navn: DISPOSAL_SENTENCE_LABEL.asbest,
+    label: "P5",
+    handling: "genbrug",
+    niveau: "farligt",
+    asbest: true,
+  },
+];
+
+/**
+ * Maengden og standen i previewet.
+ *
+ * Et eksempel og ikke en paastand: paa en sag kommer begge fra proven. De staar
+ * her, fordi saetningerne er skrevet til at laene sig paa dem — «... kan
+ * genbruges» giver ingen mening uden noget foran.
+ */
+export const PREVIEW_TON = 12;
+export const PREVIEW_STAND = 2;
+
+export type Preview = {
+  oversigt: Ressourceoversigt;
+  /** De raekker, der har en saetning at vise. */
+  skrevne: Previewraekke[];
+  /** De raekker, der ikke har. Naevnes under arket frem for at mangle i tavshed. */
+  tomme: Previewraekke[];
+};
+
+/**
+ * Bygger previewet af et materiale.
+ *
+ * Kun de saetninger, der er skrevet, bliver til prover. En tom saetning ville
+ * ellers give en linje med et haengende komma efter standen — og det er ikke
+ * det, previewet skal laere kontoret at rapporten goer.
+ */
+export function previewOversigt(materiale: Material, del: BuildingPart): Preview {
+  const skrevne = PREVIEWRAEKKER.filter((r) => materiale[r.felt]?.trim());
+  const tomme = PREVIEWRAEKKER.filter((r) => !materiale[r.felt]?.trim());
+
+  const proever: RessourceProve[] = skrevne.map((r) => ({
+    label: r.label,
+    material: materiale.name,
+    building_part_id: del.id,
+    material_condition: PREVIEW_STAND,
+    resource_handling: r.handling,
+    estimated_tons: PREVIEW_TON,
+    level: r.niveau,
+    asbestPaavist: r.asbest,
+    isLabSample: true,
+  }));
+
+  return {
+    oversigt: ressourceoversigt(proever, [materiale], [del]),
+    skrevne,
+    tomme,
+  };
+}

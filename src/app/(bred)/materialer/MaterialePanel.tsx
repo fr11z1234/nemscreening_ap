@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useId, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ressourceLinjeHale } from "@/lib/rapport/ressourcer";
+import { Linjegruppe, Overskrift } from "@/components/rapport/Linjegruppe";
+import { previewOversigt } from "@/lib/rapport/preview";
 import {
   DISPOSAL_SENTENCE_FIELD,
   DISPOSAL_SENTENCE_HINT,
@@ -25,8 +26,20 @@ import {
   type PanelState,
 } from "./actions";
 
+/*
+ * Feltet er hvidt med en kant, ikke en gra tone.
+ *
+ * Resten af appen adskiller flader med tone og skygge, og det virker, fordi
+ * felterne der ligger pa et hvidt kort. Panelet har ikke noget kort — det gar
+ * direkte pa sidens bone — og bone-200 pa bone-100 er tre procents forskel.
+ * Kanten er det, der gor en kasse til et felt, man kan skrive i.
+ *
+ * Kanten er --grid og ikke --border-strong af samme grund som i skemaet:
+ * bone-300 pa hvid er 1,4:1 og forsvinder, bone-400 er 1,9:1 og ses. Det er
+ * ogsa den forskel, globals.css beskriver ved de to tokens.
+ */
 const felt =
-  "w-full rounded-lg bg-surface-2 px-3 py-2 outline-none focus:inset-ring-2 focus:inset-ring-primary-line";
+  "w-full rounded-lg border border-grid bg-surface px-3 py-2 outline-none placeholder:text-muted focus:border-primary focus:inset-ring-2 focus:inset-ring-primary-line";
 
 function GemKnap({ tekst = "Gem" }: { tekst?: string }) {
   const { pending } = useFormStatus();
@@ -133,7 +146,7 @@ export function MaterialePanel({
         {/* key: formularen skal bygges forfra, nar der skiftes materiale.
             Ellers ville felterne blive staaende med det forriges tekst. */}
         {valgt ? (
-          <MaterialeForm key={valgt.id} m={valgt} />
+          <MaterialeForm key={valgt.id} m={valgt} bygningsdele={bygningsdele} />
         ) : (
           <p className="text-sm text-muted">Vælg et materiale til venstre.</p>
         )}
@@ -159,11 +172,18 @@ const BORTSKAFFELSESTEKSTER: Bortskaffelsestekst[] = [
   "asbest",
 ];
 
-function MaterialeForm({ m }: { m: Material }) {
+function MaterialeForm({
+  m,
+  bygningsdele,
+}: {
+  m: Material;
+  bygningsdele: BuildingPart[];
+}) {
   const [state, formAction] = useActionState<PanelState, FormData>(
     gemMateriale,
     {},
   );
+  const [viserPreview, setViserPreview] = useState(false);
 
   const [navn, setNavn] = useState(m.name);
   const [rapportnavn, setRapportnavn] = useState(m.report_name ?? "");
@@ -176,8 +196,6 @@ function MaterialeForm({ m }: { m: Material }) {
     sentence_forurenet: m.sentence_forurenet ?? "",
     sentence_asbest: m.sentence_asbest ?? "",
   });
-
-  const linjenavn = rapportnavn.trim() || navn.trim() || "Materiale";
 
   const saetFelt = (felt: string, vaerdi: string) =>
     setSaetninger((s) => ({ ...s, [felt]: vaerdi }));
@@ -219,7 +237,6 @@ function MaterialeForm({ m }: { m: Material }) {
               overskrift={RESOURCE_HANDLING_LABEL[h]}
               vaerdi={saetninger[SENTENCE_FIELD[h]]}
               onChange={(v) => saetFelt(SENTENCE_FIELD[h], v)}
-              hoved={linjenavn}
             />
           ))}
         </div>
@@ -232,8 +249,8 @@ function MaterialeForm({ m }: { m: Material }) {
           vaelger her. Derfor staar hvornar-forklaringen ved hvert felt: uden
           den er de tre kasser umulige at kende fra hinanden.
         */}
-        <fieldset className="flex flex-col gap-3 rounded-xl bg-surface-2/50 p-4">
-          <legend className="label-xs px-1">Bortskaffelse</legend>
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-grid bg-surface-2 p-4">
+          <legend className="label-xs px-1 uppercase tracking-wide">Bortskaffelse</legend>
 
           <p className="text-xs leading-relaxed text-muted">
             Laboratoriesvaret vælger teksten. Er asbest påvist, bruges
@@ -249,30 +266,46 @@ function MaterialeForm({ m }: { m: Material }) {
               hjaelp={DISPOSAL_SENTENCE_HINT[t]}
               vaerdi={saetninger[DISPOSAL_SENTENCE_FIELD[t]]}
               onChange={(v) => saetFelt(DISPOSAL_SENTENCE_FIELD[t], v)}
-              // Forureningsafsnittet navngiver linjen med provenummeret og ikke
-              // materialet. Eksemplet skal vise det, kunden faar — ellers
-              // skriver kontoret en saetning, der laener sig pa et navn, der
-              // ikke staar der.
-              hoved="P1"
             />
           ))}
         </fieldset>
 
         <Besked state={state} />
 
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <GemKnap />
+          {/* Previewet viser det, der staar i felterne — ikke det, der er gemt.
+              Det er hele pointen: saetningen skal kunne ses, for den bliver
+              til en rapport nogen sender til en kommune. */}
+          <button
+            type="button"
+            onClick={() => setViserPreview(true)}
+            className="tap rounded-lg border border-border-strong px-4 py-2 font-medium hover:bg-surface-2 active:bg-surface-2"
+          >
+            Vis i rapporten
+          </button>
         </div>
       </form>
+
+      {viserPreview && (
+        <RapportPreview
+          navn={navn}
+          rapportnavn={rapportnavn}
+          saetninger={saetninger}
+          m={m}
+          bygningsdele={bygningsdele}
+          onLuk={() => setViserPreview(false)}
+        />
+      )}
 
       <form action={skiftMaterialeAdgang} className="border-t border-border pt-4">
         <input type="hidden" name="id" value={m.id} />
         <input type="hidden" name="active" value={m.active ? "false" : "true"} />
         <button
-          className={`tap rounded-lg px-3 py-2 text-sm ${
+          className={`tap rounded-lg border px-3 py-2 text-sm ${
             m.active
-              ? "text-danger hover:underline"
-              : "border border-border-strong hover:bg-surface-2"
+              ? "border-danger/40 text-danger hover:bg-danger-soft"
+              : "border-border-strong hover:bg-surface-2"
           }`}
         >
           {m.active ? "Luk materialet" : "Åbn materialet igen"}
@@ -282,29 +315,19 @@ function MaterialeForm({ m }: { m: Material }) {
   );
 }
 
-/**
- * Et tekstfelt med et eksempel paa linjen, som kunden faar den at se.
- *
- * Eksemplet fanger det, en tom tekstboks ikke kan vise: at saetningen laener
- * sig paa maengden og standen, og at den derfor hverken skal begynde med stort
- * eller gentage det, der staar foran den. Uden ramme og daempet — den er et
- * ekko af feltet ovenfor, ikke et felt i sig selv.
- */
+/** Et tekstfelt til en af materialets fem saetninger. */
 function Saetningsfelt({
   navn,
   overskrift,
   hjaelp,
   vaerdi,
   onChange,
-  hoved,
 }: {
   navn: string;
   overskrift: string;
   hjaelp?: string;
   vaerdi: string;
   onChange: (v: string) => void;
-  /** Linjens forreste led i eksemplet: materialets navn eller «P1». */
-  hoved: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -312,26 +335,138 @@ function Saetningsfelt({
       {hjaelp && <span className="text-xs text-muted">{hjaelp}</span>}
       <textarea
         name={navn}
-        rows={2}
+        rows={3}
         value={vaerdi}
         onChange={(e) => onChange(e.target.value)}
-        className={felt}
+        className={`${felt} resize-y text-sm leading-relaxed`}
       />
-      {vaerdi.trim() && (
-        <span className="text-xs leading-relaxed text-muted opacity-70">
-          {hoved}{" "}
-          {ressourceLinjeHale({
-            navn: hoved,
-            kg: 12000,
-            condition: 2,
-            handling: null,
-            saetning: vaerdi.trim(),
-            niveau: null,
-            labels: [],
-          })}
-        </span>
-      )}
     </label>
+  );
+}
+
+/**
+ * Materialets saetninger, som de kommer til at staa i rapporten.
+ *
+ * Laeser felterne og ikke det gemte: saetningen skal kunne ses, FOR den bliver
+ * til en rapport, nogen sender til en kommune.
+ */
+function RapportPreview({
+  navn,
+  rapportnavn,
+  saetninger,
+  m,
+  bygningsdele,
+  onLuk,
+}: {
+  navn: string;
+  rapportnavn: string;
+  saetninger: Record<string, string>;
+  m: Material;
+  bygningsdele: BuildingPart[];
+  onLuk: () => void;
+}) {
+  const overskriftId = useId();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onLuk();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onLuk]);
+
+  const materialenavn = navn.trim() || m.name;
+  const tekst = (felt: keyof Material) =>
+    (saetninger[felt] ?? "").trim() || null;
+
+  // En rigtig bygningsdel og ikke en opfundet: overskriften i rapporten ER
+  // bygningsdelen, og en opdigtet en ville vise en form, kontoret ikke kender.
+  const del: BuildingPart = bygningsdele.find((b) => b.active) ??
+    bygningsdele[0] ?? {
+      id: "preview",
+      name: "Bygningsdel",
+      sort_order: 0,
+      active: true,
+    };
+
+  const materiale: Material = {
+    ...m,
+    name: materialenavn,
+    report_name: rapportnavn.trim() || null,
+    sentence_genbrug: tekst("sentence_genbrug"),
+    sentence_genanvendelse: tekst("sentence_genanvendelse"),
+    sentence_bortskaffelse: tekst("sentence_bortskaffelse"),
+    sentence_forurenet: tekst("sentence_forurenet"),
+    sentence_asbest: tekst("sentence_asbest"),
+  };
+
+  const { oversigt, skrevne, tomme } = previewOversigt(materiale, del);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={overskriftId}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-fg/40 p-3"
+    >
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-bg shadow-sheet">
+        <div className="flex items-center justify-between gap-4 border-b border-grid px-5 py-3">
+          <h2 id={overskriftId} className="font-semibold">
+            {materialenavn} i rapporten
+          </h2>
+          <button
+            type="button"
+            onClick={onLuk}
+            className="tap rounded-lg border border-border-strong px-4 py-1.5 text-sm hover:bg-surface-2 active:bg-surface-2"
+          >
+            Luk
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+          <p className="mx-auto mb-4 max-w-[21cm] text-xs leading-relaxed text-muted">
+            Det, der står i felterne — ikke det, der er gemt. Mængde og stand er
+            et eksempel; på en sag kommer de fra prøven, og overskriften er den
+            bygningsdel, prøven står på.
+          </p>
+
+          {skrevne.length > 0 ? (
+            <div className="print-side">
+              {oversigt.ressourcer.length > 0 && (
+                <>
+                  <Overskrift>Ressourcescreening</Overskrift>
+                  {oversigt.ressourcer.map((g) => (
+                    <Linjegruppe key={g.overskrift} gruppe={g} />
+                  ))}
+                </>
+              )}
+
+              {oversigt.forureninger.length > 0 && (
+                <>
+                  <Overskrift>Forureninger</Overskrift>
+                  {oversigt.forureninger.map((g) => (
+                    <Linjegruppe key={g.overskrift} gruppe={g} visProvenumre />
+                  ))}
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="mx-auto max-w-[21cm] rounded-xl border border-grid bg-surface p-4 text-sm leading-relaxed text-muted">
+              Der er ingen sætninger skrevet endnu. Rapporten skriver så navn og
+              mængde og lover ikke andet.
+            </p>
+          )}
+
+          {tomme.length > 0 && skrevne.length > 0 && (
+            <p className="mx-auto mt-4 max-w-[21cm] text-xs leading-relaxed text-muted">
+              Uden tekst:{" "}
+              {tomme.map((r) => r.navn).join(", ")}
+              . De linjer skriver kun navn og mængde.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -413,8 +548,10 @@ function Bygningsdele({ dele }: { dele: BuildingPart[] }) {
                   value={d.active ? "false" : "true"}
                 />
                 <button
-                  className={`tap rounded-lg px-2.5 py-1 text-sm ${
-                    d.active ? "text-danger hover:underline" : "hover:bg-surface-2"
+                  className={`tap rounded-lg border px-2.5 py-1 text-sm ${
+                    d.active
+                      ? "border-danger/40 text-danger hover:bg-danger-soft"
+                      : "border-border-strong hover:bg-surface-2"
                   }`}
                 >
                   {d.active ? "Luk" : "Åbn"}

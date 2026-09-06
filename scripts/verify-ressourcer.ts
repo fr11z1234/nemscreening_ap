@@ -38,6 +38,12 @@ import {
 } from "../src/lib/types";
 import { LAB_PARAMETERS } from "../src/lib/lab/parametre";
 import {
+  PREVIEWRAEKKER,
+  PREVIEW_STAND,
+  PREVIEW_TON,
+  previewOversigt,
+} from "../src/lib/rapport/preview";
+import {
   analysekolonne,
   NAVNEKOLONNER,
   NAVNEKOLONNER_SELEKTIV,
@@ -900,6 +906,106 @@ check(
   "en bygning forsvandt i sideopdelingen",
 );
 check(bygningsSider([]).length === 0, "ingen bygninger skulle give ingen sider");
+
+// ---------------------------------------------------------------------------
+// 9b. Materialepanelets preview
+// ---------------------------------------------------------------------------
+// Previewet viser kontoret, hvor hver af de fem saetninger lander, FOR den
+// bliver til en rapport nogen sender til en kommune. Det bygger ikke selv
+// linjerne — det koerer fem opdigtede prover gennem `ressourceoversigt` — men
+// det VAELGER de fem prover, og det valg er en paastand om `bortskaffelsestekst`
+// og `faktiskHandtering`: at netop de fem situationer rammer de fem felter, en
+// hver. Aendres rangfolgen i `bortskaffelsestekst`, holder paastanden op med at
+// passe, og previewet vil vise en saetning under den forkerte overskrift uden
+// at noget gaar i stykker. Derfor proves afbildningen her.
+const PREVIEWMAT = materiale({
+  name: "Previewmateriale",
+  report_name: "Preview",
+  // Feltets eget navn som saetning, sa hver linje kan kendes fra de andre.
+  sentence_genbrug: "S-GENBRUG.",
+  sentence_genanvendelse: "S-GENANVENDELSE.",
+  sentence_bortskaffelse: "S-BORTSKAFFELSE.",
+  sentence_forurenet: "S-FORURENET.",
+  sentence_asbest: "S-ASBEST.",
+});
+
+const fuldtPreview = previewOversigt(PREVIEWMAT, FACADE);
+
+check(
+  fuldtPreview.skrevne.length === 5 && fuldtPreview.tomme.length === 0,
+  `previewet fandt ${fuldtPreview.skrevne.length} skrevne saetninger, forventede 5`,
+);
+
+const previewLinjer = (grupper: RessourceGruppe[]) =>
+  grupper.flatMap((g) => g.linjer);
+
+const previewRessourcer = previewLinjer(fuldtPreview.oversigt.ressourcer);
+const previewForureninger = previewLinjer(fuldtPreview.oversigt.forureninger);
+
+check(
+  previewRessourcer.length === 2,
+  `previewet gav ${previewRessourcer.length} ressourcelinjer, forventede 2`,
+);
+check(
+  previewForureninger.length === 3,
+  `previewet gav ${previewForureninger.length} forureningslinjer, forventede 3`,
+);
+
+// Hver saetning praecis en gang, og i det afsnit den hoerer til.
+for (const [saetning, linjer, afsnit] of [
+  ["S-GENBRUG.", previewRessourcer, "Ressourcescreening"],
+  ["S-GENANVENDELSE.", previewRessourcer, "Ressourcescreening"],
+  ["S-BORTSKAFFELSE.", previewForureninger, "Forureninger"],
+  ["S-FORURENET.", previewForureninger, "Forureninger"],
+  ["S-ASBEST.", previewForureninger, "Forureninger"],
+] as const) {
+  const traf = linjer.filter((l) => l.saetning === saetning);
+  check(
+    traf.length === 1,
+    `"${saetning}" stod ${traf.length} gange under ${afsnit}, forventede 1`,
+  );
+}
+
+// Maengden og standen er previewets eget eksempel. Slaar de fejl, laeser
+// kontoret en linje, der ikke ligner den rapporten skriver.
+check(
+  previewRessourcer.every(
+    (l) => l.kg === PREVIEW_TON * 1000 && l.condition === PREVIEW_STAND,
+  ),
+  "previewets maengde eller stand kom ikke igennem til linjen",
+);
+
+// Farverne. Uden dem viser previewet ikke det, det blev lavet for at vise.
+const previewNiveau = (saetning: string) =>
+  previewForureninger.find((l) => l.saetning === saetning)?.niveau ?? null;
+check(previewNiveau("S-BORTSKAFFELSE.") === "farligt", "bortskaffelse mistede sit rode maerke");
+check(previewNiveau("S-FORURENET.") === "forurenet", "forurenet mistede sit gule maerke");
+check(previewNiveau("S-ASBEST.") === "farligt", "asbest mistede sit rode maerke");
+check(
+  previewRessourcer.every((l) => l.niveau === "rent"),
+  "en ressourcelinje i previewet var ikke ren",
+);
+
+// Tomme saetninger bliver aldrig til en linje: rapporten ville skrive
+// «Preview – 12.000 kg i god stand,» med et haengende komma, og det er ikke det
+// previewet skal laere kontoret at den goer.
+const halvtPreview = previewOversigt(
+  materiale({ name: "Halvt", sentence_genbrug: "S-GENBRUG." }),
+  FACADE,
+);
+check(
+  halvtPreview.skrevne.length === 1 && halvtPreview.tomme.length === 4,
+  "previewet talte de tomme saetninger forkert",
+);
+check(
+  previewLinjer(halvtPreview.oversigt.ressourcer).length === 1 &&
+    previewLinjer(halvtPreview.oversigt.forureninger).length === 0,
+  "en tom saetning blev til en linje i previewet",
+);
+check(
+  PREVIEWRAEKKER.every((r) => r.navn.trim().length > 0),
+  "en previewraekke manglede sit navn",
+);
 
 // ---------------------------------------------------------------------------
 // 10. Migrationen der seeder saetningerne

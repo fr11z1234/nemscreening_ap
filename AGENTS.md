@@ -92,12 +92,13 @@ ny branch falder i.
 ## Kør altid dette
 
 ```bash
-npm run verify:eurofins && npm run verify:lab && npm run verify:ressourcer && npx tsc --noEmit && npm run lint && npm run build
+npm run verify:eurofins && npm run verify:lab && npm run verify:ressourcer && npm run verify:kamera && npx tsc --noEmit && npm run lint && npm run build
 ```
 
-De tre `verify`-scripts er den eneste rigtige testdækning. De kører uden
-database og uden browser. Rør du `src/lib/eurofins/`, `src/lib/lab/` eller
-`src/lib/rapport/`, skal de køre — og udvid dem, når du tilføjer noget.
+De fire `verify`-scripts er den eneste rigtige testdækning. De kører uden
+database og uden browser. Rør du `src/lib/eurofins/`, `src/lib/lab/`,
+`src/lib/rapport/` eller `src/lib/camera/`, skal de køre — og udvid dem, når du
+tilføjer noget.
 
 `verify:ressourcer` kan ikke længere prøve rapportens tekst; den ligger i
 databasen. Den prøver til gengæld alt det, der ikke må kunne rettes ved et uheld:
@@ -106,6 +107,9 @@ overskrifter, sideopdelingen, analyseskemaets bredde og BBR's kodelister. Og den
 holder migrationen med sætningerne op mod den, der seeder materialelisten — et
 navn stavet forkert dér giver ikke en fejl, men en rapport hvor et materiale
 mangler sin sætning.
+
+`verify:kamera` prøver den ene ting ved kameraet, der kan regnes efter uden en
+browser: at billedet viser det, der stod i søgeren. Se «Kameraet» nedenfor.
 
 Der er ingen automatiseret browsertest. Kan du ikke se ændringen i en browser,
 så **sig det** i stedet for at melde den færdig.
@@ -154,6 +158,41 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 - **Påvist asbest er farligt affald.** Rød, hver gang. Der er intet gult
   mellemniveau og ingen manuel vurdering af om den støver — den vurdering
   fandtes, og den blev ikke sat.
+
+## Kameraet
+
+**Billedet skal være det, der stod i søgeren.** Det lyder som en selvfølge, og
+det var det ikke: strømmen blev bestilt som 16:9, søgeren viser den i en
+4:3-kasse med `object-fit: cover`, og optagelsen tegnede hele strømmen. En
+fjerdedel af bredden lå altså uden for skærmen og kom alligevel med i filen.
+Screeneren ramte prøven ind i firkanten og fik en radiator med i siden — og
+opdagede det først i rapporten, som viser billedet med `object-contain`.
+
+Fejlen kunne ikke ses noget sted i appen. Søgeren så rigtig ud, miniaturen er
+kvadratisk med `object-cover` og skjulte det samme, og billedsiden ligeså.
+
+Det er rettet to steder, og de skal begge blive:
+
+- **Strømmen bestilles i 4:3** i `useCamera.ts`, altså søgerens egen form.
+  Telefonens sensor **er** 4:3; et 16:9-billede er den beskåret. Så er der
+  helst ikke noget at skære væk til at begynde med.
+- **`synligtUdsnit` i `compress.ts` beskærer optagelsen** til det, elementet
+  faktisk viser. Det er den afgørende: `ideal` er et ønske, og svarer browseren
+  16:9 alligevel, skal filen stadig vise det, screeneren sigtede på.
+
+**Målene tages af elementet** (`clientWidth`/`clientHeight`), ikke af et tal i
+koden. Så kan søgerens form ændres i CSS uden at regnestykket tavst bliver
+forkert — det var præcis den slags to steder, fejlen kom af. Kender vi ikke
+kassen, kommer hele billedet med; et gæt på en form ville skære noget væk, som
+ingen har bedt om.
+
+`npm run verify:kamera` regner udsnittet efter og kontrollerer, at optagelsen
+rent faktisk bruger det. **Ændrer du søgerens form eller `object-fit`**, fejler
+den med vilje: billedet bliver noget andet end før, og det skal være et valg.
+
+Filvælgeren er undtagelsen. Har telefonen ikke `getUserMedia`, tages billedet i
+systemets eget kamera, og der er ingen søger af vores at rette sig efter —
+filen kommer med i sin helhed.
 
 ## Selektiv nedrivning
 

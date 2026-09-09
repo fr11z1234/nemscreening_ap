@@ -38,8 +38,26 @@ export function useCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          /*
+           * 4:3, fordi sogeren er 4:3.
+           *
+           * Der blev bedt om 1920x1080. Sogeren viser strommen i en
+           * 4:3-kasse med `object-fit: cover`, og saa laa en fjerdedel af
+           * bredden uden for skaermen — mens optagelsen tog det hele med. Det
+           * gav billeder med mere pa end det, screeneren sigtede paa.
+           *
+           * Det er den ene af to halvdele. Denne her soerger for, at der ikke
+           * er noget at skaere vaek: telefonens sensor ER 4:3, og et 16:9-billede
+           * er den beskaaret. `synligtUdsnit` i compress.ts er den anden og den
+           * afgorende — `ideal` er et onske, og svarer browseren 16:9 alligevel,
+           * skal filen stadig vise det, der stod i sogeren.
+           *
+           * 1600x1200 og ikke mere: MAX_EDGE er 1600, sa alt derover bliver
+           * alligevel skaleret ned igen.
+           */
+          aspectRatio: { ideal: 4 / 3 },
+          width: { ideal: 1600 },
+          height: { ideal: 1200 },
         },
         audio: false,
       });

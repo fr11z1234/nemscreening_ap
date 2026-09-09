@@ -60,16 +60,18 @@ Login er e-mail og kodeord. Adgang kræver en aktiv række i
 npm run verify:eurofins    # eksportfilen mod Eurofins' skabelon
 npm run verify:lab         # indlæsning af labsvar og farvelægning
 npm run verify:ressourcer  # ressourcescreeningens linjer og mængder
+npm run verify:kamera      # at billedet viser det, der stod i søgeren
 npm run lint
 npx tsc --noEmit
 npm run build
 ```
 
-De tre `verify`-scripts er projektets egentlige testdækning. De kører uden
+De fire `verify`-scripts er projektets egentlige testdækning. De kører uden
 database og uden browser, og de dækker præcis de steder hvor en fejl er dyr:
 en importfil Eurofins afviser, et analysesvar der får den forkerte farve,
-eller et forkert antal kilo beton i en rapport. **Kør dem efter enhver
-ændring i `src/lib/eurofins/`, `src/lib/lab/` eller
+eller et forkert antal kilo beton i en rapport — eller et foto med mere på end
+det, screeneren sigtede på. **Kør dem efter enhver ændring i
+`src/lib/eurofins/`, `src/lib/lab/`, `src/lib/camera/` eller
 `src/lib/rapport/ressourcer.ts`.**
 
 ## Hvor tingene ligger
@@ -85,6 +87,7 @@ eller et forkert antal kilo beton i en rapport. **Kør dem efter enhver
 | `src/lib/lab/` | Indlæsning af svar og grænseværdier. Se `LAESMIG.md`. |
 | `src/lib/rapport/` | Rapportens bilag og faste tekst. `ressourcer.ts` er ressourcescreeningen, `bygninger.ts` er «Projektets omfang». |
 | `src/lib/bbr/` | Opslag i BBR via Datafordelerens GraphQL. |
+| `src/lib/camera/` | Live kamera og komprimering. Billedet beskæres til det, søgeren viste — se «Kameraet» i `AGENTS.md`. |
 | `scripts/` | Verifikation. Køres med `npm run verify:*`. |
 
 De to `LAESMIG.md`-filer er ikke pynt. De indeholder det, filerne fra Eurofins

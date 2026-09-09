@@ -87,6 +87,35 @@
   --level-farligt-bg: #ffb3b3;
   --level-farligt-fg: #6b1111;
 
+  /*
+   * Asbest. Den fjerde farve, og den staar KUN paa rapportens
+   * forureningslinjer — analyseskemaet farver asbest rodt som alt andet
+   * farligt affald, for det er hvad den er.
+   *
+   * Lilla, fordi de tre andre er trafiklyset og et fjerde trin i det ikke
+   * findes: asbest er ikke vaerre end farligt affald, den skal bare haandteres
+   * anderledes. En farve udenfor skalaen siger netop det. Den er valgt langt
+   * nok fra det rode til at kunne skelnes i en sort/hvid-print ogsa.
+   */
+  --level-asbest-bg: #ded5fa;
+  --level-asbest-fg: #37206e;
+
+  /*
+   * De blege flader bag standardteksterne nederst i forureningsafsnittet.
+   *
+   * Samme kulor som maerket, men saa lys at sort tekst staar rent oven paa. Det
+   * er ikke pynt: teksten skal kunne findes fra maerket paa linjen laengere
+   * oppe, og fladen er det, der binder de to sammen paa et ark uden andet
+   * farve.
+   *
+   * De bruges KUN der. Farvelaegges ogsaa linjerne eller graenserne, staar der
+   * rodt og gult paa hver eneste side, og saa holder farven op med at betyde
+   * noget.
+   */
+  --level-forurenet-soft: #fff6da;
+  --level-farligt-soft: #ffeceb;
+  --level-asbest-soft: #f1ecfd;
+
   --shadow-sm: 0 1px 2px rgb(15 19 23 / 0.05);
   --shadow: 0 1px 3px rgb(15 19 23 / 0.07), 0 1px 2px rgb(15 19 23 / 0.04);
   /* Panelet haenger i toppen, sa skyggen falder nedad. */
@@ -232,6 +261,47 @@ h2 {
 @utility level-farligt {
   background: var(--level-farligt-bg);
   color: var(--level-farligt-fg);
+}
+
+/* Kun rapportens forureningslinjer. Skemaet farver asbest rodt. */
+@utility level-asbest {
+  background: var(--level-asbest-bg);
+  color: var(--level-asbest-fg);
+}
+
+/*
+ * Fladen bag en standardtekst, og stregen mellem maerket og teksten.
+ *
+ * Begge dele i en klasse pr. affaldstype: stregen arver farven af fladen
+ * gennem `streg-arvet` nedenfor, sa den ikke skal skrives to gange og ikke kan
+ * komme til at vaere en anden.
+ */
+@utility flade-farligt {
+  background: var(--level-farligt-soft);
+  border-color: var(--level-farligt-bg);
+}
+
+@utility flade-forurenet {
+  background: var(--level-forurenet-soft);
+  border-color: var(--level-forurenet-bg);
+}
+
+@utility flade-asbest {
+  background: var(--level-asbest-soft);
+  border-color: var(--level-asbest-bg);
+}
+
+/* Det neutrale maerke har ingen kulor — det staar paa en prove, laboratoriet
+   ikke har fundet noget i. */
+@utility flade-bortskaffelse {
+  background: var(--surface-2);
+  border-color: var(--grid);
+}
+
+/* Tailwinds standardkant er currentColor, altsa teksten. Den skal vaere
+   fladens. */
+@utility streg-arvet {
+  border-color: inherit;
 }
 
 /*
@@ -603,6 +673,12 @@ h2 {
     --level-forurenet-fg: #4d3800;
     --level-farligt-bg: #ffb3b3;
     --level-farligt-fg: #6b1111;
+    --level-asbest-bg: #ded5fa;
+    --level-asbest-fg: #37206e;
+
+    --level-forurenet-soft: #fff6da;
+    --level-farligt-soft: #ffeceb;
+    --level-asbest-soft: #f1ecfd;
   }
 
   html,

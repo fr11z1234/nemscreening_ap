@@ -2,27 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getMember } from "@/lib/auth";
+import { kraevKontor as kraevKontorMed } from "@/lib/auth";
 import type { BuildingPart } from "@/lib/types";
+import type { PanelState } from "@/lib/panel";
 
-export type PanelState = { error?: string; ok?: string };
-
-/**
- * Kun kontor og admin.
- *
- * Samme graense som RLS: `materials_write` og `building_parts_write` kraever
- * `screening.is_office()`. Tjekket her findes for at give en forstaelig besked
- * frem for en handling der ikke gor noget — RLS afviser ved at ramme nul
- * raekker, ikke ved at fejle.
- */
-async function kraevKontor() {
-  const member = await getMember();
-  const rolle = member?.profile?.role;
-  if (!member?.profile?.active || (rolle !== "office" && rolle !== "admin")) {
-    return "Kun kontoret kan rette materialelisten.";
-  }
-  return null;
-}
+/** Materialelistens egen ordlyd paa graensen, som RLS haandhaever den. */
+const kraevKontor = () => kraevKontorMed("Kun kontoret kan rette materialelisten.");
 
 const tekst = (fd: FormData, felt: string) =>
   String(fd.get(felt) ?? "").trim() || null;

@@ -20,22 +20,40 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
+  maerkerFor,
+  MAERKE_ORDEN,
   RESSOURCE_INDLEDNING,
   ressourceLinjeHoved,
   ressourceLinjeTekst,
   ressourceSider,
   ressourceoversigt,
+  standardtekstHoejde,
+  TEKST_ORDEN,
   tekstHoejde,
   type RessourceGruppe,
   type RessourceProve,
 } from "../src/lib/rapport/ressourcer";
 import {
+  affaldsmaerke,
+  AFFALDSMAERKE_LABEL,
+  DISPOSAL_SENTENCE_FIELD,
   faktiskHandtering,
+  MAERKE_TEKST,
   MATERIAL_CONDITIONS,
   SENTENCE_FIELD,
+  type Bortskaffelsestekster,
   type BuildingPart,
   type Material,
 } from "../src/lib/types";
+import {
+  faellesTekster,
+  INDSTILLING_NOEGLER,
+  laesIndstillinger,
+} from "../src/lib/indstillinger";
+import {
+  MAERKE_CLASS,
+  MAERKE_FLADE,
+} from "../src/components/rapport/Linjegruppe";
 import { LAB_PARAMETERS } from "../src/lib/lab/parametre";
 import {
   PREVIEWRAEKKER,
@@ -427,6 +445,125 @@ check(udenMat.ressourcer.length === 0, "en prove uden materiale kom med");
 check(udenMat.udenMateriale === 1, `udenMateriale blev ${udenMat.udenMateriale}`);
 
 // ---------------------------------------------------------------------------
+// 1c. Maerket paa linjen
+// ---------------------------------------------------------------------------
+/*
+ * Maerket svarer paa: hvad ER det her for noget affald? Ikke hvad der skal ske
+ * med det, og ikke hvad der skal staa.
+ *
+ * Det vigtige er, at MAERKET FOLGER LABORATORIET og ikke screenerens valg.
+ * Sagde Eurofins gult, staar der «Forurenet affald» — ogsa naar screeneren selv
+ * havde skrevet bortskaffelse paa proven, og ogsa selvom linjen saa faar
+ * bortskaffelsesteksten. Ellers ville rapporten kalde en prove rod, som
+ * analyseskemaet farver gul, og laeseren ville ikke vide hvem der havde ret.
+ *
+ * Derfor proves alle kombinationer: maerket maa aldrig paastaa et andet niveau,
+ * end det skemaet viser.
+ */
+const maerkeFor = (p: Partial<RessourceProve>) =>
+  urene([prove({ isLabSample: true, ...p })])[0]?.maerke;
+
+for (const niveau of ["rent", "forurenet", "farligt", null] as const) {
+  for (const valgt of ["genbrug", "genanvendelse", "bortskaffelse", null] as const) {
+    for (const asbest of [false, true]) {
+      const forventet = affaldsmaerke(niveau, asbest);
+      const linje = urene([
+        prove({
+          isLabSample: niveau !== null,
+          level: niveau,
+          resource_handling: valgt,
+          asbestPaavist: asbest,
+        }),
+      ])[0];
+      if (!linje) continue;
+
+      check(
+        linje.maerke === forventet,
+        `${valgt ?? "intet valg"} + ${niveau ?? "intet svar"}${asbest ? " + asbest" : ""} fik maerket "${linje.maerke}", forventede "${forventet}"`,
+      );
+      // Og den anden vej: maerket maa ikke sige et niveau, proven ikke har.
+      check(
+        !(linje.maerke === "farligt" && niveau !== "farligt"),
+        `en prove med svaret ${niveau ?? "intet"} fik det rode maerke`,
+      );
+      check(
+        !(linje.maerke === "forurenet" && niveau !== "forurenet"),
+        `en prove med svaret ${niveau ?? "intet"} fik det gule maerke`,
+      );
+      check(
+        (linje.maerke === "asbest") === asbest,
+        "asbestmaerket fulgte ikke asbestsvaret",
+      );
+    }
+  }
+}
+
+// Det gule svar beholder sit gule maerke, ogsa naar screeneren valgte
+// bortskaffelse og linjen derfor faar bortskaffelsesteksten. De to siger hver
+// sit, og det er meningen: maerket er hvad laboratoriet fandt, teksten er hvad
+// entreprenoren skal goere.
+check(
+  maerkeFor({ level: "forurenet", resource_handling: "bortskaffelse" }) ===
+    "forurenet",
+  "screenerens valg flyttede det gule maerke",
+);
+check(
+  saetningFor({ level: "forurenet", resource_handling: "bortskaffelse" }) === BORT,
+  "det gule maerke aendrede saetningen",
+);
+
+// Pavist asbest er stadig farligt affald — skemaet farver den rod. Det er kun
+// maerket i rapporten, der siger hvilken slags.
+check(
+  maerkeFor({ level: "farligt", asbestPaavist: true }) === "asbest",
+  "asbest fik ikke sit eget maerke",
+);
+check(
+  urene([prove({ isLabSample: true, level: "farligt", asbestPaavist: true })])[0]
+    ?.niveau === "farligt",
+  "asbestlinjen holdt op med at vaere farligt affald",
+);
+
+// Det neutrale maerke: screeneren valgte bortskaffelse, og laboratoriet har
+// ikke fundet noget. Linjen stod for uden maerke — med en faelles tekst ville
+// den saa staa uden tekst overhovedet.
+check(
+  maerkeFor({ level: "rent", resource_handling: "bortskaffelse" }) ===
+    "bortskaffelse",
+  "en ren prove sat til bortskaffelse fik ikke det neutrale maerke",
+);
+check(
+  urene([prove({ resource_handling: "bortskaffelse", isLabSample: false })])[0]
+    ?.maerke === "bortskaffelse",
+  "en prove uden analyse fik ikke det neutrale maerke",
+);
+
+// Ressourceafsnittet har ingen maerker: alt i det er gront, og et gront maerke
+// paa hver linje betyder ingenting.
+check(
+  linjer([prove({})]).every((l) => l.maerke === null),
+  "en ressourcelinje fik et maerke",
+);
+
+// Hvert maerke skal have et navn og en tekst at hente. Mangler et af dem, staar
+// der en tom firkant i rapporten.
+for (const m of MAERKE_ORDEN) {
+  check(
+    (AFFALDSMAERKE_LABEL[m] ?? "").trim().length > 0,
+    `maerket "${m}" mangler sit navn`,
+  );
+  check(MAERKE_TEKST[m] !== undefined, `maerket "${m}" peger ikke paa en tekst`);
+}
+check(
+  MAERKE_TEKST.farligt === MAERKE_TEKST.bortskaffelse,
+  "farligt affald og bortskaffelse holdt op med at dele tekst",
+);
+check(
+  maerkerFor("bortskaffelse").join(",") === "farligt,bortskaffelse",
+  `bortskaffelsesteksten hentes af ${maerkerFor("bortskaffelse").join(", ")}`,
+);
+
+// ---------------------------------------------------------------------------
 // 2. Navn og saetning kommer fra materialet
 // ---------------------------------------------------------------------------
 const betonLinje = linjer([prove({})])[0]!;
@@ -477,6 +614,230 @@ check(fremmed[0]?.saetning === null, "et ukendt materiale fik en saetning");
 for (const [handling, felt] of Object.entries(SENTENCE_FIELD)) {
   check(felt in BETON, `${handling} peger pa feltet "${felt}", som ikke findes`);
 }
+
+// ---------------------------------------------------------------------------
+// 2b. Den faelles bortskaffelsestekst
+// ---------------------------------------------------------------------------
+/*
+ * Kontoret kan slaa en faelles tekst til: de tre saetninger er de samme uanset
+ * materiale, og gentaget paa tredive linjer er de stoej frem for en anvisning.
+ * Saa staar de EN gang under linjerne, og maerket peger paa den, der gaelder.
+ *
+ * Materialernes egne saetninger roeres ikke — kontakten skal kunne gaa begge
+ * veje. Det proves ved at koere de samme prover igennem med og uden.
+ */
+const FAELLES: Bortskaffelsestekster = {
+  bortskaffelse: "F-BORT.",
+  forurenet: "F-FORUR.",
+  asbest: "F-ASBEST.",
+};
+const medFaelles = (proever: RessourceProve[]) =>
+  ressourceoversigt(proever, MATERIALER, DELE, FAELLES);
+
+const alleSlags = [
+  prove({ label: "P1", isLabSample: true, level: "farligt", estimated_tons: 3 }),
+  prove({ label: "P2", isLabSample: true, level: "forurenet", estimated_tons: 2 }),
+  prove({
+    label: "P3",
+    isLabSample: true,
+    level: "farligt",
+    asbestPaavist: true,
+    estimated_tons: 1,
+  }),
+  prove({
+    label: "P4",
+    isLabSample: false,
+    level: null,
+    resource_handling: "bortskaffelse",
+    estimated_tons: 4,
+  }),
+  // En ren prove, sa ressourceafsnittet ogsa er med.
+  prove({ label: "P5", isLabSample: true, level: "rent", estimated_tons: 5 }),
+];
+
+const faelles = medFaelles(alleSlags);
+const faellesUrene = faelles.forureninger.flatMap((g) => g.linjer);
+
+// Saetningen staar ikke paa linjen laengere. Den staar under dem.
+check(
+  faellesUrene.every((l) => l.saetning === null),
+  "en forureningslinje beholdt sin egen saetning, da teksten blev faelles",
+);
+check(
+  faellesUrene.every((l) => l.maerke !== null),
+  "en forureningslinje stod uden maerke — saa peger den ikke paa nogen tekst",
+);
+// Ressourceafsnittet roeres ikke: genbrug og genanvendelse ER forskellige fra
+// materiale til materiale, og de bliver staaende paa materialet.
+check(
+  faelles.ressourcer.flatMap((g) => g.linjer)[0]?.saetning ===
+    BETON.sentence_genanvendelse,
+  "ressourcelinjen mistede materialets egen saetning",
+);
+
+// De tre tekster, i den orden kunden moder dem, og med de maerker der henter
+// dem. Farligt og bortskaffelse deler tekst og staar derfor sammen.
+check(
+  faelles.standardtekster.length === 3,
+  `fik ${faelles.standardtekster.length} standardtekster, forventede 3`,
+);
+check(
+  faelles.standardtekster.map((s) => s.tekst).join(" | ") ===
+    "F-BORT. | F-FORUR. | F-ASBEST.",
+  "standardteksterne stod i den forkerte orden",
+);
+check(
+  faelles.standardtekster[0]?.maerker.join(",") === "farligt,bortskaffelse",
+  `den forste standardtekst hentes af ${faelles.standardtekster[0]?.maerker.join(", ")}`,
+);
+check(
+  faelles.standardtekster[2]?.maerker.join(",") === "asbest",
+  "asbestteksten fik ikke sit eget maerke",
+);
+
+// Kun det, sagen faktisk har. En standardtekst om asbest i en rapport uden
+// asbest er en oplysning om ingenting — praecis det, Word-skabelonen gjorde.
+const kunGul = medFaelles([
+  prove({ label: "P1", isLabSample: true, level: "forurenet" }),
+]);
+check(
+  kunGul.standardtekster.length === 1 &&
+    kunGul.standardtekster[0]?.tekst === "F-FORUR.",
+  "en sag med kun gult fik andre standardtekster end den gule",
+);
+
+// Uden kontakten: ingen tekster nederst, og saetningen staar paa linjen igen.
+const udenFaelles = oversigt(alleSlags);
+check(
+  udenFaelles.standardtekster.length === 0,
+  "der stod standardtekster, selvom teksten kommer fra materialerne",
+);
+check(
+  udenFaelles.forureninger
+    .flatMap((g) => g.linjer)
+    .some((l) => l.saetning !== null),
+  "linjerne mistede materialets saetninger, da den faelles tekst var slaaet fra",
+);
+
+// En tekst, ingen har skrevet, springes over. Maerket staar stadig paa linjen —
+// den lover bare ingenting, praecis som et materiale uden saetning.
+const asbestprove = prove({
+  label: "P1",
+  isLabSample: true,
+  level: "farligt",
+  asbestPaavist: true,
+});
+check(
+  ressourceoversigt([asbestprove], MATERIALER, DELE, { ...FAELLES, asbest: null })
+    .standardtekster.length === 0,
+  "en uskreven faelles tekst blev alligevel til en raekke",
+);
+check(
+  medFaelles([asbestprove]).forureninger[0]?.linjer[0]?.maerke === "asbest",
+  "asbestlinjen mistede sit maerke",
+);
+
+/*
+ * Sammenlaegningen skifter med kontakten, og det skal den.
+ *
+ * To gule prover af samme materiale, hvor screeneren valgte hver sit: uden
+ * faelles tekst faar de hver sin saetning og skal derfor staa hver for sig. Med
+ * faelles tekst er der kun EN tekst pr. maerke, og saa ville de to linjer staa
+ * med praecis det samme paa arket.
+ */
+const toGuleForskelligtValg = [
+  prove({
+    label: "P1",
+    isLabSample: true,
+    level: "forurenet",
+    resource_handling: "genbrug",
+    estimated_tons: 4,
+  }),
+  prove({
+    label: "P2",
+    isLabSample: true,
+    level: "forurenet",
+    resource_handling: "bortskaffelse",
+    estimated_tons: 6,
+  }),
+];
+check(
+  urene(toGuleForskelligtValg).length === 2,
+  "de to gule blev lagt sammen, selvom de faar hver sin saetning",
+);
+const lagtSammen = medFaelles(toGuleForskelligtValg).forureninger.flatMap(
+  (g) => g.linjer,
+);
+check(
+  lagtSammen.length === 1,
+  `de to gule blev til ${lagtSammen.length} ens linjer under en faelles tekst`,
+);
+check(lagtSammen[0]?.kg === 10000, "maengderne blev ikke lagt sammen");
+
+// Men rodt med og uden asbest maa ALDRIG smelte sammen: de peger paa hver sin
+// tekst, og den ene af dem ville forsvinde ud af rapporten.
+const asbestAdskilt = medFaelles([
+  prove({ label: "P1", isLabSample: true, level: "farligt", estimated_tons: 4 }),
+  prove({
+    label: "P2",
+    isLabSample: true,
+    level: "farligt",
+    asbestPaavist: true,
+    estimated_tons: 6,
+  }),
+]);
+check(
+  asbestAdskilt.forureninger.flatMap((g) => g.linjer).length === 2,
+  "rod med og uden asbest blev lagt sammen under en faelles tekst",
+);
+
+// Indstillingerne, som de laeses ud af databasen.
+check(
+  laesIndstillinger([{ key: INDSTILLING_NOEGLER.faelles, value: true }])
+    .faellesBortskaffelse,
+  "kontakten blev ikke laest som slaaet til",
+);
+check(
+  !laesIndstillinger(null).faellesBortskaffelse,
+  "en tom tabel slog den faelles tekst TIL",
+);
+check(
+  laesIndstillinger([
+    { key: INDSTILLING_NOEGLER.bortskaffelse, value: "  Tekst.  " },
+  ]).tekster.bortskaffelse === "Tekst.",
+  "teksten blev ikke trimmet",
+);
+check(
+  laesIndstillinger([{ key: INDSTILLING_NOEGLER.forurenet, value: "" }]).tekster
+    .forurenet === null,
+  "en tom tekst blev ikke laest som ingen tekst",
+);
+// Kontakten kan vaere slaaet til, uden at nogen har skrevet teksterne. Sa
+// falder rapporten tilbage paa materialerne frem for at tie.
+check(
+  faellesTekster(
+    laesIndstillinger([{ key: INDSTILLING_NOEGLER.faelles, value: true }]),
+  ) === null,
+  "en slaaet til kontakt uden tekster tomte forureningsafsnittet",
+);
+check(
+  faellesTekster(
+    laesIndstillinger([
+      { key: INDSTILLING_NOEGLER.faelles, value: true },
+      { key: INDSTILLING_NOEGLER.asbest, value: "Kun asbest." },
+    ]),
+  )?.asbest === "Kun asbest.",
+  "en enkelt skreven tekst blev ikke taget i brug",
+);
+check(
+  faellesTekster(
+    laesIndstillinger([
+      { key: INDSTILLING_NOEGLER.faelles, value: false },
+      { key: INDSTILLING_NOEGLER.asbest, value: "Kun asbest." },
+    ]),
+  ) === null,
+  "teksterne blev brugt, selvom kontakten var slaaet fra",
+);
 
 // ---------------------------------------------------------------------------
 // 3. Sammenlaegning
@@ -651,6 +1012,7 @@ const mange: RessourceGruppe[] = [
       handling: null,
       saetning: null,
       niveau: null,
+      maerke: null,
       labels: [String(i)],
     })),
   },
@@ -671,6 +1033,50 @@ for (const [nr, s] of delt.entries()) {
     check(g.linjer.length > 0, `side ${nr + 1} har en overskrift uden linjer under`);
   }
 }
+
+/*
+ * De faelles tekster staar nederst paa den sidste side, og de skal have plads.
+ *
+ * Er der ikke plads, faar de et ark for sig. Sker det ikke, loeber de ud over
+ * kanten — `.print-side` braekker ikke af sig selv, og det ses forst naar nogen
+ * printer.
+ */
+check(standardtekstHoejde([]) === 0, "ingen tekster skulle tage ingen plads");
+check(
+  standardtekstHoejde([{ maerker: ["asbest"], tekst: "Kort." }]) === 20,
+  `en kort tekst blev ${standardtekstHoejde([{ maerker: ["asbest"], tekst: "Kort." }])} mm`,
+);
+check(
+  standardtekstHoejde([{ maerker: ["asbest"], tekst: "x".repeat(170) }]) === 26,
+  "en tekst over to linjer blev ikke hojere end en over en",
+);
+
+// Den sidste af de tre sider har syv linjer og altsaa god plads. 200 mm er mere
+// end der er tilbage, og saa skal teksterne have et ark.
+const fyldtSide = ressourceSider(mange);
+const medPlads = ressourceSider(mange, 0, 200);
+check(
+  medPlads.length === fyldtSide.length + 1,
+  "teksterne nederst fik ikke et ark, da den sidste side var fuld",
+);
+check(
+  medPlads[medPlads.length - 1]?.length === 0,
+  "det sidste ark skulle vaere tomt og kun baere teksterne",
+);
+check(
+  medPlads.reduce((n, s) => n + s.reduce((m, g) => m + g.linjer.length, 0), 0) === 40,
+  "en linje forsvandt, da teksterne fik plads",
+);
+// Er der luft tilbage, faar de ikke et ark for sig — et halvtomt ark mere er
+// ogsa en fejl, bare en billigere en.
+check(
+  ressourceSider(enLinje, 0, 60).length === 1,
+  "teksterne fik et ark for sig, selvom der var plads",
+);
+check(
+  ressourceSider([], 0, 60).length === 0,
+  "en tom oversigt gav en side alligevel",
+);
 
 // ---------------------------------------------------------------------------
 // 7. Analyseskemaets bredde
@@ -726,6 +1132,60 @@ for (const [navn, navne] of [
 check(
   NAVNEKOLONNER_SELEKTIV.length === NAVNEKOLONNER.length + 2,
   `det selektive skema har ${NAVNEKOLONNER_SELEKTIV.length} navnekolonner, forventede ${NAVNEKOLONNER.length + 2}`,
+);
+
+// ---------------------------------------------------------------------------
+// 7b. Maerkernes farver
+// ---------------------------------------------------------------------------
+// Klassen skal findes i globals.css, og den skal ogsa staa i @media print.
+// Farverne tvinges igennem med print-color-adjust, men et token, der kun findes
+// paa skaermen, kommer ud som ingenting — og saa staar der et navnloest maerke
+// paa papiret. Det ses forst, naar nogen printer.
+const printblok = css.slice(css.indexOf("@media print"));
+
+/** Alt hvad en @utility slaar op i, saa tokenet kan foelges hele vejen. */
+const tokensI = (klasse: string): string[] | null => {
+  const start = css.indexOf(`@utility ${klasse} {`);
+  if (start === -1) return null;
+  const blok = css.slice(start, css.indexOf("}", start));
+  return [...blok.matchAll(/var\((--[a-z0-9-]+)\)/g)].map((t) => t[1]!);
+};
+
+for (const m of MAERKE_ORDEN) {
+  const klasser = `${MAERKE_CLASS[m]} ${MAERKE_FLADE[m]}`.split(" ");
+  for (const klasse of klasser) {
+    // Tailwinds egne klasser staar ikke i filen; det er vores egne, der skal
+    // kontrolleres.
+    if (!klasse.startsWith("level-") && !klasse.startsWith("flade-")) continue;
+
+    const tokens = tokensI(klasse);
+    check(
+      tokens !== null,
+      `maerket "${m}" bruger .${klasse}, som ikke findes i globals.css`,
+    );
+    check(
+      (tokens?.length ?? 0) > 0,
+      `.${klasse} slaar ikke et eneste token op — saa har den ingen farve`,
+    );
+
+    // Og hvert token skal ogsa staa i @media print. Farverne tvinges igennem
+    // med print-color-adjust, men et token, der kun findes paa skaermen, kommer
+    // ud som ingenting — og saa staar der en navnloes firkant paa papiret. Det
+    // ses forst, naar nogen printer.
+    for (const token of tokens ?? []) {
+      check(
+        printblok.includes(`${token}:`),
+        `${token} mangler i @media print — .${klasse} kommer ud uden farve`,
+      );
+    }
+  }
+}
+
+// Stregen mellem maerket og teksten skal arve fladens farve. Uden den er
+// Tailwinds standard currentColor, altsa en sort streg gennem en bleg flade.
+check(
+  /@utility streg-arvet \{\s*border-color: inherit;/.test(css),
+  "streg-arvet arver ikke fladens farve",
 );
 
 // ---------------------------------------------------------------------------
@@ -1007,6 +1467,42 @@ check(
   "en previewraekke manglede sit navn",
 );
 
+/*
+ * Previewet under en faelles tekst.
+ *
+ * Panelet viser ikke materialets tre felter, naar teksten er faelles — saa
+ * skal previewet heller ikke. Gjorde det det, ville kontoret se en tekst, ingen
+ * kommer til at laese, og ikke den der bliver trykt.
+ */
+const faellesPreview = previewOversigt(
+  materiale({ name: "Kun genbrug", sentence_genbrug: "S-GENBRUG." }),
+  FACADE,
+  FAELLES,
+);
+check(
+  faellesPreview.skrevne.length === 4,
+  `previewet fandt ${faellesPreview.skrevne.length} skrevne saetninger med faelles tekst, forventede 4`,
+);
+check(
+  faellesPreview.tomme.map((r) => r.felt).join(",") === "sentence_genanvendelse",
+  "previewet regnede de tomme forkert, da teksten var faelles",
+);
+check(
+  faellesPreview.oversigt.standardtekster.length === 3,
+  "previewet viste ikke de tre faelles tekster",
+);
+check(
+  previewLinjer(faellesPreview.oversigt.forureninger).every(
+    (l) => l.saetning === null,
+  ),
+  "previewets forureningslinjer beholdt en saetning under en faelles tekst",
+);
+// Og materialets egne felter er stadig dem, der bruges for de rene.
+check(
+  previewLinjer(faellesPreview.oversigt.ressourcer)[0]?.saetning === "S-GENBRUG.",
+  "previewet mistede materialets genbrugssaetning",
+);
+
 // ---------------------------------------------------------------------------
 // 10. Migrationen der seeder saetningerne
 // ---------------------------------------------------------------------------
@@ -1042,6 +1538,35 @@ for (const navn of brugte) {
   check(
     kendteMaterialer.has(navn),
     `"${navn}" i saetningsmigrationen findes ikke i screening.materials`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 11. Migrationen der slar den faelles tekst til
+// ---------------------------------------------------------------------------
+// Kontakten seedes, sa et miljo bygget op fra bunden staar som kunden har bedt
+// om. Noeglen skal vaere den, appen laeser — staar der en tastefejl, laeser
+// appen standardvaerdien i stedet, og ingen kan se paa rapporten, at det ikke
+// var det, der var meningen.
+const faellesMigration = migration("20260909120000_faelles_bortskaffelsestekst.sql");
+check(
+  new RegExp(`\\('${INDSTILLING_NOEGLER.faelles}', 'true'::jsonb\\)`).test(
+    faellesMigration,
+  ),
+  `migrationen slar ikke "${INDSTILLING_NOEGLER.faelles}" til`,
+);
+
+// Og teksterne skal IKKE staa her. Det er kundens ord, og de hoerer i
+// databasen — samme regel som rapportens ovrige saetninger, der flyttede ud af
+// koden med materialepanelet. En seedet tekst ville desuden vaere umulig at
+// skelne fra en, kontoret selv havde skrevet.
+for (const felt of TEKST_ORDEN) {
+  check(
+    !faellesMigration.includes(`to_jsonb`) &&
+      !new RegExp(`'${DISPOSAL_SENTENCE_FIELD[felt]}',\\s*\\n?\\s*'`).test(
+        faellesMigration,
+      ),
+    `migrationen seeder en tekst for "${felt}" — den hoerer paa /indstillinger`,
   );
 }
 

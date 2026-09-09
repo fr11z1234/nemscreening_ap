@@ -77,7 +77,7 @@ eller et forkert antal kilo beton i en rapport. **Kør dem efter enhver
 | Sti | Hvad |
 | --- | --- |
 | `src/app/(app)/` | Marken. Smal kolonne, bygget til en telefon. |
-| `src/app/(bred)/` | Kontoret. Bredt bord til resultatskema og rapport. |
+| `src/app/(bred)/` | Kontoret. Bredt bord til resultatskema og rapport. Herunder `materialer/` og `indstillinger/`, som kun `office` og `admin` kan se. |
 | `src/app/(app)/sager/[id]/proever/` | Prøvetagning: kamera, formular, offline-kø. |
 | `src/lib/offline/` | IndexedDB-kø og synkronisering mod Supabase. |
 | `src/lib/cases/` | Sagens status, og sletning af en sag med alt under den. |
@@ -109,6 +109,7 @@ med `db: { schema: "screening" }`, så `.from("samples")` rammer
 | `lab_results` | Ét svar pr. prøve. Værdier gemmes som tekst. |
 | `case_files` | Rapportens bilag: forsidebillede, plantegning og et vilkårligt antal Eurofins-PDF'er. Filerne ligger i bucket'en `screening-rapport`, som er privat. |
 | `materials` | Materialelisten, plus `report_name` og en sætning pr. håndtering. Det er rapportens ord, og de rettes på `/materialer`. |
+| `app_settings` | Nøgle/værdi for det, der gælder alle sager: de tre fælles bortskaffelsestekster og kontakten, der afgør om de bruges. Rettes på `/indstillinger`. |
 | `app_users` | Medlemskab og rolle: `screener`, `office`, `admin`. |
 
 RLS er slået til overalt. Læsning kræver `screening.is_member()`. Skrivning

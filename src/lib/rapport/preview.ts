@@ -3,6 +3,8 @@ import {
   DISPOSAL_SENTENCE_LABEL,
   RESOURCE_HANDLING_LABEL,
   SENTENCE_FIELD,
+  type Bortskaffelsestekst,
+  type Bortskaffelsestekster,
   type BuildingPart,
   type Material,
   type ResourceHandling,
@@ -46,6 +48,15 @@ export type Previewraekke = {
   handling: ResourceHandling;
   niveau: LabLevel;
   asbest: boolean;
+  /**
+   * Hvilken af de tre bortskaffelsestekster raekken viser — null for de to
+   * rene.
+   *
+   * Staar her, fordi teksten kan komme to steder fra: materialets eget felt,
+   * eller den faelles tekst fra indstillingerne. Previewet skal laese den
+   * samme, som rapporten vil.
+   */
+  bortskaffelse: Bortskaffelsestekst | null;
 };
 
 /**
@@ -70,6 +81,7 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     handling: "genbrug",
     niveau: "rent",
     asbest: false,
+    bortskaffelse: null,
   },
   {
     felt: SENTENCE_FIELD.genanvendelse,
@@ -78,6 +90,7 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     handling: "genanvendelse",
     niveau: "rent",
     asbest: false,
+    bortskaffelse: null,
   },
   {
     felt: DISPOSAL_SENTENCE_FIELD.bortskaffelse,
@@ -86,6 +99,7 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     handling: "genbrug",
     niveau: "farligt",
     asbest: false,
+    bortskaffelse: "bortskaffelse",
   },
   {
     felt: DISPOSAL_SENTENCE_FIELD.forurenet,
@@ -94,6 +108,7 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     handling: "genbrug",
     niveau: "forurenet",
     asbest: false,
+    bortskaffelse: "forurenet",
   },
   {
     felt: DISPOSAL_SENTENCE_FIELD.asbest,
@@ -102,6 +117,7 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     handling: "genbrug",
     niveau: "farligt",
     asbest: true,
+    bortskaffelse: "asbest",
   },
 ];
 
@@ -129,10 +145,25 @@ export type Preview = {
  * Kun de saetninger, der er skrevet, bliver til prover. En tom saetning ville
  * ellers give en linje med et haengende komma efter standen — og det er ikke
  * det, previewet skal laere kontoret at rapporten goer.
+ *
+ * Er den faelles tekst slaaet til, laeser de tre bortskaffelsesraekker den frem
+ * for materialets egne felter — for det er den, rapporten vil skrive. Ellers
+ * ville panelet vise en tekst, ingen kommer til at laese, og skjule den der
+ * bliver trykt.
  */
-export function previewOversigt(materiale: Material, del: BuildingPart): Preview {
-  const skrevne = PREVIEWRAEKKER.filter((r) => materiale[r.felt]?.trim());
-  const tomme = PREVIEWRAEKKER.filter((r) => !materiale[r.felt]?.trim());
+export function previewOversigt(
+  materiale: Material,
+  del: BuildingPart,
+  faelles: Bortskaffelsestekster | null = null,
+): Preview {
+  const raekketekst = (r: Previewraekke) =>
+    (r.bortskaffelse && faelles
+      ? faelles[r.bortskaffelse]
+      : materiale[r.felt]
+    )?.trim();
+
+  const skrevne = PREVIEWRAEKKER.filter((r) => raekketekst(r));
+  const tomme = PREVIEWRAEKKER.filter((r) => !raekketekst(r));
 
   const proever: RessourceProve[] = skrevne.map((r) => ({
     label: r.label,
@@ -147,7 +178,7 @@ export function previewOversigt(materiale: Material, del: BuildingPart): Preview
   }));
 
   return {
-    oversigt: ressourceoversigt(proever, [materiale], [del]),
+    oversigt: ressourceoversigt(proever, [materiale], [del], faelles),
     skrevne,
     tomme,
   };

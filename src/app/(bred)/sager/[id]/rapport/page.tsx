@@ -12,7 +12,11 @@ import {
   type SkemaResult,
   type SkemaSample,
 } from "@/components/lab/ResultatSkema";
-import { Linjegruppe, Overskrift } from "@/components/rapport/Linjegruppe";
+import {
+  Linjegruppe,
+  Overskrift,
+  Standardtekster,
+} from "@/components/rapport/Linjegruppe";
 import { TilpasBredde } from "@/components/lab/TilpasBredde";
 import { Graensevaerdier } from "@/components/lab/Graensevaerdier";
 import { Logo } from "@/components/Logo";
@@ -33,9 +37,16 @@ import {
   RESSOURCE_INDLEDNING,
   ressourceSider,
   ressourceoversigt,
+  standardtekstHoejde,
   tekstHoejde,
   type RessourceGruppe,
 } from "@/lib/rapport/ressourcer";
+import {
+  faellesTekster,
+  INDSTILLING_NOEGLER,
+  laesIndstillinger,
+  type Indstillingsraekke,
+} from "@/lib/indstillinger";
 import {
   bygningsBlok,
   bygningsSider,
@@ -184,7 +195,7 @@ export default async function RapportPage({
    * bygningsdele hentes med: en prove taget for nogen lukkede et materiale skal
    * stadig kunne skrives ud med sit navn og sin saetning.
    */
-  const [materialerRes, delerRes] = erSelektiv
+  const [materialerRes, delerRes, indstillingerRes] = erSelektiv
     ? await Promise.all([
         supabase.from("materials").select("*").returns<Material[]>(),
         supabase
@@ -192,8 +203,22 @@ export default async function RapportPage({
           .select("*")
           .order("sort_order")
           .returns<BuildingPart[]>(),
+        supabase
+          .from("app_settings")
+          .select("key, value")
+          .in("key", Object.values(INDSTILLING_NOEGLER))
+          .returns<Indstillingsraekke[]>(),
       ])
-    : [{ data: [] as Material[] }, { data: [] as BuildingPart[] }];
+    : [
+        { data: [] as Material[] },
+        { data: [] as BuildingPart[] },
+        { data: [] as Indstillingsraekke[] },
+      ];
+
+  // Er den faelles tekst slaaet til, staar de tre bortskaffelsestekster EN gang
+  // under linjerne i stedet for paa hver af dem. Null betyder: hent dem paa
+  // materialerne, som appen altid har gjort.
+  const faelles = faellesTekster(laesIndstillinger(indstillingerRes.data));
 
   const ressourcer = erSelektiv
     ? ressourceoversigt(
@@ -210,6 +235,7 @@ export default async function RapportPage({
         })),
         materialerRes.data ?? [],
         delerRes.data ?? [],
+        faelles,
       )
     : null;
 
@@ -220,8 +246,15 @@ export default async function RapportPage({
   // Sideopdelingen far dens hojde at vide, sa materialelinjerne ikke bliver lagt
   // pa en side, der ikke har plads til dem.
   const haandteringsnote = sag.contamination_handling_note?.trim() || null;
+  // Og standardteksterne staar nederst paa den sidste side. Er der ikke plads,
+  // faar de et ark for sig — ellers loeber de ud over kanten.
+  const standardtekster = ressourcer?.standardtekster ?? [];
   const forureningSiderListe = ressourcer
-    ? ressourceSider(ressourcer.forureninger, tekstHoejde(haandteringsnote))
+    ? ressourceSider(
+        ressourcer.forureninger,
+        tekstHoejde(haandteringsnote),
+        standardtekstHoejde(standardtekster),
+      )
     : [];
 
   const ressourceNoter = ressourcer
@@ -618,6 +651,14 @@ export default async function RapportPage({
                 visProvenumre
               />
             ))}
+
+            {/* Standardteksterne staar EN gang, nederst: de gaelder alle
+                linjerne i afsnittet, og maerket paa linjen peger paa den, der
+                gaelder den. Kun naar kontoret har slaaet faelles tekst til —
+                ellers baerer hver linje sin egen saetning. */}
+            {nr === forureningSiderTilVisning.length - 1 && (
+              <Standardtekster raekker={standardtekster} />
+            )}
 
             {nr === 0 && !harForureninger && (
               <p className="mt-5 text-sm leading-relaxed text-muted">

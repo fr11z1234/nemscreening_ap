@@ -3,6 +3,12 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMember } from "@/lib/auth";
 import type { BuildingPart, Material } from "@/lib/types";
+import {
+  faellesTekster,
+  INDSTILLING_NOEGLER,
+  laesIndstillinger,
+  type Indstillingsraekke,
+} from "@/lib/indstillinger";
 import { MaterialePanel } from "./MaterialePanel";
 
 export const metadata = { title: "Materialer · Nemscreening" };
@@ -27,7 +33,7 @@ export default async function MaterialerPage() {
   const supabase = await createClient();
 
   // Ogsa de lukkede. Panelet er stedet, hvor de kan aabnes igen.
-  const [materialerRes, deleRes] = await Promise.all([
+  const [materialerRes, deleRes, indstillingerRes] = await Promise.all([
     supabase
       .from("materials")
       .select("*")
@@ -38,6 +44,11 @@ export default async function MaterialerPage() {
       .select("*")
       .order("sort_order")
       .returns<BuildingPart[]>(),
+    supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", Object.values(INDSTILLING_NOEGLER))
+      .returns<Indstillingsraekke[]>(),
   ]);
 
   return (
@@ -51,9 +62,13 @@ export default async function MaterialerPage() {
 
       <h1 className="mt-2 text-2xl font-semibold">Materialer</h1>
 
+      {/* Er den faelles tekst slaaet til, viser panelet DEN frem for
+          materialets tre felter — ellers retter kontoret en tekst, ingen
+          kommer til at laese. */}
       <MaterialePanel
         materialer={materialerRes.data ?? []}
         bygningsdele={deleRes.data ?? []}
+        faelles={faellesTekster(laesIndstillinger(indstillingerRes.data))}
       />
     </main>
   );

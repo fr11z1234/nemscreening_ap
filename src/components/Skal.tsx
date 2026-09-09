@@ -21,6 +21,7 @@ export async function Skal({ children }: { children: React.ReactNode }) {
   const nav: NavPunkt[] = [{ href: "/sager", label: "Sager" }];
   if (rolle === "office" || rolle === "admin") {
     nav.push({ href: "/materialer", label: "Materialer" });
+    nav.push({ href: "/indstillinger", label: "Indstillinger" });
   }
 
   return (

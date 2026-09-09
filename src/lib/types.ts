@@ -337,6 +337,15 @@ export const DISPOSAL_SENTENCE_LABEL: Record<Bortskaffelsestekst, string> = {
 };
 
 /**
+ * De tre saetninger, loesrevet fra et materiale.
+ *
+ * Samme tre felter, hvad enten de staar paa materialet eller er den faelles
+ * tekst fra indstillingerne. Det er hele pointen i at kunne slaa faelles tekst
+ * til: rapporten spoerger om det samme, og kun kilden skifter.
+ */
+export type Bortskaffelsestekster = Record<Bortskaffelsestekst, string | null>;
+
+/**
  * Hvornar hver af de tre bruges. Vises i materialepanelet, sa kontoret ikke
  * skal gaette hvilket felt der ender i hvilken rapport.
  */
@@ -408,6 +417,74 @@ export function bortskaffelsestekst(
   if (niveau === "farligt") return "bortskaffelse";
   return "forurenet";
 }
+
+/**
+ * Maerket paa en linje i forureningsafsnittet.
+ *
+ * Den tredje regel ved siden af de to ovenfor, og den svarer paa: hvad ER det
+ * her for noget affald? Ikke hvad der skal ske med det (`faktiskHandtering`) og
+ * ikke hvad der skal staa (`bortskaffelsestekst`).
+ *
+ * `asbest` er ny og er hele grunden til at funktionen findes. For havde en
+ * asbestprove det samme rode maerke som alt andet farligt affald, og saa kunne
+ * entreprenoren ikke se paa linjen, at netop den skal befugtes og emballeres
+ * stovtaet. Pavist asbest ER stadig farligt affald — analyseskemaet farver den
+ * rod som for, og det er med vilje: maerket siger hvilken slags, ikke hvor slemt.
+ *
+ * `bortskaffelse` er det neutrale. Det staar paa den prove, screeneren selv
+ * satte til bortskaffelse, og som hverken er gul eller rod — tagpap uden
+ * analyse, en mineraluld der bare skal vaek. Den linje stod for uden maerke,
+ * fordi der ikke var et niveau at farve. Det gaar ikke laengere: med en faelles
+ * tekst er maerket det eneste, der peger paa hvilken standardtekst der gaelder,
+ * og en linje uden maerke ville staa uden tekst overhovedet.
+ *
+ * MAERKET FOLGER LABORATORIET, ikke screenerens valg. Sagde Eurofins gult, staar
+ * der «Forurenet affald» — ogsa selvom screeneren havde skrevet bortskaffelse
+ * paa proven, og ogsa selvom det er `sentence_bortskaffelse`, linjen faar. Ellers
+ * ville rapporten kalde en prove rod, som analyseskemaet farver gul, og laeseren
+ * ville ikke vide hvem der havde ret.
+ *
+ * Kaldes kun for linjer i forureningsafsnittet. Ressourceafsnittet har ingen
+ * maerker — alt i det er gront, og et gront maerke paa hver linje betyder
+ * ingenting.
+ */
+export type Affaldsmaerke =
+  | "farligt"
+  | "forurenet"
+  | "asbest"
+  | "bortskaffelse";
+
+export function affaldsmaerke(
+  niveau: LabLevel | null,
+  asbestPaavist: boolean,
+): Affaldsmaerke {
+  if (asbestPaavist) return "asbest";
+  if (niveau === "farligt") return "farligt";
+  if (niveau === "forurenet") return "forurenet";
+  return "bortskaffelse";
+}
+
+export const AFFALDSMAERKE_LABEL: Record<Affaldsmaerke, string> = {
+  farligt: "Farligt affald",
+  forurenet: "Forurenet affald",
+  asbest: "Asbest affald",
+  bortskaffelse: "Bortskaffelse",
+};
+
+/**
+ * Hvilken af de tre tekster et maerke henter.
+ *
+ * `farligt` og `bortskaffelse` peger paa det samme felt, praecis som de altid
+ * har gjort: farligt affald og screenerens eget valg om bortskaffelse er den
+ * samme besked til entreprenoren. Derfor staar de to maerker ogsa ved den samme
+ * standardtekst i rapporten frem for at faa hver sin, der siger det samme.
+ */
+export const MAERKE_TEKST: Record<Affaldsmaerke, Bortskaffelsestekst> = {
+  farligt: "bortskaffelse",
+  bortskaffelse: "bortskaffelse",
+  forurenet: "forurenet",
+  asbest: "asbest",
+};
 
 /** De fire analysevalg screeneren ser i felten. */
 export const ANALYSIS_FIELDS = [

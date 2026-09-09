@@ -201,6 +201,12 @@ Rapporten slår altså navnet op på materialet og sætningen på håndteringen,
 overskriften kommer fra bygningsdelen. `src/lib/rapport/ressourcer.ts` samler
 linjerne og lægger mængderne sammen — den bestemmer intet om ordene.
 
+**De tre bortskaffelsestekster kan dog være fælles.** Er kontakten på
+`/indstillinger` slået til — og det er den som standard — henter rapporten dem
+fra `screening.app_settings` i stedet for fra materialet og skriver dem ét sted
+under linjerne. Se «Én fælles tekst, eller én pr. materiale» nedenfor. Genbrug
+og genanvendelse er altid materialets egne.
+
 **Materialer slettes ikke, de lukkes.** Prøver gemmer materialets *navn* som
 tekst, så en sletning rører ikke historikken — men den tager sætningen med, og så
 bliver en to år gammel rapport stille kortere. Et lukket materiale forsvinder
@@ -236,6 +242,10 @@ Det er den vigtigste regel i hele afsnittet, og den er kundens egen:
 | Farligt affald | Forureninger | materialets **bortskaffelse** |
 | Asbest påvist | Forureninger | materialets **asbest** |
 | Afventer svar | ingen af dem, men tælles | — |
+
+Er den fælles tekst slået til på `/indstillinger`, står de tre sætninger ét sted
+under linjerne i stedet for på hver af dem — se «Én fælles tekst» nedenfor. Hvad
+der lander hvor, ændrer sig ikke af det.
 
 Håndteringen, screeneren valgte, bestemmer altså kun sætningen for de rene.
 Skriver hun «genbrug» på en prøve, og kommer svaret tilbage gult eller rødt,
@@ -294,6 +304,84 @@ analysen der ved det, ikke navnet.
 **Teksten er med i grupperingsnøglen.** To røde prøver af samme materiale, hvor
 asbest kun er påvist i den ene, må ikke lægges sammen til én linje — så ville
 den ene af de to sætninger forsvinde ud af rapporten.
+
+### Mærket på linjen
+
+Hver linje i Forureninger bærer et mærke. Det svarer på et tredje spørgsmål end
+de to regler ovenfor: ikke *hvad der skal ske* (`faktiskHandtering`) og ikke
+*hvad der skal stå* (`bortskaffelsestekst`), men **hvad linjen er for noget
+affald**. Reglen er `affaldsmaerke` i `src/lib/types.ts`, ved siden af de to
+andre.
+
+| Mærke | Farve | Hvornår |
+| --- | --- | --- |
+| Asbest affald | lilla | Asbest påvist i prøven |
+| Farligt affald | rød | Rødt svar |
+| Forurenet affald | gul | Gult svar |
+| Bortskaffelse | neutral | Screeneren valgte det selv, og svaret er rent eller mangler |
+
+**Asbest fik sin egen farve, fordi den kræver noget andet.** Med det røde mærke
+kunne entreprenøren ikke se på linjen, at netop den skal befugtes og emballeres
+støvtæt. Lilla er valgt uden for trafiklyset med vilje: asbest er ikke *værre*
+end farligt affald, den er en anden slags. **Analyseskemaet farver den stadig
+rød** — påvist asbest *er* farligt affald, og den regel står uændret.
+
+**Mærket følger laboratoriet, ikke screenerens valg.** Svarede Eurofins gult,
+står der «Forurenet affald» — også når screeneren selv havde skrevet
+bortskaffelse på prøven, og også selvom linjen så får bortskaffelsesteksten.
+Ellers ville rapporten kalde en prøve rød, som analyseskemaet farver gul, og
+læseren ville ikke vide hvem der havde ret. De to siger derfor hver sit om hver
+sin ting: mærket er hvad laboratoriet fandt, sætningen er hvad entreprenøren
+skal gøre.
+
+**Det neutrale mærke er nyt og er der af nød.** En prøve, screeneren selv satte
+til bortskaffelse, og som er ren eller slet ikke analyseret, stod før uden
+mærke — der var ikke noget niveau at farve. Med en fælles tekst (nedenfor) er
+mærket det eneste, der peger på hvilken standardtekst der gælder, og en linje
+uden mærke ville stå helt uden tekst.
+
+### Én fælles tekst, eller én pr. materiale
+
+De tre bortskaffelsestekster er i praksis **de samme for alle materialer** —
+«farligt affald skal til et godkendt modtageanlæg» ændrer sig ikke af, om det er
+beton eller tagpap. De blev alligevel skrevet pr. materiale, fordi de bor sammen
+med genbrugs- og genanvendelsessætningen, og de to *er* forskellige fra
+materiale til materiale.
+
+Derfor en kontakt på `/indstillinger` og ikke en udskiftning:
+
+- **Slået til** (standard) skriver rapporten de tre tekster **én gang** under
+  forureningslinjerne, under overskriften «Standardtekst for affaldstyper», og
+  mærket på linjen peger på den, der gælder. Linjen selv bærer ingen sætning.
+- **Slået fra** henter hver linje sætningen fra sit eget materiale og skriver den
+  efter mængden, præcis som appen altid har gjort.
+
+**Materialernes egne sætninger røres aldrig af kontakten.** De står uberørt i
+`screening.materials`, så den kan gå begge veje. Påpeger en kommune en dag, at
+en tekst skal være unik for det enkelte materiale, er svaret et flueben og ikke
+en udrulning. Materialepanelet viser derfor de fælles tekster i stedet for de tre
+felter, når kontakten er slået til — og det **skjulte felt pr. sætning er ikke
+pynt**: `gemMateriale` læser alle fem sætninger ud af formularen, og et felt der
+ikke står der, bliver gemt som tomt.
+
+**Kun de affaldstyper sagen faktisk har, bliver skrevet.** En standardtekst om
+asbest i en rapport uden asbest er en oplysning om ingenting — præcis det,
+Word-skabelonen gjorde. «Farligt affald» og «Bortskaffelse» deler tekst og står
+derfor ved den samme, frem for at få hver sin der siger det samme.
+
+**Er kontakten slået til, men teksterne ikke skrevet, falder rapporten tilbage
+på materialerne** frem for at skrive et forureningsafsnit uden et ord om
+affaldet.
+
+**Sammenlægningen skifter med kontakten**, og det skal den: to gule prøver af
+samme materiale, hvor screeneren valgte hver sit, får hver sin sætning uden
+fælles tekst og skal stå hver for sig. Med fælles tekst er der kun én tekst pr.
+mærke, og to linjer ville stå med præcis det samme på arket. Rødt med og uden
+asbest lægges **aldrig** sammen — de peger på hver sin tekst.
+
+Standardteksterne står nederst på afsnittets sidste side, og `ressourceSider`
+får deres højde at vide. Er der ikke plads, får de et ark for sig:
+`.print-side` brækker ikke af sig selv.
 
 **Forureningslinjen navngives med prøvenummeret, ikke materialet:** `P1, P2 –
 200 kg i ringe stand, …`. Entreprenøren skal kunne slå den enkelte prøve op i

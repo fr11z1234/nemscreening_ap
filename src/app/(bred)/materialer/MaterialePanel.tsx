@@ -1,9 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useId, useMemo, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Linjegruppe, Overskrift } from "@/components/rapport/Linjegruppe";
+import { Besked, felt, GemKnap } from "@/components/PanelFelter";
+import {
+  Linjegruppe,
+  Maerke,
+  Overskrift,
+  Standardtekster,
+} from "@/components/rapport/Linjegruppe";
 import { previewOversigt } from "@/lib/rapport/preview";
+import { maerkerFor } from "@/lib/rapport/ressourcer";
 import {
   DISPOSAL_SENTENCE_FIELD,
   DISPOSAL_SENTENCE_HINT,
@@ -11,6 +18,7 @@ import {
   RESOURCE_HANDLING_LABEL,
   SENTENCE_FIELD,
   type Bortskaffelsestekst,
+  type Bortskaffelsestekster,
   type BuildingPart,
   type Material,
   type ResourceHandling,
@@ -23,59 +31,25 @@ import {
   opretMateriale,
   skiftBygningsdelAdgang,
   skiftMaterialeAdgang,
-  type PanelState,
 } from "./actions";
-
-/*
- * Feltet er hvidt med en kant, ikke en gra tone.
- *
- * Resten af appen adskiller flader med tone og skygge, og det virker, fordi
- * felterne der ligger pa et hvidt kort. Panelet har ikke noget kort — det gar
- * direkte pa sidens bone — og bone-200 pa bone-100 er tre procents forskel.
- * Kanten er det, der gor en kasse til et felt, man kan skrive i.
- *
- * Kanten er --grid og ikke --border-strong af samme grund som i skemaet:
- * bone-300 pa hvid er 1,4:1 og forsvinder, bone-400 er 1,9:1 og ses. Det er
- * ogsa den forskel, globals.css beskriver ved de to tokens.
- */
-const felt =
-  "w-full rounded-lg border border-grid bg-surface px-3 py-2 outline-none placeholder:text-muted focus:border-primary focus:inset-ring-2 focus:inset-ring-primary-line";
-
-function GemKnap({ tekst = "Gem" }: { tekst?: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="tap rounded-lg bg-primary px-4 py-2 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover disabled:opacity-60"
-    >
-      {pending ? "Gemmer…" : tekst}
-    </button>
-  );
-}
-
-function Besked({ state }: { state: PanelState }) {
-  if (state.error)
-    return (
-      <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
-        {state.error}
-      </p>
-    );
-  if (state.ok)
-    return (
-      <p className="rounded-lg bg-primary-soft px-3 py-2 text-sm font-medium text-primary">
-        {state.ok}
-      </p>
-    );
-  return null;
-}
+import type { PanelState } from "@/lib/panel";
 
 export function MaterialePanel({
   materialer,
   bygningsdele,
+  /**
+   * De faelles bortskaffelsestekster, nar kontoret har slaaet dem til.
+   *
+   * Null er det, panelet altid har gjort: hvert materiale har sine egne tre.
+   * Er de sat, skriver rapporten dem i stedet — og saa skal panelet vise DEM,
+   * ikke felterne, der ligger og venter. Ellers retter kontoret en tekst, ingen
+   * kommer til at laese.
+   */
+  faelles = null,
 }: {
   materialer: Material[];
   bygningsdele: BuildingPart[];
+  faelles?: Bortskaffelsestekster | null;
 }) {
   const [valgtId, setValgtId] = useState<string | null>(
     materialer[0]?.id ?? null,
@@ -146,7 +120,12 @@ export function MaterialePanel({
         {/* key: formularen skal bygges forfra, nar der skiftes materiale.
             Ellers ville felterne blive staaende med det forriges tekst. */}
         {valgt ? (
-          <MaterialeForm key={valgt.id} m={valgt} bygningsdele={bygningsdele} />
+          <MaterialeForm
+            key={valgt.id}
+            m={valgt}
+            bygningsdele={bygningsdele}
+            faelles={faelles}
+          />
         ) : (
           <p className="text-sm text-muted">Vælg et materiale til venstre.</p>
         )}
@@ -175,9 +154,11 @@ const BORTSKAFFELSESTEKSTER: Bortskaffelsestekst[] = [
 function MaterialeForm({
   m,
   bygningsdele,
+  faelles,
 }: {
   m: Material;
   bygningsdele: BuildingPart[];
+  faelles: Bortskaffelsestekster | null;
 }) {
   const [state, formAction] = useActionState<PanelState, FormData>(
     gemMateriale,
@@ -258,16 +239,20 @@ function MaterialeForm({
             ellers er fundet.
           </p>
 
-          {BORTSKAFFELSESTEKSTER.map((t) => (
-            <Saetningsfelt
-              key={t}
-              navn={DISPOSAL_SENTENCE_FIELD[t]}
-              overskrift={DISPOSAL_SENTENCE_LABEL[t]}
-              hjaelp={DISPOSAL_SENTENCE_HINT[t]}
-              vaerdi={saetninger[DISPOSAL_SENTENCE_FIELD[t]]}
-              onChange={(v) => saetFelt(DISPOSAL_SENTENCE_FIELD[t], v)}
-            />
-          ))}
+          {faelles ? (
+            <FaellesTekster faelles={faelles} saetninger={saetninger} />
+          ) : (
+            BORTSKAFFELSESTEKSTER.map((t) => (
+              <Saetningsfelt
+                key={t}
+                navn={DISPOSAL_SENTENCE_FIELD[t]}
+                overskrift={DISPOSAL_SENTENCE_LABEL[t]}
+                hjaelp={DISPOSAL_SENTENCE_HINT[t]}
+                vaerdi={saetninger[DISPOSAL_SENTENCE_FIELD[t]]}
+                onChange={(v) => saetFelt(DISPOSAL_SENTENCE_FIELD[t], v)}
+              />
+            ))
+          )}
         </fieldset>
 
         <Besked state={state} />
@@ -294,6 +279,7 @@ function MaterialeForm({
           saetninger={saetninger}
           m={m}
           bygningsdele={bygningsdele}
+          faelles={faelles}
           onLuk={() => setViserPreview(false)}
         />
       )}
@@ -312,6 +298,65 @@ function MaterialeForm({
         </button>
       </form>
     </section>
+  );
+}
+
+/**
+ * De faelles tekster, vist i stedet for materialets tre felter.
+ *
+ * Rettes paa /indstillinger og ikke her: teksten er den samme for alle
+ * materialer, og et felt pr. materiale ville lade kontoret rette den for beton
+ * og undre sig over, at tagpap ikke fulgte med.
+ *
+ * DE SKJULTE FELTER ER IKKE PYNT. `gemMateriale` laeser alle fem saetninger ud
+ * af formularen, og et felt der ikke staar der, bliver læst som tomt og
+ * gemt som null. Uden dem ville et enkelt tryk paa «Gem» — paa et helt andet
+ * felt — tomme materialets tre bortskaffelsestekster, og saa ville de vaere
+ * vaek den dag, kontakten blev slaaet fra igen.
+ */
+function FaellesTekster({
+  faelles,
+  saetninger,
+}: {
+  faelles: Bortskaffelsestekster;
+  saetninger: Record<string, string>;
+}) {
+  return (
+    <>
+      {BORTSKAFFELSESTEKSTER.map((t) => (
+        <input
+          key={DISPOSAL_SENTENCE_FIELD[t]}
+          type="hidden"
+          name={DISPOSAL_SENTENCE_FIELD[t]}
+          value={saetninger[DISPOSAL_SENTENCE_FIELD[t]]}
+        />
+      ))}
+
+      <p className="rounded-lg bg-surface px-3 py-2 text-xs leading-relaxed">
+        Teksten er <span className="font-medium">fælles for alle materialer</span>{" "}
+        og rettes under{" "}
+        <Link href="/indstillinger" className="underline hover:text-fg">
+          Indstillinger
+        </Link>
+        . Materialets egne sætninger står gemt og bruges igen, hvis den fælles
+        tekst slås fra.
+      </p>
+
+      <dl className="flex flex-col gap-2 text-sm leading-relaxed">
+        {BORTSKAFFELSESTEKSTER.map((t) => (
+          <div key={t} className="flex flex-col gap-0.5">
+            <dt className="flex flex-wrap items-center gap-1">
+              {maerkerFor(t).map((mk) => (
+                <Maerke key={mk} maerke={mk} />
+              ))}
+            </dt>
+            <dd className={faelles[t] ? "" : "text-muted"}>
+              {faelles[t] ?? "Ingen tekst skrevet. Rapporten lover ingenting."}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </>
   );
 }
 
@@ -356,6 +401,7 @@ function RapportPreview({
   saetninger,
   m,
   bygningsdele,
+  faelles,
   onLuk,
 }: {
   navn: string;
@@ -363,6 +409,7 @@ function RapportPreview({
   saetninger: Record<string, string>;
   m: Material;
   bygningsdele: BuildingPart[];
+  faelles: Bortskaffelsestekster | null;
   onLuk: () => void;
 }) {
   const overskriftId = useId();
@@ -400,7 +447,7 @@ function RapportPreview({
     sentence_asbest: tekst("sentence_asbest"),
   };
 
-  const { oversigt, skrevne, tomme } = previewOversigt(materiale, del);
+  const { oversigt, skrevne, tomme } = previewOversigt(materiale, del, faelles);
 
   return (
     <div
@@ -447,6 +494,10 @@ function RapportPreview({
                   {oversigt.forureninger.map((g) => (
                     <Linjegruppe key={g.overskrift} gruppe={g} visProvenumre />
                   ))}
+                  {/* Er teksten faelles, staar den her og ikke paa linjerne —
+                      og saa skal previewet ogsa vise den, ellers ser panelet
+                      ud som om rapporten intet lover. */}
+                  <Standardtekster raekker={oversigt.standardtekster} />
                 </>
               )}
             </div>

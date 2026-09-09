@@ -1,12 +1,16 @@
 import { formatHeltal } from "@/lib/format";
 import { worstLevel, type LabLevel } from "@/lib/lab/parametre";
 import {
+  affaldsmaerke,
   bortskaffelsestekst,
   conditionLabel,
   DISPOSAL_SENTENCE_FIELD,
   faktiskHandtering,
+  MAERKE_TEKST,
   SENTENCE_FIELD,
+  type Affaldsmaerke,
   type Bortskaffelsestekst,
+  type Bortskaffelsestekster,
   type BuildingPart,
   type Material,
   type ResourceHandling,
@@ -111,12 +115,32 @@ export type RessourceLinje = {
   /** Daarligste stand blandt proverne bag linjen. */
   condition: number | null;
   handling: ResourceHandling | null;
-  /** Materialets saetning for den handtering. Null nar den ikke er skrevet. */
+  /**
+   * Saetningen efter maengden. Null nar den ikke er skrevet — og ogsa nar
+   * teksten er faelles, for saa staar den EN gang under linjerne i stedet.
+   */
   saetning: string | null;
   /** Vaerste niveau blandt proverne. Null nar der ikke er malt noget. */
   niveau: LabLevel | null;
+  /**
+   * Hvad linjen er for noget affald. Null i ressourceafsnittet, hvor alt er
+   * gront og et maerke pa hver linje ikke ville betyde noget.
+   */
+  maerke: Affaldsmaerke | null;
   /** Provenumrene bag linjen, sa den kan spores tilbage. */
   labels: string[];
+};
+
+/**
+ * En af de faelles bortskaffelsestekster, som den staar under linjerne.
+ *
+ * `maerker` er dem, der peger paa netop denne tekst — som regel et, men
+ * «Farligt affald» og «Bortskaffelse» deler felt og staar derfor ved den samme
+ * tekst frem for at faa hver sin, der siger det samme.
+ */
+export type Standardtekst = {
+  maerker: Affaldsmaerke[];
+  tekst: string;
 };
 
 export type RessourceGruppe = {
@@ -136,6 +160,16 @@ export type Ressourceoversigt = {
    * for materialet: se `ressourceLinjeHoved`.
    */
   forureninger: RessourceGruppe[];
+  /**
+   * De faelles tekster, der skal staa under forureningslinjerne.
+   *
+   * Tom, nar teksten hentes fra materialerne — saa staar saetningen paa hver
+   * linje, og der er ingenting at samle nederst. Ellers staar der praecis de
+   * tekster, som linjerne paa denne sag faktisk peger paa: en standardtekst om
+   * asbest i en rapport uden asbest er en oplysning om ingenting, og det er
+   * netop den slags, Word-skabelonen var fuld af.
+   */
+  standardtekster: Standardtekst[];
   /**
    * Prover med bygningsdel, der stadig venter pa laboratoriet.
    *
@@ -159,6 +193,8 @@ type Post = {
    * hvor `handling` vaelger saetningen i stedet.
    */
   tekst: Bortskaffelsestekst | null;
+  /** Hvad linjen er for noget affald. Null i ressourceafsnittet. */
+  maerke: Affaldsmaerke | null;
   proever: RessourceProve[];
 };
 
@@ -188,6 +224,19 @@ export function ressourceoversigt(
   proever: RessourceProve[],
   materialer: Material[],
   bygningsdele: BuildingPart[],
+  /**
+   * De faelles bortskaffelsestekster, nar kontoret har slaaet dem til.
+   *
+   * Null er det, appen altid har gjort: hver linje henter saetningen fra sit
+   * eget materiale. Er de sat, staar de tre tekster i stedet EN gang under
+   * linjerne, og linjen baerer kun sit maerke — for de tre saetninger er de
+   * samme uanset materiale, og gentaget paa tredive linjer er de stoej frem for
+   * en anvisning.
+   *
+   * Kun bortskaffelsen. Genbrug og genanvendelse er stadig materialets egne
+   * ord, for de ER forskellige: beton knuses, trae genbruges.
+   */
+  faelles: Bortskaffelsestekster | null = null,
 ): Ressourceoversigt {
   const materialeVedNavn = new Map(materialer.map((m) => [m.name, m]));
   const delVedId = new Map(bygningsdele.map((b) => [b.id, b]));
@@ -225,19 +274,26 @@ export function ressourceoversigt(
       // rode prover af samme materiale far hver sin saetning, hvis asbest kun er
       // pavist i den ene. Uden den i noglen ville de to smelte sammen til en
       // linje, og den ene af saetningerne ville forsvinde ud af rapporten.
+      //
+      // Med en faelles tekst er den grund vaek — der ER kun en saetning pr.
+      // maerke — og saa ville teksten i noglen dele to linjer op, som ville
+      // staa med praecis det samme paa arket. Derfor deler maerket dem naar
+      // teksten er faelles, og teksten naar den ikke er.
       const tekst = bortskaffelsestekst(
         p.resource_handling,
         p.level,
         p.asbestPaavist,
       );
+      const maerke = affaldsmaerke(p.level, p.asbestPaavist);
       laegTil(
         urene,
-        noegle(del.id, materiale, p.level ?? "", tekst),
+        noegle(del.id, materiale, p.level ?? "", maerke, faelles ? "" : tekst),
         del,
         materiale,
         p,
         "bortskaffelse",
         tekst,
+        maerke,
       );
     } else {
       // Her vaelger handteringen saetningen: er halvdelen af betonen til genbrug
@@ -250,16 +306,75 @@ export function ressourceoversigt(
         p,
         handling,
         null,
+        null,
       );
     }
   }
 
+  const forureninger = byggGrupper(urene, bygningsdele, materialeVedNavn, faelles);
+
   return {
-    ressourcer: byggGrupper(rene, bygningsdele, materialeVedNavn),
-    forureninger: byggGrupper(urene, bygningsdele, materialeVedNavn),
+    ressourcer: byggGrupper(rene, bygningsdele, materialeVedNavn, faelles),
+    forureninger,
+    standardtekster: standardtekster(forureninger, faelles),
     afventer,
     udenMateriale,
   };
+}
+
+/**
+ * Rangfolgen paa teksterne under linjerne, og paa maerkerne i hver af dem.
+ *
+ * Farligt forst, saa forurenet, saa asbest — som paa graensevaerdisiden og i
+ * skemaets forklaring, saa kunden moder de samme tre i den samme orden hele
+ * rapporten igennem. Det neutrale maerke staar hos det farlige, fordi de deler
+ * tekst.
+ */
+export const MAERKE_ORDEN: Affaldsmaerke[] = [
+  "farligt",
+  "bortskaffelse",
+  "forurenet",
+  "asbest",
+];
+export const TEKST_ORDEN: Bortskaffelsestekst[] = [
+  "bortskaffelse",
+  "forurenet",
+  "asbest",
+];
+
+/** Maerkerne, der henter netop denne tekst. Bruges ogsa af indstillingssiden. */
+export const maerkerFor = (tekst: Bortskaffelsestekst): Affaldsmaerke[] =>
+  MAERKE_ORDEN.filter((m) => MAERKE_TEKST[m] === tekst);
+
+/**
+ * De faelles tekster, sagens egne linjer faktisk peger paa.
+ *
+ * Ikke alle tre hver gang. En standardtekst om asbest i en rapport uden asbest
+ * er en oplysning om ingenting — og praecis den slags er grunden til, at
+ * rapporten bygges af det registrerede frem for af en skabelon, hvor alt staar
+ * og skal slettes.
+ *
+ * En tekst, ingen har skrevet, springes over. Saa staar maerket alene paa
+ * linjen og lover ingenting, hvilket er det samme, en manglende saetning paa et
+ * materiale goer.
+ */
+function standardtekster(
+  forureninger: RessourceGruppe[],
+  faelles: Bortskaffelsestekster | null,
+): Standardtekst[] {
+  if (!faelles) return [];
+
+  const brugte = new Set(
+    forureninger.flatMap((g) =>
+      g.linjer.map((l) => l.maerke).filter((m): m is Affaldsmaerke => m !== null),
+    ),
+  );
+
+  return TEKST_ORDEN.flatMap((t) => {
+    const maerker = maerkerFor(t).filter((m) => brugte.has(m));
+    const tekst = faelles[t]?.trim();
+    return maerker.length && tekst ? [{ maerker, tekst }] : [];
+  });
 }
 
 function laegTil(
@@ -270,16 +385,18 @@ function laegTil(
   p: RessourceProve,
   handling: ResourceHandling | null,
   tekst: Bortskaffelsestekst | null,
+  maerke: Affaldsmaerke | null,
 ) {
   const post = kort.get(k);
   if (post) post.proever.push(p);
-  else kort.set(k, { part, material, handling, tekst, proever: [p] });
+  else kort.set(k, { part, material, handling, tekst, maerke, proever: [p] });
 }
 
 function byggGrupper(
   poster: Map<string, Post>,
   bygningsdele: BuildingPart[],
   materialeVedNavn: Map<string, Material>,
+  faelles: Bortskaffelsestekster | null,
 ): RessourceGruppe[] {
   // Grupperne folger bygningsdelenes egen raekkefolge. Den staar i databasen og
   // rettes i panelet, sa afsnittene kan flyttes uden en udrulning.
@@ -302,18 +419,24 @@ function byggGrupper(
 
     const linjer = iDelen.map((post) => {
       const m = materialeVedNavn.get(post.material);
-      const saetning = m
-        ? post.tekst
-          ? m[DISPOSAL_SENTENCE_FIELD[post.tekst]]
-          : post.handling
-            ? m[SENTENCE_FIELD[post.handling]]
-            : null
-        : null;
+      // Er teksten faelles, staar den under linjerne og ikke paa dem. Linjen
+      // baerer sit maerke, og maerket peger paa teksten.
+      const saetning =
+        post.tekst && faelles
+          ? null
+          : m
+            ? post.tekst
+              ? m[DISPOSAL_SENTENCE_FIELD[post.tekst]]
+              : post.handling
+                ? m[SENTENCE_FIELD[post.handling]]
+                : null
+            : null;
 
       return byggLinje(
         m?.report_name?.trim() || post.material,
         post.handling,
         saetning ?? null,
+        post.maerke,
         post.proever,
       );
     });
@@ -328,6 +451,7 @@ function byggLinje(
   navn: string,
   handling: ResourceHandling | null,
   saetning: string | null,
+  maerke: Affaldsmaerke | null,
   proever: RessourceProve[],
 ): RessourceLinje {
   const medMaengde = proever.filter((p) => p.estimated_tons != null);
@@ -351,6 +475,7 @@ function byggLinje(
     handling,
     saetning: saetning?.trim() || null,
     niveau: worstLevel(proever.map((p) => p.level)),
+    maerke,
     labels: proever.map((p) => p.label),
   };
 }
@@ -419,6 +544,24 @@ const HOEJDE = { overskrift: 10, linje: 13 };
 const SIDEPLADS = { foerste: 204, senere: 259 };
 
 /**
+ * Anslaaet hojde af de faelles tekster under linjerne.
+ *
+ * Otte til overskriften, og pr. tekst seks til maerkerne plus dens egne linjer.
+ * Teksten staar i en smallere spalte end en materialelinje, fordi maerkerne har
+ * en spalte for sig — derfor 85 anslag og ikke 95.
+ */
+export function standardtekstHoejde(raekker: Standardtekst[]): number {
+  if (raekker.length === 0) return 0;
+  return (
+    8 +
+    raekker.reduce(
+      (sum, r) => sum + 6 + Math.max(1, Math.ceil(r.tekst.length / 85)) * 6,
+      0,
+    )
+  );
+}
+
+/**
  * Deler grupperne op i sider, en sektion pr. side.
  *
  * En overskrift bliver aldrig staaende alene nederst: er der ikke plads til
@@ -436,6 +579,14 @@ export function ressourceSider(
    * havde plads til dem.
    */
   forbrugtPaaFoersteSide = 0,
+  /**
+   * Millimeter, der skal vaere tilbage paa den SIDSTE side.
+   *
+   * De faelles bortskaffelsestekster staar under linjerne, og de staar der kun
+   * en gang — altsaa nederst. Er der ikke plads, faar de et ark for sig frem
+   * for at lobe ud over kanten: `.print-side` braekker ikke af sig selv.
+   */
+  forbrugtPaaSidsteSide = 0,
 ): RessourceGruppe[][] {
   const sider: RessourceGruppe[][] = [];
   let side: RessourceGruppe[] = [];
@@ -478,5 +629,17 @@ export function ressourceSider(
   }
 
   if (side.length > 0) sider.push(side);
+
+  // Teksterne nederst faar et tomt ark, hvis den sidste side er fuld. Kun naar
+  // der ER en sidste side: er der ingen linjer overhovedet, tegner rapporten
+  // alligevel en enkelt side, og den har hele arket til dem.
+  if (
+    forbrugtPaaSidsteSide > 0 &&
+    sider.length > 0 &&
+    hoejde + forbrugtPaaSidsteSide > plads
+  ) {
+    sider.push([]);
+  }
+
   return sider;
 }

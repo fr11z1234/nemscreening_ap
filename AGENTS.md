@@ -161,24 +161,40 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
 
 ## Kameraet
 
-**Billedet skal være det, der stod i søgeren.** Det lyder som en selvfølge, og
-det var det ikke: strømmen blev bestilt som 16:9, søgeren viser den i en
-4:3-kasse med `object-fit: cover`, og optagelsen tegnede hele strømmen. En
-fjerdedel af bredden lå altså uden for skærmen og kom alligevel med i filen.
-Screeneren ramte prøven ind i firkanten og fik en radiator med i siden — og
-opdagede det først i rapporten, som viser billedet med `object-contain`.
+**Søgeren ER den ramme, billedet ender i.** Det er hele reglen, og den var brudt
+på to måder på én gang.
 
-Fejlen kunne ikke ses noget sted i appen. Søgeren så rigtig ud, miniaturen er
-kvadratisk med `object-cover` og skjulte det samme, og billedsiden ligeså.
+Strømmen blev bestilt som 16:9, søgeren viste den i en **liggende** 4:3-kasse
+med `object-fit: cover`, og optagelsen tegnede hele strømmen. En fjerdedel af
+bredden lå altså uden for skærmen og kom alligevel med i filen: screeneren
+ramte prøven ind i firkanten og fik en radiator med i siden. Og formen var
+forkert — begge steder billedet ender, er **stående**:
 
-Det er rettet to steder, og de skal begge blive:
+| Billedet | Ramme | Hvor |
+| --- | --- | --- |
+| Prøvebilledet | 89 × 130 mm | `h-[13cm]` på prøvesiden, to i bredden |
+| Forsidebilledet | 210 × 297 | `.forside` i `globals.css`, hele arket |
 
-- **Strømmen bestilles i 4:3** i `useCamera.ts`, altså søgerens egen form.
-  Telefonens sensor **er** 4:3; et 16:9-billede er den beskåret. Så er der
-  helst ikke noget at skære væk til at begynde med.
+Et liggende billede fylder 67 mm af prøvesidens 130 — halvdelen af den plads,
+arket blev vendt for at give billedet, stod tom. Og på forsiden skar
+`object-cover` næsten halvdelen af bredden væk.
+
+Ingen af delene kunne ses i appen. Søgeren så rigtig ud, miniaturen er
+kvadratisk med `object-cover` og skjulte det samme igen, og billedsiden ligeså.
+Først rapporten viser filen som den er. **De gamle billeder ser rigtige ud i
+rapporten ved et uheld:** telefonen holdes lodret, strømmen var stående, og
+optagelsen gemte hele den — altså mere, end der stod i søgeren.
+
+Rettet tre steder, og de skal alle blive:
+
+- **Søgerne er rammerne**, `aspect-89/130` og `aspect-210/297`. Tallene er ikke
+  runde med vilje — de er rapportens egne.
+- **Strømmen bestilles stående** (3:4, 1200 × 1600) i `useCamera.ts`.
+  Telefonens sensor er 4:3 rejst op. Så er der så lidt som muligt at skære væk,
+  og **højden er den dyre led** på et stående ark.
 - **`synligtUdsnit` i `compress.ts` beskærer optagelsen** til det, elementet
-  faktisk viser. Det er den afgørende: `ideal` er et ønske, og svarer browseren
-  16:9 alligevel, skal filen stadig vise det, screeneren sigtede på.
+  faktisk viser. Den er den afgørende: `ideal` er et ønske, og svarer browseren
+  noget andet, skal filen stadig vise det, screeneren sigtede på.
 
 **Målene tages af elementet** (`clientWidth`/`clientHeight`), ikke af et tal i
 koden. Så kan søgerens form ændres i CSS uden at regnestykket tavst bliver
@@ -186,9 +202,15 @@ forkert — det var præcis den slags to steder, fejlen kom af. Kender vi ikke
 kassen, kommer hele billedet med; et gæt på en form ville skære noget væk, som
 ingen har bedt om.
 
-`npm run verify:kamera` regner udsnittet efter og kontrollerer, at optagelsen
-rent faktisk bruger det. **Ændrer du søgerens form eller `object-fit`**, fejler
-den med vilje: billedet bliver noget andet end før, og det skal være et valg.
+De to søgere er ikke helt ens (0,685 og 0,707), og det gør ikke noget: strømmen
+bestilles én gang for begge, og udsnittet skærer bagefter til præcis den søger,
+screeneren kiggede i. Det koster 9 % af bredden på prøvebilledet og 6 % på
+forsiden — af bredden, aldrig af højden.
+
+`npm run verify:kamera` regner udsnittet efter, kontrollerer at optagelsen rent
+faktisk bruger det, og **holder søgerne op mod de mål, de skal ramme**: ændres
+`h-[13cm]` på prøvesiden eller `aspect-ratio` på forsiden, fejler den, indtil
+søgeren følger med. Bliver en søger liggende igen, fejler den også.
 
 Filvælgeren er undtagelsen. Har telefonen ikke `getUserMedia`, tages billedet i
 systemets eget kamera, og der er ingen søger af vores at rette sig efter —

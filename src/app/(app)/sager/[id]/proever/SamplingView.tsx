@@ -736,7 +736,19 @@ export function SamplingView({
         )}
       </header>
 
-      <div className="relative aspect-4/3 w-full overflow-hidden bg-black">
+      {/*
+        Sogeren ER rapportens billedramme: 89 x 130 mm, staaende.
+
+        Den var liggende 4:3, og det passede ingen steder. Rapporten giver hver
+        prove to billeder ved siden af hinanden paa et staaende ark — 89 mm
+        brede og 130 mm hoje — og et liggende billede fylder 67 mm af de 130.
+        Halvdelen af den plads, arket blev vendt for at give billedet, stod tom.
+
+        Tallene er rapportens egne og ikke runde med vilje: 130 er `h-[13cm]`
+        paa provesiden. Aendrer den sig, fejler `verify:kamera`, og saa skal
+        sogeren folge med.
+      */}
+      <div className="relative aspect-89/130 w-full overflow-hidden bg-black">
         <video
           ref={videoRef}
           playsInline

@@ -39,25 +39,31 @@ export function useCamera() {
         video: {
           facingMode: { ideal: "environment" },
           /*
-           * 4:3, fordi sogeren er 4:3.
+           * STAAENDE, fordi begge sogere er staaende — og fordi papiret er.
            *
-           * Der blev bedt om 1920x1080. Sogeren viser strommen i en
-           * 4:3-kasse med `object-fit: cover`, og saa laa en fjerdedel af
-           * bredden uden for skaermen — mens optagelsen tog det hele med. Det
-           * gav billeder med mere pa end det, screeneren sigtede paa.
+           * Der blev bedt om 1920x1080, altsa liggende 16:9. Sogeren viste
+           * strommen i en liggende 4:3-kasse med `object-fit: cover`, og
+           * optagelsen tegnede hele strommen: en fjerdedel af bredden laa uden
+           * for skaermen og kom alligevel med i filen.
            *
-           * Det er den ene af to halvdele. Denne her soerger for, at der ikke
-           * er noget at skaere vaek: telefonens sensor ER 4:3, og et 16:9-billede
-           * er den beskaaret. `synligtUdsnit` i compress.ts er den anden og den
-           * afgorende — `ideal` er et onske, og svarer browseren 16:9 alligevel,
-           * skal filen stadig vise det, der stod i sogeren.
+           * Formen var ogsaa forkert. Billedet ender enten som rapportens
+           * forside — et staaende A4 — eller i provesidens ramme paa 89 x 130
+           * mm. Et liggende billede fylder 67 mm af de 130, og halvdelen af den
+           * plads, arket blev vendt for at give billedet, star tom.
            *
-           * 1600x1200 og ikke mere: MAX_EDGE er 1600, sa alt derover bliver
+           * 3:4 er telefonens egen sensor rejst op. De to sogere er ikke
+           * praecis ens (0,685 og 0,707), og det gor ikke noget: `ideal` er et
+           * onske, og `synligtUdsnit` i compress.ts skaerer bagefter til
+           * praecis den soger, screeneren kiggede i. Denne her soerger blot for,
+           * at der er saa lidt som muligt at skaere vaek — hojden er den dyre
+           * led, og den bliver bevaret.
+           *
+           * 1200x1600 og ikke mere: MAX_EDGE er 1600, sa alt derover bliver
            * alligevel skaleret ned igen.
            */
-          aspectRatio: { ideal: 4 / 3 },
-          width: { ideal: 1600 },
-          height: { ideal: 1200 },
+          aspectRatio: { ideal: 3 / 4 },
+          width: { ideal: 1200 },
+          height: { ideal: 1600 },
         },
         audio: false,
       });

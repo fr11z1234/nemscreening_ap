@@ -78,7 +78,18 @@ export function Forsidebillede({
     <div className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">Forsidebillede</span>
 
-      <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-black">
+      {/*
+        Sogeren ER arket: 210 x 297, staaende A4.
+
+        Billedet bliver baggrund paa rapportens forside i fuld flade, og den
+        er et staaende ark. Sogeren var liggende 4:3, og saa skar `object-cover`
+        naesten halvdelen af bredden vaek paa forsiden — kunden saa den
+        midterste tredjedel af det, screeneren sigtede paa.
+
+        Tallene staar ogsaa i `.forside` i globals.css, og `verify:kamera`
+        holder de to op mod hinanden.
+      */}
+      <div className="relative aspect-210/297 w-full overflow-hidden rounded-xl bg-black">
         {/*
           Videoen bliver staaende, ogsa mens billedet vises ovenpa.
           Rev vi den ud af DOM'en, ville krydset montere et NYT videoelement,

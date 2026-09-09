@@ -3,16 +3,17 @@
  * Koeres med: npm run verify:kamera
  *
  * Fejlen den her fanger, var i appen i maaneder uden at nogen kunne se den paa
- * skaermen: sogeren viser strommen i en 4:3-kasse med `object-fit: cover`, og
- * optagelsen tegnede hele strommen. Var den 16:9, laa en fjerdedel af bredden
- * uden for sogeren og kom alligevel med i filen. Screeneren ramte proven ind i
- * firkanten og fik en radiator med i siden — og opdagede det forst i rapporten,
- * som viser billedet med `object-contain`.
+ * skaermen: sogeren viste strommen i en LIGGENDE 4:3-kasse med
+ * `object-fit: cover`, og optagelsen tegnede hele strommen. En fjerdedel af
+ * bredden laa uden for sogeren og kom alligevel med i filen.
  *
- * Regnestykket er rent og kan proves uden browser. Selve sogerens form kan det
- * ikke: den kommer fra CSS'en og maales paa elementet. Derfor kontrolleres det
- * ogsa her, at de to kameraer i appen faktisk staar i den kasse, udsnittet
- * regnes ud fra.
+ * Og formen var forkert. Billedet ender enten paa rapportens forside eller i
+ * provesidens ramme paa 89 x 130 mm, og begge er STAAENDE — et liggende billede
+ * fylder 67 mm af de 130.
+ *
+ * Derfor to slags kontrol: at udsnittet er det, sogeren viser, og at sogeren er
+ * den ramme, billedet ender i. Regnestykket er rent og kan proves uden browser;
+ * formen maales paa elementet, sa den holdes op mod rapportens egne maal.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -57,6 +58,33 @@ check(
   `der kom ${((bredStrom.sw / 1920) * 100).toFixed(1)} % af bredden med, forventede 75 %`,
 );
 
+/*
+ * De to former appen faktisk beder om og viser i.
+ *
+ * Strommen er staaende 1200x1600, sogerne er rapportens egne rammer. Hojden —
+ * den dyre led paa et staaende ark — skal blive i behold begge steder; det er
+ * bredden, der giver de faa procent.
+ */
+const proveramme = synligtUdsnit(1200, 1600, 89, 130);
+check(
+  proveramme.sh === 1600,
+  `provebilledet mistede hojde: ${proveramme.sh} af 1600`,
+);
+check(
+  proveramme.sw === 1095 && proveramme.sx === 53,
+  `provebilledet blev ${proveramme.sw} bredt ved ${proveramme.sx}, forventede 1095 ved 53`,
+);
+
+const forsideramme = synligtUdsnit(1200, 1600, 210, 297);
+check(
+  forsideramme.sh === 1600,
+  `forsidebilledet mistede hojde: ${forsideramme.sh} af 1600`,
+);
+check(
+  forsideramme.sw === 1131 && forsideramme.sx === 35,
+  `forsidebilledet blev ${forsideramme.sw} bredt ved ${forsideramme.sx}, forventede 1131 ved 35`,
+);
+
 // Passer strommen til sogeren, skal der ikke skaeres noget vaek overhovedet.
 const passer = synligtUdsnit(1600, 1200, 400, 300);
 check(
@@ -83,6 +111,10 @@ for (const [vb, vh, kb, kh] of [
   [1600, 1200, 400, 300],
   [640, 480, 1000, 1000],
   [1920, 1080, 300, 400],
+  // De to sogere appen faktisk har, med en staaende og en liggende strom.
+  [1200, 1600, 89, 130],
+  [1200, 1600, 210, 297],
+  [1600, 1200, 89, 130],
 ] as const) {
   const u = synligtUdsnit(vb, vh, kb, kh);
   check(
@@ -130,22 +162,69 @@ const kameraer: [string, string][] = [
   ["forsidebilledet", join("src", "components", "Forsidebillede.tsx")],
 ];
 
+/** Formen paa den kasse, videoen staar i. */
+const soegerform = (kilde: string): number | null => {
+  // Rigeligt vindue: der staar en forklaring mellem kassen og elementet i
+  // begge filer, og kommentarer skal kunne skrives uden at braekke en kontrol.
+  const fundet = kilde.match(/aspect-(\d+)\/(\d+)[\s\S]{0,900}?<video/);
+  return fundet ? Number(fundet[1]) / Number(fundet[2]) : null;
+};
+
+const former: Record<string, number | null> = {};
+
 for (const [navn, sti] of kameraer) {
   const kilde = fil(sti);
-  const soeger = kilde.match(
-    /<video[\s\S]{0,400}?className="([^"]*)"/,
-  );
+  const soeger = kilde.match(/<video[\s\S]{0,400}?className="([^"]*)"/);
   check(soeger !== null, `fandt ikke sogeren i ${navn}`);
   check(
     soeger?.[1]?.includes("object-cover") ?? false,
     `sogeren i ${navn} bruger ikke object-cover — sa beskaerer optagelsen forkert`,
   );
-  // Rigeligt vindue: der staar en forklaring mellem kassen og elementet i
-  // Forsidebillede, og kommentarer skal kunne skrives uden at braekke en
-  // kontrol.
+
+  const form = soegerform(kilde);
+  former[navn] = form;
+  check(form !== null, `fandt ikke sogerens form i ${navn}`);
+  // Staaende. Papiret er staaende, og begge steder billedet ender er det ogsa.
   check(
-    /aspect-4\/3[\s\S]{0,800}?<video/.test(kilde),
-    `sogeren i ${navn} staar ikke laengere i en 4:3-kasse`,
+    form === null || form < 1,
+    `sogeren i ${navn} er liggende (${form?.toFixed(3)}) — billedet ender paa et staaende ark`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3. Sogeren er den ramme, billedet ender i
+// ---------------------------------------------------------------------------
+/*
+ * Det er ikke nok, at sogeren er staaende. Den skal have samme form som det
+ * sted, billedet havner — ellers beskaerer eller lader rapporten det, og
+ * screeneren kan ikke se paa firkanten, hvad kunden faar.
+ *
+ * Maalene staar to steder hver, og de to skal folges ad. Derfor holdes de op
+ * mod hinanden her frem for at staa som et tal, nogen skal huske at rette med.
+ */
+
+// Provebilledet: rapporten giver det 89 mm bredde og 13 cm hojde.
+const rapport = fil("src", "app", "(bred)", "sager", "[id]", "rapport", "page.tsx");
+const hoejde = rapport.match(/className="h-\[(\d+)cm\][^"]*object-contain"/);
+check(hoejde !== null, "fandt ikke provebilledets hojde i rapporten");
+if (hoejde && former["provetagningen"] !== null) {
+  const mm = Number(hoejde[1]) * 10;
+  const forventet = 89 / mm;
+  check(
+    Math.abs(former["provetagningen"]! - forventet) < 0.005,
+    `sogeren i provetagningen er ${former["provetagningen"]!.toFixed(3)}, men rapportens ramme er 89x${mm} mm (${forventet.toFixed(3)})`,
+  );
+}
+
+// Forsidebilledet: hele arket.
+const css = fil("src", "app", "globals.css");
+const ark = css.match(/aspect-ratio:\s*(\d+)\s*\/\s*(\d+)/);
+check(ark !== null, "fandt ikke forsidens format i globals.css");
+if (ark && former["forsidebilledet"] !== null) {
+  const forventet = Number(ark[1]) / Number(ark[2]);
+  check(
+    Math.abs(former["forsidebilledet"]! - forventet) < 0.005,
+    `sogeren til forsidebilledet er ${former["forsidebilledet"]!.toFixed(3)}, men forsiden er ${ark[1]}x${ark[2]} (${forventet.toFixed(3)})`,
   );
 }
 
@@ -169,8 +248,8 @@ check(
 // udsnittet ovenfor billedet, men saa er der brugt pixels paa ingenting.
 const kamera = fil("src", "lib", "camera", "useCamera.ts");
 check(
-  /aspectRatio:\s*\{\s*ideal:\s*4\s*\/\s*3\s*\}/.test(kamera),
-  "strommen bestilles ikke i 4:3 — sogerens egen form",
+  /aspectRatio:\s*\{\s*ideal:\s*3\s*\/\s*4\s*\}/.test(kamera),
+  "strommen bestilles ikke staaende — sogerne er staaende, og det er papiret ogsaa",
 );
 check(
   !/width:\s*\{\s*ideal:\s*1920\s*\}/.test(kamera),

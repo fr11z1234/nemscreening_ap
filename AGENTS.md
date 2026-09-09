@@ -216,6 +216,32 @@ Filvælgeren er undtagelsen. Har telefonen ikke `getUserMedia`, tages billedet i
 systemets eget kamera, og der er ingen søger af vores at rette sig efter —
 filen kommer med i sin helhed.
 
+### En systemdialog sætter søgeren på pause
+
+**Strømmen kan leve, uden at der kommer billeder.** `window.confirm` foran en
+sletning og filvælgeren suspenderer begge siden, og browseren sætter `<video>`
+på pause. Sporet er stadig `live`, så kontrollen «lever sporet?» sagde ja og
+gjorde intet — søgeren frøs på det sidste billede, indtil screeneren gik ud af
+prøven og ind igen, for så blev komponenten monteret forfra.
+
+Reglen er `genoptagelse` i `useCamera.ts`, og den skelner tre ting, der ligner
+hinanden udefra:
+
+| Tilstand | Hvad der skal til |
+| --- | --- |
+| Sporet er dødt | `start` — ny strøm |
+| Strømmen lever, elementet har den ikke | `tildel` — `srcObject` sættes kun ved start |
+| Strømmen lever, elementet står på pause | `afspil` |
+
+`resume()` kaldes tre steder: når fanen kommer frem, når videoen får et
+`pause`-event, og i hånden efter hver systemdialog. Det sidste er ikke
+overflødigt — `pause`-eventet er browserens, ikke vores, og et kald koster
+ingenting, når der ikke er noget at genoptage.
+
+**Pause-lytteren svarer kun, mens siden er fremme.** Ellers ville en browser,
+der pauser fordi fanen gik i baggrunden, få et svar med det samme, og de to
+ville skiftes til at pause og afspille resten af dagen.
+
 ## Selektiv nedrivning
 
 `cases.report_type` er `miljoescreening` eller `selektiv` og vælges, når sagen

@@ -263,6 +263,7 @@ export function SamplingView({
     state: cameraState,
     capture,
     retry: retryCamera,
+    resume: resumeCamera,
     torchOn,
     torchSupported,
     toggleTorch,
@@ -425,6 +426,8 @@ export function SamplingView({
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
+    // Filvaelgeren er ogsa en systemdialog og stopper sogeren pa samme maade.
+    void resumeCamera();
     if (!file) return;
     if (atPhotoLimit) {
       setNotice(photoLimitNotice);
@@ -436,7 +439,14 @@ export function SamplingView({
   async function removePhoto(id: string) {
     // Et billede kan ikke tages om, nar screeneren er kort hjem fra adressen.
     // Derfor en bekraeftelse frem for et tryk der bare sletter.
-    if (!window.confirm("Slet billedet?")) return;
+    const svar = window.confirm("Slet billedet?");
+
+    // Dialogen satte sogeren paa pause. Stroemmen lever videre, sa ingenting
+    // opdager det af sig selv — den frøs paa det sidste billede, indtil
+    // screeneren gik ud af proven og ind igen. Ogsa naar der svares nej: det
+    // er dialogen der stopper videoen, ikke sletningen.
+    void resumeCamera();
+    if (!svar) return;
 
     const thumb = thumbs.find((t) => t.id === id);
     if (thumb?.local) {

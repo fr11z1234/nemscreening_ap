@@ -5,6 +5,38 @@ import { captureFromVideo, type Captured } from "./compress";
 
 export type CameraState = "starting" | "ready" | "denied" | "unavailable";
 
+/** Hvad der skal til for at faa sogeren i gang igen. */
+export type Genoptagelse = "start" | "tildel" | "afspil" | "intet";
+
+/**
+ * Hvorfor sogeren staar stille — og dermed hvad der skal goeres ved det.
+ *
+ * Der er tre maader at miste billedet paa, og de kraever hver sit:
+ *
+ *   start   Sporet er doet. Browseren lukkede kameraet, typisk fordi fanen har
+ *           vaeret i baggrunden laenge. Der skal en ny stroem til.
+ *   tildel  Stroemmen lever, men elementet har den ikke. Sker naar videoen er
+ *           blevet monteret paa ny — `start` saetter kun `srcObject` en gang.
+ *   afspil  Stroemmen lever, elementet har den, men det staar paa pause.
+ *
+ * Den sidste er den, ingen taenkte paa. En systemdialog — `window.confirm`, en
+ * filvaelger — suspenderer siden, og browseren saetter videoen paa pause.
+ * Sporet lever videre, saa kontrollen «lever sporet?» siger ja og goer intet.
+ * Sogeren frøs paa det sidste billede, indtil screeneren gik ud af proven og
+ * ind igen — for saa blev komponenten monteret forfra.
+ *
+ * Reglen staar her og ikke inde i en effekt, saa `verify:kamera` kan naa den.
+ */
+export function genoptagelse(
+  sporLever: boolean,
+  elementHarStroemmen: boolean,
+  paaPause: boolean,
+): Genoptagelse {
+  if (!sporLever) return "start";
+  if (!elementHarStroemmen) return "tildel";
+  return paaPause ? "afspil" : "intet";
+}
+
 /** Torch er ikke i TypeScripts DOM-typer endnu, men understottes pa Android. */
 type TorchConstraint = { torch: boolean };
 
@@ -100,19 +132,64 @@ export function useCamera() {
     return stop;
   }, [start, stop]);
 
+  /**
+   * Faar sogeren i gang igen, hvad end der stoppede den.
+   *
+   * Kaldes bade af sig selv — naar fanen kommer frem, og naar videoen bliver
+   * sat paa pause — og af den der aabner en systemdialog. Se `genoptagelse`
+   * for de tre tilfaelde.
+   */
+  const resume = useCallback(async () => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    const lever =
+      stream?.getVideoTracks().some((t) => t.readyState === "live") ?? false;
+
+    switch (genoptagelse(lever, !!video && video.srcObject === stream, !!video?.paused)) {
+      case "start":
+        await start();
+        return;
+      case "tildel":
+        if (video && stream) video.srcObject = stream;
+        break;
+      case "intet":
+        return;
+    }
+    await video?.play().catch(() => {});
+  }, [start]);
+
   // Browsere stopper strommen nar fanen har vaeret i baggrunden. Uden det her
   // kommer screeneren tilbage til et sort felt efter et opkald.
   useEffect(() => {
     function onVisible() {
       if (document.visibilityState !== "visible") return;
-      const live = streamRef.current
-        ?.getVideoTracks()
-        .some((t) => t.readyState === "live");
-      if (!live) start();
+      void resume();
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [start]);
+  }, [resume]);
+
+  /*
+   * Og saa den, der ikke kunne ses: en systemdialog saetter videoen paa pause.
+   *
+   * `window.confirm` foran en sletning, eller filvaelgeren, suspenderer siden.
+   * Stroemmen lever videre, saa kontrollen ovenfor gor intet — sogeren stod og
+   * frøs, indtil screeneren gik ud af proven og ind igen.
+   *
+   * Kun mens siden er fremme. Braekker browseren afspilningen af, fordi fanen
+   * er gaaet i baggrunden, ville et svar her blive til en loekke af pause og
+   * play; naar fanen kommer frem igen, tager kontrollen ovenfor den.
+   */
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    function onPause() {
+      if (document.visibilityState !== "visible") return;
+      void resume();
+    }
+    video.addEventListener("pause", onPause);
+    return () => video.removeEventListener("pause", onPause);
+  }, [resume]);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -139,6 +216,13 @@ export function useCamera() {
     state,
     capture,
     retry: start,
+    /**
+     * Kaldes efter en systemdialog. Pause-lytteren ovenfor tager den som regel
+     * selv, men den bygger paa at browseren rent faktisk sender et
+     * `pause`-event — og det er ikke noget, vi kan kontrollere. Et kald her
+     * koster ingenting, naar der ikke er noget at genoptage.
+     */
+    resume,
     torchOn,
     torchSupported,
     toggleTorch,

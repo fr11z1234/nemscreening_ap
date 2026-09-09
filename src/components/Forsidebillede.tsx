@@ -27,6 +27,7 @@ export function Forsidebillede({
     state: cameraState,
     capture,
     retry,
+    resume,
     torchOn,
     torchSupported,
     toggleTorch,
@@ -65,6 +66,9 @@ export function Forsidebillede({
   async function vaelgFil(e: React.ChangeEvent<HTMLInputElement>) {
     const fil = e.target.files?.[0];
     e.target.value = "";
+    // Filvaelgeren er en systemdialog og saetter sogeren paa pause. Stroemmen
+    // lever videre, saa ingenting opdager det af sig selv.
+    void resume();
     if (!fil) return;
     setFejl(null);
     try {

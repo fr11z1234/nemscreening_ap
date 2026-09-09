@@ -19,6 +19,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { synligtUdsnit } from "../src/lib/camera/compress";
+import {
+  genoptagelse,
+  type Genoptagelse,
+} from "../src/lib/camera/useCamera";
 
 let failures = 0;
 const check = (ok: boolean, msg: string) => {
@@ -149,6 +153,63 @@ check(
   ingenStrom.sw === 0 && ingenStrom.sh === 0,
   "en tom strom gav et udsnit med indhold",
 );
+
+// ---------------------------------------------------------------------------
+// 1b. Hvad der skal til for at faa sogeren i gang igen
+// ---------------------------------------------------------------------------
+/*
+ * Sogeren frøs, naar man slettede et billede. `window.confirm` suspenderer
+ * siden, og browseren saetter videoen paa pause — men STROMMEN LEVER VIDERE.
+ * Kontrollen var «lever sporet?», og den sagde ja, saa der skete ingenting.
+ * Screeneren maatte ud af proven og ind igen, for saa blev komponenten
+ * monteret forfra.
+ *
+ * De tre tilfaelde kraever hver sit, og det er derfor reglen findes: et doet
+ * spor skal have en ny stroem, et nymonteret element skal have den tildelt, og
+ * en video paa pause skal bare afspilles.
+ */
+const genoptagelser: [boolean, boolean, boolean, Genoptagelse, string][] = [
+  [false, false, false, "start", "doet spor uden element"],
+  [false, true, false, "start", "doet spor, selvom elementet har stroemmen"],
+  [false, true, true, "start", "doet spor paa pause"],
+  [true, false, false, "tildel", "levende spor, elementet mangler stroemmen"],
+  [true, false, true, "tildel", "nymonteret element paa pause"],
+  // Den her ER fejlen. Alt lever, og alligevel staar billedet stille.
+  [true, true, true, "afspil", "systemdialogen satte videoen paa pause"],
+  [true, true, false, "intet", "alt korer allerede"],
+];
+
+for (const [spor, tildelt, pause, forventet, hvad] of genoptagelser) {
+  const fik = genoptagelse(spor, tildelt, pause);
+  check(fik === forventet, `${hvad}: fik "${fik}", forventede "${forventet}"`);
+}
+
+// Der maa ALDRIG svares «intet», naar der er noget at se paa. Det var praecis
+// det, den gamle kontrol gjorde.
+for (const [spor, tildelt, pause] of genoptagelser) {
+  const staarStille = !spor || !tildelt || pause;
+  check(
+    (genoptagelse(spor, tildelt, pause) === "intet") === !staarStille,
+    `en soger der staar stille (spor=${spor} tildelt=${tildelt} pause=${pause}) blev ladt i fred`,
+  );
+}
+
+// Og de tre steder, der aabner en systemdialog, skal bede om det. Pause-lytteren
+// tager den som regel selv, men den bygger paa et event, vi ikke kontrollerer.
+const dialoger: [string, string][] = [
+  ["provetagningen", join("src", "app", "(app)", "sager", "[id]", "proever", "SamplingView.tsx")],
+  ["forsidebilledet", join("src", "components", "Forsidebillede.tsx")],
+];
+for (const [navn, sti] of dialoger) {
+  const kilde = fil(sti);
+  const kalder = (kilde.match(/\bresume(?:Camera)?\(\)/g) ?? []).length;
+  const dialogRegex = /window\.confirm\(|\.click\(\)/g;
+  const antalDialoger = (kilde.match(dialogRegex) ?? []).length;
+  check(
+    antalDialoger === 0 || kalder > 0,
+    `${navn} aabner en systemdialog uden at genoptage sogeren bagefter`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 2. Sogeren i appen er den, regnestykket gaar ud fra

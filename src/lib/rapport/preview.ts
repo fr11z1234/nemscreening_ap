@@ -17,7 +17,7 @@ import {
 } from "@/lib/rapport/ressourcer";
 
 /**
- * Materialepanelets preview: materialets fem saetninger, som de kommer til at
+ * Materialepanelets preview: materialets seks saetninger, som de kommer til at
  * staa i rapporten.
  *
  * Der stod for et eksempel under hvert felt, sat sammen i hand. Det var forkert
@@ -32,13 +32,14 @@ import {
  * browser ikke importere.
  */
 
-/** Feltet paa `Material`, der baerer en af de fem saetninger. */
+/** Feltet paa `Material`, der baerer en af de seks saetninger. */
 export type Saetningsfelt =
   | typeof SENTENCE_FIELD.genbrug
   | typeof SENTENCE_FIELD.genanvendelse
-  | typeof DISPOSAL_SENTENCE_FIELD.bortskaffelse
+  | typeof DISPOSAL_SENTENCE_FIELD.farligt
   | typeof DISPOSAL_SENTENCE_FIELD.forurenet
-  | typeof DISPOSAL_SENTENCE_FIELD.asbest;
+  | typeof DISPOSAL_SENTENCE_FIELD.asbest
+  | typeof DISPOSAL_SENTENCE_FIELD.bortskaffelse;
 
 export type Previewraekke = {
   felt: Saetningsfelt;
@@ -49,7 +50,7 @@ export type Previewraekke = {
   niveau: LabLevel;
   asbest: boolean;
   /**
-   * Hvilken af de tre bortskaffelsestekster raekken viser — null for de to
+   * Hvilken af de fire bortskaffelsestekster raekken viser — null for de to
    * rene.
    *
    * Staar her, fordi teksten kan komme to steder fra: materialets eget felt,
@@ -60,18 +61,19 @@ export type Previewraekke = {
 };
 
 /**
- * De fem situationer, der hver udloeser en af saetningerne.
+ * De seks situationer, der hver udloeser en af saetningerne.
  *
  * Valgene er ikke tilfaeldige — de er laest ud af `bortskaffelsestekst`:
  *
  *   P1, P2  rent svar, screenerens valg staar ved magt        -> ressource
- *   P3      rodt svar overruler genbrug                       -> bortskaffelse
+ *   P3      rodt svar overruler genbrug                       -> farligt
  *   P4      gult svar overruler genbrug                       -> forurenet
- *   P5      asbest pavist, som overruler bade valg og niveau  -> asbest
+ *   P5      asbest pavist, som overruler niveauet             -> asbest
+ *   P6      screeneren valgte bortskaffelse, svaret er rent   -> bortskaffelse
  *
- * P3 vises med det rode svar og ikke med screenerens eget valg af
- * bortskaffelse. Feltet daekker begge veje, men kun den ene har en farve at
- * vise — og hjaelpeteksten ved feltet siger allerede, at der er to.
+ * P6 vises med et rent svar og ikke uden analyse. Feltet daekker begge veje,
+ * men previewets prover er labprover alle sammen, og hjaelpeteksten ved feltet
+ * siger allerede, at der er to.
  */
 export const PREVIEWRAEKKER: Previewraekke[] = [
   {
@@ -93,13 +95,13 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     bortskaffelse: null,
   },
   {
-    felt: DISPOSAL_SENTENCE_FIELD.bortskaffelse,
-    navn: DISPOSAL_SENTENCE_LABEL.bortskaffelse,
+    felt: DISPOSAL_SENTENCE_FIELD.farligt,
+    navn: DISPOSAL_SENTENCE_LABEL.farligt,
     label: "P3",
     handling: "genbrug",
     niveau: "farligt",
     asbest: false,
-    bortskaffelse: "bortskaffelse",
+    bortskaffelse: "farligt",
   },
   {
     felt: DISPOSAL_SENTENCE_FIELD.forurenet,
@@ -118,6 +120,15 @@ export const PREVIEWRAEKKER: Previewraekke[] = [
     niveau: "farligt",
     asbest: true,
     bortskaffelse: "asbest",
+  },
+  {
+    felt: DISPOSAL_SENTENCE_FIELD.bortskaffelse,
+    navn: DISPOSAL_SENTENCE_LABEL.bortskaffelse,
+    label: "P6",
+    handling: "bortskaffelse",
+    niveau: "rent",
+    asbest: false,
+    bortskaffelse: "bortskaffelse",
   },
 ];
 
@@ -146,7 +157,7 @@ export type Preview = {
  * ellers give en linje med et haengende komma efter standen — og det er ikke
  * det, previewet skal laere kontoret at rapporten goer.
  *
- * Er den faelles tekst slaaet til, laeser de tre bortskaffelsesraekker den frem
+ * Er den faelles tekst slaaet til, laeser de fire bortskaffelsesraekker den frem
  * for materialets egne felter — for det er den, rapporten vil skrive. Ellers
  * ville panelet vise en tekst, ingen kommer til at laese, og skjule den der
  * bliver trykt.

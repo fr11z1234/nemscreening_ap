@@ -215,7 +215,7 @@ export default async function RapportPage({
         { data: [] as Indstillingsraekke[] },
       ];
 
-  // Er den faelles tekst slaaet til, staar de tre bortskaffelsestekster EN gang
+  // Er den faelles tekst slaaet til, staar de fire bortskaffelsestekster EN gang
   // under linjerne i stedet for paa hver af dem. Null betyder: hent dem paa
   // materialerne, som appen altid har gjort.
   const faelles = faellesTekster(laesIndstillinger(indstillingerRes.data));
@@ -229,8 +229,9 @@ export default async function RapportPage({
           material_condition: s.material_condition,
           resource_handling: s.resource_handling,
           estimated_tons: s.estimated_tons,
-          level: levelOfSample(results.get(s.id)),
-          asbestPaavist: asbestPaavist(results.get(s.id)),
+          // Provearten er med: Asbest og Sod er fund uden analyse.
+          level: levelOfSample(results.get(s.id), s.sample_type),
+          asbestPaavist: asbestPaavist(results.get(s.id), s.sample_type),
           isLabSample: s.is_lab_sample,
         })),
         materialerRes.data ?? [],
@@ -595,7 +596,7 @@ export default async function RapportPage({
 
         Linjerne navngives med provenummeret og ikke materialet, sa
         entreprenoren kan slaa den enkelte prove op i analyseskemaet. Hvilken af
-        de tre saetninger der staar, afgores af `bortskaffelsestekst` i
+        de fire saetninger der staar, afgores af `bortskaffelsestekst` i
         types.ts — asbest overruler alt.
  
         Afsnittet staar ogsa nar der ingen fund er. Spoergsmalet skal besvares,
@@ -719,7 +720,7 @@ export default async function RapportPage({
               </div>
               <span className="ml-auto">
                 <LevelBadge
-                  level={levelOfSample(results.get(s.id))}
+                  level={levelOfSample(results.get(s.id), s.sample_type)}
                   erLabprove={s.is_lab_sample}
                 />
               </span>

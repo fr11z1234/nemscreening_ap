@@ -1,6 +1,7 @@
 import { EUROFINS_ANALYSES } from "./template";
 import {
   ANALYSIS_FIELDS,
+  analyserLaast,
   analysisApplies,
   type BuildingPeriod,
 } from "@/lib/types";
@@ -91,6 +92,17 @@ export function validateForExport(
       issues.push({
         level: "warning",
         message: `${s.label} har ${a.label} valgt, men bygningen er fra efter 1990. Åbn prøven og gem den igen for at fjerne analysen.`,
+      });
+    }
+
+    // Asbest og Sod laaser analyserne i provetagningen, men en raekke gemt for
+    // laasen kan stadig baere dem — og saa er den paa vej til laboratoriet med
+    // et fund, screeneren allerede har gjort. Skal den analyseres alligevel,
+    // er provearten «Mulig asbest».
+    if (analyserLaast(s.sample_type)) {
+      issues.push({
+        level: "warning",
+        message: `${s.label} er registreret som ${s.sample_type}, som ikke sendes til laboratoriet, men har analyser valgt. Åbn prøven og gem den igen for at fjerne dem — eller skift prøveart, hvis den skal analyseres.`,
       });
     }
   }

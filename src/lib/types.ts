@@ -295,17 +295,19 @@ export type LookupItem = {
  * gasbeton, letbeton)», men rapporten skriver «Beton». Er feltet tomt, bruges
  * navnet.
  *
- * De tre saetninger printes efter maengden, en pr. handtering. Screeneren
- * vaelger handteringen pa proven, og rapporten henter den saetning. Er den tom,
- * skriver rapporten navn og maengde og lover ingenting.
+ * Saetningerne printes efter maengden. To for de rene — screeneren vaelger
+ * handtering pa proven, og rapporten henter den saetning — og fire for det, der
+ * skal vaek, en pr. affaldsmaerke. Er den tom, skriver rapporten navn og
+ * maengde og lover ingenting.
  */
 export type Material = LookupItem & {
   report_name: string | null;
   sentence_genbrug: string | null;
   sentence_genanvendelse: string | null;
-  sentence_bortskaffelse: string | null;
+  sentence_farligt: string | null;
   sentence_forurenet: string | null;
   sentence_asbest: string | null;
+  sentence_bortskaffelse: string | null;
 };
 
 /** Feltet pa `Material` der baerer saetningen for en given handtering. */
@@ -316,45 +318,54 @@ export const SENTENCE_FIELD = {
 } as const satisfies Record<ResourceHandling, keyof Material>;
 
 /**
- * Hvilken af de tre bortskaffelsestekster en linje skal baere.
+ * Hvilken af de fire bortskaffelsestekster en linje skal baere.
  *
- * `bortskaffelse` er den oprindelige og daekker to tilfaelde, fordi de siger
- * det samme til entreprenoren: screeneren valgte selv bortskaffelse, eller
- * svaret kom tilbage rodt. Farligt affald og bortskaffelse er samme besked.
+ * En pr. affaldsmaerke, og de hedder det samme. `farligt` og `bortskaffelse`
+ * delte engang et felt, fordi de blev regnet for den samme besked. Det er de
+ * ikke: rodt er laboratoriets bevis paa, at materialet ER farligt affald;
+ * bortskaffelse er screenerens vurdering af noget rent eller uanalyseret, der
+ * bare skal vaek.
  */
-export type Bortskaffelsestekst = "bortskaffelse" | "forurenet" | "asbest";
+export type Bortskaffelsestekst =
+  | "farligt"
+  | "forurenet"
+  | "asbest"
+  | "bortskaffelse";
 
 export const DISPOSAL_SENTENCE_FIELD = {
-  bortskaffelse: "sentence_bortskaffelse",
+  farligt: "sentence_farligt",
   forurenet: "sentence_forurenet",
   asbest: "sentence_asbest",
+  bortskaffelse: "sentence_bortskaffelse",
 } as const satisfies Record<Bortskaffelsestekst, keyof Material>;
 
 export const DISPOSAL_SENTENCE_LABEL: Record<Bortskaffelsestekst, string> = {
-  bortskaffelse: "Bortskaffelse",
+  farligt: "Farligt affald",
   forurenet: "Forurenet affald",
   asbest: "Asbest påvist",
+  bortskaffelse: "Bortskaffelse",
 };
 
 /**
- * De tre saetninger, loesrevet fra et materiale.
+ * De fire saetninger, loesrevet fra et materiale.
  *
- * Samme tre felter, hvad enten de staar paa materialet eller er den faelles
+ * Samme fire felter, hvad enten de staar paa materialet eller er den faelles
  * tekst fra indstillingerne. Det er hele pointen i at kunne slaa faelles tekst
  * til: rapporten spoerger om det samme, og kun kilden skifter.
  */
 export type Bortskaffelsestekster = Record<Bortskaffelsestekst, string | null>;
 
 /**
- * Hvornar hver af de tre bruges. Vises i materialepanelet, sa kontoret ikke
+ * Hvornar hver af de fire bruges. Vises i materialepanelet, sa kontoret ikke
  * skal gaette hvilket felt der ender i hvilken rapport.
  */
 export const DISPOSAL_SENTENCE_HINT: Record<Bortskaffelsestekst, string> = {
+  farligt: "Rødt svar fra laboratoriet.",
+  forurenet: "Gult svar fra laboratoriet, eller prøvearten Sod.",
+  asbest:
+    "Asbest påvist — af laboratoriet eller ved prøvearten Asbest. Overruler de andre.",
   bortskaffelse:
-    "Screeneren valgte bortskaffelse, eller svaret er farligt affald.",
-  forurenet:
-    "Gult svar på en prøve, screeneren havde sat til genbrug eller genanvendelse.",
-  asbest: "Asbest påvist i prøven. Overruler de to andre.",
+    "Screeneren valgte bortskaffelse, og svaret er rent eller prøven er uden analyse.",
 };
 
 /**
@@ -383,50 +394,13 @@ export function faktiskHandtering(
 }
 
 /**
- * HVILKEN bortskaffelsestekst linjen far. Soesterreglen til `faktiskHandtering`.
- *
- * `faktiskHandtering` afgor OM proven skal bortskaffes; den her afgor hvad der
- * sa staar. De er delt, fordi de svarer pa hver sit sporgsmal — skemaets
- * kolonne skal kun vide det forste.
- *
- * Rangfolgen, oppefra og ned:
- *
- *   1. Asbest pavist       — overruler alt, ogsa screenerens eget valg. Pavist
- *                            asbest er farligt affald hver gang, og handteringen
- *                            er en anden end for andet farligt affald: befugtes,
- *                            emballeres stovtaet, holdes adskilt.
- *   2. Screeneren valgte    — hun stod ved materialet. Sagde hun bortskaffelse,
- *      bortskaffelse         gaelder det, uanset hvad Eurofins svarer.
- *   3. Farligt affald       — samme besked som bortskaffelse, samme saetning.
- *   4. Forurenet affald     — den eneste, der far sin egen nye tekst: her blev
- *                             screenerens genbrug eller genanvendelse rettet af
- *                             analysen, og materialet er hverken rent eller
- *                             farligt.
- *
- * Kaldes kun for linjer, der ER endt i forureningsafsnittet. Er niveauet rent
- * eller ukendt, og valgte screeneren ikke bortskaffelse, er proven en ressource
- * og kommer aldrig herind — se `ressourceoversigt`.
- */
-export function bortskaffelsestekst(
-  valgt: ResourceHandling | null,
-  niveau: LabLevel | null,
-  asbestPaavist: boolean,
-): Bortskaffelsestekst {
-  if (asbestPaavist) return "asbest";
-  if (valgt === "bortskaffelse") return "bortskaffelse";
-  if (niveau === "farligt") return "bortskaffelse";
-  return "forurenet";
-}
-
-/**
  * Maerket paa en linje i forureningsafsnittet.
  *
- * Den tredje regel ved siden af de to ovenfor, og den svarer paa: hvad ER det
- * her for noget affald? Ikke hvad der skal ske med det (`faktiskHandtering`) og
- * ikke hvad der skal staa (`bortskaffelsestekst`).
+ * Den anden regel ved siden af `faktiskHandtering`, og den svarer paa: hvad ER
+ * det her for noget affald? Ikke hvad der skal ske med det.
  *
- * `asbest` er ny og er hele grunden til at funktionen findes. For havde en
- * asbestprove det samme rode maerke som alt andet farligt affald, og saa kunne
+ * `asbest` er hele grunden til at funktionen findes. For havde en asbestprove
+ * det samme rode maerke som alt andet farligt affald, og saa kunne
  * entreprenoren ikke se paa linjen, at netop den skal befugtes og emballeres
  * stovtaet. Pavist asbest ER stadig farligt affald — analyseskemaet farver den
  * rod som for, og det er med vilje: maerket siger hvilken slags, ikke hvor slemt.
@@ -440,9 +414,11 @@ export function bortskaffelsestekst(
  *
  * MAERKET FOLGER LABORATORIET, ikke screenerens valg. Sagde Eurofins gult, staar
  * der «Forurenet affald» — ogsa selvom screeneren havde skrevet bortskaffelse
- * paa proven, og ogsa selvom det er `sentence_bortskaffelse`, linjen faar. Ellers
- * ville rapporten kalde en prove rod, som analyseskemaet farver gul, og laeseren
- * ville ikke vide hvem der havde ret.
+ * paa proven. Ellers ville rapporten kalde en prove rod, som analyseskemaet
+ * farver gul, og laeseren ville ikke vide hvem der havde ret.
+ *
+ * Niveauet kan ogsa komme fra provearten og ikke fra laboratoriet — se
+ * `visueltFund`. Reglen her er ligeglad med hvor det kom fra.
  *
  * Kaldes kun for linjer i forureningsafsnittet. Ressourceafsnittet har ingen
  * maerker — alt i det er gront, og et gront maerke paa hver linje betyder
@@ -472,19 +448,60 @@ export const AFFALDSMAERKE_LABEL: Record<Affaldsmaerke, string> = {
 };
 
 /**
- * Hvilken af de tre tekster et maerke henter.
+ * Hvilken tekst et maerke henter. En-til-en.
  *
- * `farligt` og `bortskaffelse` peger paa det samme felt, praecis som de altid
- * har gjort: farligt affald og screenerens eget valg om bortskaffelse er den
- * samme besked til entreprenoren. Derfor staar de to maerker ogsa ved den samme
- * standardtekst i rapporten frem for at faa hver sin, der siger det samme.
+ * `farligt` og `bortskaffelse` pegede engang paa det samme felt, ud fra at
+ * farligt affald og screenerens eget valg var den samme besked. Det holdt ikke:
+ * rodt er et bevis, bortskaffelse er en vurdering, og de skal ikke skrives med
+ * samme ord. Afbildningen staar alligevel som en tabel og ikke som en
+ * identitet, fordi maerket og teksten svarer paa hver sit sporgsmal — hvad
+ * linjen ER, og hvad der skal STAA — og de to steder, der spoerger, skal kunne
+ * laeses hver for sig.
  */
 export const MAERKE_TEKST: Record<Affaldsmaerke, Bortskaffelsestekst> = {
-  farligt: "bortskaffelse",
-  bortskaffelse: "bortskaffelse",
+  farligt: "farligt",
   forurenet: "forurenet",
   asbest: "asbest",
+  bortskaffelse: "bortskaffelse",
 };
+
+/**
+ * HVILKEN bortskaffelsestekst linjen far. Soesterreglen til `faktiskHandtering`.
+ *
+ * `faktiskHandtering` afgor OM proven skal bortskaffes; den her afgor hvad der
+ * sa staar. De er delt, fordi de svarer pa hver sit sporgsmal — skemaets
+ * kolonne skal kun vide det forste.
+ *
+ * Teksten folger maerket, og maerket folger laboratoriet. Rangfolgen er derfor
+ * `affaldsmaerke`s egen:
+ *
+ *   1. Asbest pavist    — overruler alt. Pavist asbest er farligt affald hver
+ *                         gang, og handteringen er en anden end for andet
+ *                         farligt affald: befugtes, emballeres stovtaet, holdes
+ *                         adskilt.
+ *   2. Farligt affald   — rodt svar.
+ *   3. Forurenet affald — gult svar.
+ *   4. Bortskaffelse    — screeneren valgte det selv, og laboratoriet har ikke
+ *                         fundet noget, eller er aldrig spurgt.
+ *
+ * Screenerens eget valg staar IKKE i rangfolgen laengere. Der stod engang, at
+ * valgte hun bortskaffelse, gjaldt det uanset hvad Eurofins svarede — det var
+ * harmlost, dengang farligt og bortskaffelse delte tekst. Nu de har hver sin,
+ * er det laboratoriet der bestemmer: Eurofins har et konkret bevis paa
+ * standen, hvor screeneren antager. Valgte hun bortskaffelse, og svaret er
+ * gult, faar linjen forureningsteksten — det er den anvisning, der passer til
+ * det affald, linjen er.
+ *
+ * Kaldes kun for linjer, der ER endt i forureningsafsnittet. Er niveauet rent
+ * eller ukendt, og valgte screeneren ikke bortskaffelse, er proven en ressource
+ * og kommer aldrig herind — se `ressourceoversigt`.
+ */
+export function bortskaffelsestekst(
+  niveau: LabLevel | null,
+  asbestPaavist: boolean,
+): Bortskaffelsestekst {
+  return MAERKE_TEKST[affaldsmaerke(niveau, asbestPaavist)];
+}
 
 /** De fire analysevalg screeneren ser i felten. */
 export const ANALYSIS_FIELDS = [
@@ -524,4 +541,63 @@ export function analysesForPeriod(
     if (!analysisApplies(a.key, period)) off[a.key] = false;
   }
   return off;
+}
+
+/**
+ * Provearter, der i sig selv er et fund.
+ *
+ * Provearten er ellers bare tekst — «Hvid maling», «Fuger» — og styrer
+ * ingenting. To af dem er anderledes: screeneren ved, hvad hun staar med, og
+ * der bestilles ingen analyse.
+ *
+ *   Asbest — en plade hun kan se er asbest. Rapporten skriver «Pavist» i
+ *            asbestkolonnen, proven er farligt affald, og linjen faar
+ *            asbestteksten. Sendes ALDRIG til Eurofins; det ville vaere en fejl.
+ *   Sod    — der er ingen kolonne for sod i skemaet, og der bestilles ingen
+ *            analyse for det. Proven er forurenet affald; i skemaet er det
+ *            proveart-cellen selv, der bliver gul.
+ *
+ * Begge LAASER analyserne paa proven. Det er hele pointen: et labsvar, der
+ * siger «ikke pavist» paa en prove, screeneren har registreret som asbest,
+ * ville modsige rapporten — og den konflikt forebygges frem for at afgoeres.
+ * Uden analyser er proven ikke en labprove, faar intet P og kommer aldrig med i
+ * Eurofins-filen. Linjen i Forureninger hedder derfor «3» og ikke «P3».
+ *
+ * «Mulig asbest» er ikke med. Den er den proveart, der SKAL til laboratoriet.
+ *
+ * Noeglerne er navnene i `screening.sample_types`, ordret. `verify:ressourcer`
+ * holder dem op mod seed-migrationen, saa et omdoebt navn ikke stille goer
+ * reglen virkningsloes.
+ */
+export type VisueltFund = {
+  level: LabLevel;
+  /** Om fundet er asbest. Det afgor baade kolonnen i skemaet og teksten. */
+  asbest: boolean;
+};
+
+export const VISUELLE_FUND: Record<string, VisueltFund> = {
+  Asbest: { level: "farligt", asbest: true },
+  Sod: { level: "forurenet", asbest: false },
+};
+
+export function visueltFund(sampleType: string | null): VisueltFund | null {
+  if (!sampleType || !Object.hasOwn(VISUELLE_FUND, sampleType)) return null;
+  return VISUELLE_FUND[sampleType] ?? null;
+}
+
+/** Om provearten laaser analyserne. */
+export const analyserLaast = (sampleType: string | null): boolean =>
+  visueltFund(sampleType) !== null;
+
+/**
+ * De analyser provearten slar fra, som en aendring der kan gemmes.
+ *
+ * Alle fire, naar provearten er et fund. Vaelges Asbest eller Sod paa en prove,
+ * der allerede havde analyser, nulstilles de — samme greb som perioden.
+ */
+export function analysesForSampleType(
+  sampleType: string | null,
+): Partial<Record<AnalysisKey, false>> {
+  if (!analyserLaast(sampleType)) return {};
+  return Object.fromEntries(ANALYSIS_FIELDS.map((a) => [a.key, false]));
 }

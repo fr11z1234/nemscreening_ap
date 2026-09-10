@@ -12,7 +12,7 @@ const kraevKontor = () =>
 /**
  * Gemmer bortskaffelsesteksterne og kontakten, der afgor om de bruges.
  *
- * Alle fire raekker skrives paa en gang. De hoerer sammen: slaas kontakten til
+ * Alle fem raekker skrives paa en gang. De hoerer sammen: slaas kontakten til
  * i den ene skrivning og teksterne fejler i den naeste, staar rapporten med en
  * faelles tekst, ingen har skrevet — og saa er forureningsafsnittet tavst uden
  * at nogen kan se hvorfor.
@@ -40,8 +40,8 @@ export async function gemIndstillinger(
       [
         { key: INDSTILLING_NOEGLER.faelles, value: faelles, updated_at: naa },
         {
-          key: INDSTILLING_NOEGLER.bortskaffelse,
-          value: tekst("sentence_bortskaffelse"),
+          key: INDSTILLING_NOEGLER.farligt,
+          value: tekst("sentence_farligt"),
           updated_at: naa,
         },
         {
@@ -52,6 +52,11 @@ export async function gemIndstillinger(
         {
           key: INDSTILLING_NOEGLER.asbest,
           value: tekst("sentence_asbest"),
+          updated_at: naa,
+        },
+        {
+          key: INDSTILLING_NOEGLER.bortskaffelse,
+          value: tekst("sentence_bortskaffelse"),
           updated_at: naa,
         },
       ],

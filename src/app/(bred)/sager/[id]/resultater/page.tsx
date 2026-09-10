@@ -152,10 +152,23 @@ export default async function ResultaterPage({
       })),
   };
 
-  const levels = samples.map((s) => levelOfSample(results.get(s.id)));
+  // Provearten er med: Asbest og Sod er fund uden analyse og taeller som
+  // farligt og forurenet affald paa lige fod med et labsvar.
+  const levels = samples.map((s) =>
+    levelOfSample(results.get(s.id), s.sample_type),
+  );
   const tally = (level: LabLevel) => levels.filter((l) => l === level).length;
-  const answered = levels.filter((l) => l !== null).length;
+  // Men et svar er kun et svar fra laboratoriet. Uden provearten her ville
+  // «Svar modtaget» taelle hojere end antallet af prover, der er sendt.
+  const answered = samples.filter(
+    (s) => levelOfSample(results.get(s.id)) !== null,
+  ).length;
   const labSamples = samples.filter((s) => s.is_lab_sample);
+  // Rapporten kan aabnes, saa snart en prove har et niveau — ogsaa naar det
+  // kommer fra provearten og ikke fra laboratoriet. Det er den eneste vej til
+  // rapporten, og en sag med et asbestfund og ingen labprover har noget at
+  // rapportere.
+  const harNiveau = levels.some((l) => l !== null);
 
   return (
     <>
@@ -170,7 +183,7 @@ export default async function ResultaterPage({
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold">Resultater</h1>
             <StatusBadge status={sag.status} />
-            {answered > 0 && (
+            {harNiveau && (
               <Link
                 href={`/sager/${id}/rapport`}
                 className="tap ml-auto flex items-center rounded-xl bg-primary px-5 font-medium text-primary-fg hover:bg-primary-hover active:bg-primary-hover"
@@ -271,7 +284,7 @@ export default async function ResultaterPage({
           </section>
         )}
 
-        {answered > 0 && (
+        {harNiveau && (
           <section>
             <h2 className="font-semibold">Prøve for prøve</h2>
             <ul className="mt-3 flex flex-wrap gap-2">

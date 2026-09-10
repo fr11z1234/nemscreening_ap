@@ -8,11 +8,14 @@ import {
   worstLevel,
   type LabLevel,
   type LabParameterKey,
+  type LabValue,
 } from "@/lib/lab/parametre";
 import {
   faktiskHandtering,
   RESOURCE_HANDLING_LABEL,
+  visueltFund,
   type ResourceHandling,
+  type VisueltFund,
 } from "@/lib/types";
 
 /**
@@ -54,21 +57,64 @@ export const LEVEL_CLASS: Record<LabLevel, string> = {
   farligt: "level-farligt",
 };
 
-export function levelOfSample(result: SkemaResult | undefined): LabLevel | null {
-  if (!result) return null;
-  return worstLevel(
-    LAB_PARAMETERS.map((p) => classify(p, readValue(result[p.key] ?? null))),
-  );
+/**
+ * Det fund, provearten selv er — hvis det stadig gaelder.
+ *
+ * Asbest og Sod er fund uden analyse, se `visueltFund` i types.ts. Provearten
+ * laaser analyserne i marken, saa der kommer normalt aldrig et labsvar at holde
+ * det op imod. Men en raekke fra for laasen kan have begge, og saa vinder
+ * laboratoriet: har Eurofins faktisk analyseret for asbest, er deres svar et
+ * bevis, hvor screenerens er en antagelse — og saa er det deres celle, der
+ * staar, uanset hvad den siger. Sod har ingen kolonne at tabe til og gaelder
+ * altid.
+ */
+export function gaeldendeFund(
+  result: SkemaResult | undefined,
+  sampleType: string | null,
+): VisueltFund | null {
+  const fund = visueltFund(sampleType);
+  if (!fund) return null;
+  if (
+    fund.asbest &&
+    readValue(result?.asbestos ?? null).state !== "ikke_analyseret"
+  ) {
+    return null;
+  }
+  return fund;
 }
 
 /**
- * Om Eurofins har svaret «Pavist» pa asbest i netop denne prove.
+ * Provens niveau: det vaerste af laboratoriets malinger og provearten.
+ *
+ * Uden proveart er det laboratoriets svar alene. Det bruges kun til at taelle,
+ * hvor mange svar der er kommet — alle steder, hvor niveauet VISES, skal
+ * provearten med, ellers staar skemaet rodt paa en linje, rapporten ikke har
+ * flyttet.
+ */
+export function levelOfSample(
+  result: SkemaResult | undefined,
+  sampleType: string | null = null,
+): LabLevel | null {
+  const fund = gaeldendeFund(result, sampleType);
+  const malinger = result
+    ? LAB_PARAMETERS.map((p) => classify(p, readValue(result[p.key] ?? null)))
+    : [];
+  return worstLevel([...malinger, fund?.level ?? null]);
+}
+
+/**
+ * Om asbest er pavist i netop denne prove — af Eurofins, eller ved at
+ * screeneren registrerede provearten Asbest.
  *
  * Ikke det samme som at proven er rod: bly over graensen gor den ogsa rod. Det
  * er forskellen, der afgor om rapporten skriver asbestteksten, og den kan kun
  * laeses af asbestcellen selv — se `bortskaffelsestekst` i types.ts.
  */
-export function asbestPaavist(result: SkemaResult | undefined): boolean {
+export function asbestPaavist(
+  result: SkemaResult | undefined,
+  sampleType: string | null = null,
+): boolean {
+  if (gaeldendeFund(result, sampleType)?.asbest) return true;
   if (!result) return false;
   return readValue(result.asbestos ?? null).state === "pavist";
 }
@@ -249,13 +295,27 @@ export function ResultatSkema({
              */
             const handling = faktiskHandtering(
               sample.resource_handling ?? null,
-              levelOfSample(result),
+              levelOfSample(result, sample.sample_type),
             );
+            /*
+             * Provearten som fund. Asbest har sin egen kolonne og skriver
+             * «Pavist» i den — ordret det samme som et labsvar, for det ER
+             * pavist, og «pavist (set)» ville goere skemaet tvetydigt for den
+             * byggesagkyndige, der laeser det. Sod har ingen kolonne, saa der
+             * er det proveart-cellen selv, der faar farven.
+             */
+            const fund = gaeldendeFund(result, sample.sample_type);
             return (
               <tr key={sample.id}>
                 <td className="tabular font-semibold">{sample.label}</td>
                 <td className="font-medium">{sample.material ?? "—"}</td>
-                <td className="text-muted">{sample.sample_type ?? "—"}</td>
+                <td
+                  className={
+                    fund && !fund.asbest ? LEVEL_CLASS[fund.level] : "text-muted"
+                  }
+                >
+                  {sample.sample_type ?? "—"}
+                </td>
                 <td className="text-muted">{sample.building_label ?? "—"}</td>
                 {visRessourcer && (
                   <>
@@ -274,7 +334,12 @@ export function ResultatSkema({
                 </td>
 
                 {LAB_PARAMETERS.map((p) => {
-                  const value = readValue(result?.[p.key] ?? null);
+                  // Asbestcellen kan kun vaere provens egen, naar laboratoriet
+                  // ikke har analyseret for den — det sikrer gaeldendeFund.
+                  const value: LabValue =
+                    p.key === "asbestos" && fund?.asbest
+                      ? { state: "pavist", text: "Påvist" }
+                      : readValue(result?.[p.key] ?? null);
                   const level = classify(p, value);
                   return (
                     <td

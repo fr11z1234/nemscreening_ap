@@ -10,7 +10,7 @@ import {
   Standardtekster,
 } from "@/components/rapport/Linjegruppe";
 import { previewOversigt } from "@/lib/rapport/preview";
-import { maerkerFor } from "@/lib/rapport/ressourcer";
+import { maerkerFor, TEKST_ORDEN } from "@/lib/rapport/ressourcer";
 import {
   DISPOSAL_SENTENCE_FIELD,
   DISPOSAL_SENTENCE_HINT,
@@ -140,16 +140,13 @@ export function MaterialePanel({
  * De to handteringer, screeneren vaelger for et materiale, der ER en ressource.
  *
  * «Bortskaffelse» er ogsa et valg i marken, men dens saetning hoerer hjemme i
- * gruppen nedenfor sammen med de to andre bortskaffelsestekster — det er den
- * samme spalte i rapporten, og de tre skal kunne laeses op mod hinanden.
+ * gruppen nedenfor sammen med de tre andre bortskaffelsestekster — det er den
+ * samme spalte i rapporten, og de fire skal kunne laeses op mod hinanden.
  */
 const RESSOURCEHANDTERINGER: ResourceHandling[] = ["genbrug", "genanvendelse"];
 
-const BORTSKAFFELSESTEKSTER: Bortskaffelsestekst[] = [
-  "bortskaffelse",
-  "forurenet",
-  "asbest",
-];
+/** Samme orden som teksterne staar i under rapportens linjer. */
+const BORTSKAFFELSESTEKSTER: Bortskaffelsestekst[] = TEKST_ORDEN;
 
 function MaterialeForm({
   m,
@@ -168,14 +165,15 @@ function MaterialeForm({
 
   const [navn, setNavn] = useState(m.name);
   const [rapportnavn, setRapportnavn] = useState(m.report_name ?? "");
-  // Nogle er feltnavnet i databasen, sa de fem tekstfelter kan deles om den
+  // Nogle er feltnavnet i databasen, sa de seks tekstfelter kan deles om den
   // samme tilstand uden at skulle oversaettes frem og tilbage.
   const [saetninger, setSaetninger] = useState<Record<string, string>>({
     sentence_genbrug: m.sentence_genbrug ?? "",
     sentence_genanvendelse: m.sentence_genanvendelse ?? "",
-    sentence_bortskaffelse: m.sentence_bortskaffelse ?? "",
+    sentence_farligt: m.sentence_farligt ?? "",
     sentence_forurenet: m.sentence_forurenet ?? "",
     sentence_asbest: m.sentence_asbest ?? "",
+    sentence_bortskaffelse: m.sentence_bortskaffelse ?? "",
   });
 
   const saetFelt = (felt: string, vaerdi: string) =>
@@ -223,20 +221,20 @@ function MaterialeForm({
         </div>
 
         {/*
-          Bortskaffelsen har tre tekster, og de skal staa samlet.
+          Bortskaffelsen har fire tekster, og de skal staa samlet.
 
           Det er den samme spalte i rapporten — hvilken af dem der bliver
           skrevet, afgores af laboratoriesvaret og ikke af noget kontoret
           vaelger her. Derfor staar hvornar-forklaringen ved hvert felt: uden
-          den er de tre kasser umulige at kende fra hinanden.
+          den er de fire kasser umulige at kende fra hinanden.
         */}
         <fieldset className="flex flex-col gap-3 rounded-xl border border-grid bg-surface-2 p-4">
           <legend className="label-xs px-1 uppercase tracking-wide">Bortskaffelse</legend>
 
           <p className="text-xs leading-relaxed text-muted">
-            Laboratoriesvaret vælger teksten. Er asbest påvist, bruges
-            asbestteksten — uanset hvad screeneren valgte, og uanset hvad der
-            ellers er fundet.
+            Laboratoriesvaret vælger teksten — også når screeneren selv havde
+            valgt bortskaffelse. Er asbest påvist, bruges asbestteksten, uanset
+            hvad der ellers er fundet.
           </p>
 
           {faelles ? (
@@ -308,10 +306,10 @@ function MaterialeForm({
  * materialer, og et felt pr. materiale ville lade kontoret rette den for beton
  * og undre sig over, at tagpap ikke fulgte med.
  *
- * DE SKJULTE FELTER ER IKKE PYNT. `gemMateriale` laeser alle fem saetninger ud
+ * DE SKJULTE FELTER ER IKKE PYNT. `gemMateriale` laeser alle seks saetninger ud
  * af formularen, og et felt der ikke staar der, bliver læst som tomt og
  * gemt som null. Uden dem ville et enkelt tryk paa «Gem» — paa et helt andet
- * felt — tomme materialets tre bortskaffelsestekster, og saa ville de vaere
+ * felt — tomme materialets fire bortskaffelsestekster, og saa ville de vaere
  * vaek den dag, kontakten blev slaaet fra igen.
  */
 function FaellesTekster({
@@ -360,7 +358,7 @@ function FaellesTekster({
   );
 }
 
-/** Et tekstfelt til en af materialets fem saetninger. */
+/** Et tekstfelt til en af materialets seks saetninger. */
 function Saetningsfelt({
   navn,
   overskrift,
@@ -442,9 +440,10 @@ function RapportPreview({
     report_name: rapportnavn.trim() || null,
     sentence_genbrug: tekst("sentence_genbrug"),
     sentence_genanvendelse: tekst("sentence_genanvendelse"),
-    sentence_bortskaffelse: tekst("sentence_bortskaffelse"),
+    sentence_farligt: tekst("sentence_farligt"),
     sentence_forurenet: tekst("sentence_forurenet"),
     sentence_asbest: tekst("sentence_asbest"),
+    sentence_bortskaffelse: tekst("sentence_bortskaffelse"),
   };
 
   const { oversigt, skrevne, tomme } = previewOversigt(materiale, del, faelles);

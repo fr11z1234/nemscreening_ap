@@ -94,7 +94,13 @@ export type RessourceProve = {
   material_condition: number | null;
   resource_handling: ResourceHandling | null;
   estimated_tons: number | null;
-  /** Niveauet fra laboratoriet. Null nar der ikke er kommet et svar. */
+  /**
+   * Provens niveau. Null nar der ikke er kommet et svar.
+   *
+   * Som regel laboratoriets, men en proveart kan ogsa vaere et fund i sig selv
+   * — Asbest og Sod, se `visueltFund` i types.ts. Saa har proven et niveau
+   * uden at vaere en labprove, og den lander i forureningsafsnittet uden P.
+   */
   level: LabLevel | null;
   /**
    * Om asbest er pavist i netop denne prove.
@@ -134,9 +140,10 @@ export type RessourceLinje = {
 /**
  * En af de faelles bortskaffelsestekster, som den staar under linjerne.
  *
- * `maerker` er dem, der peger paa netop denne tekst — som regel et, men
- * «Farligt affald» og «Bortskaffelse» deler felt og staar derfor ved den samme
- * tekst frem for at faa hver sin, der siger det samme.
+ * `maerker` er dem, der peger paa netop denne tekst. Det er et ad gangen, nu
+ * hvor hvert maerke har sin egen — listen er blevet staaende, fordi to maerker
+ * engang delte tekst, og fordi rapporten og indstillingssiden tegner den som
+ * en raekke af maerker frem for et enkelt.
  */
 export type Standardtekst = {
   maerker: Affaldsmaerke[];
@@ -155,7 +162,7 @@ export type Ressourceoversigt = {
    * Alt der ikke er en ressource: forurenet og farligt affald, plus det rene,
    * der alligevel bortskaffes.
    *
-   * Linjerne baerer en af materialets TRE bortskaffelsestekster — hvilken, star
+   * Linjerne baerer en af materialets FIRE bortskaffelsestekster — hvilken, star
    * i `bortskaffelsestekst` i types.ts. Og de navngives med provenummeret frem
    * for materialet: se `ressourceLinjeHoved`.
    */
@@ -211,8 +218,11 @@ type Post = {
  * Vaelger screeneren selv bortskaffelse, flytter proven ogsa — et materiale, der
  * skal bortskaffes, er ikke en ressource, uanset hvad analysen siger.
  *
- * En prove uden analyser bliver aldrig flyttet: der kommer intet svar, og intet
- * har vist andet end at den er ren.
+ * En prove uden analyser bliver aldrig flyttet af et svar: der kommer intet,
+ * og intet har vist andet end at den er ren. Undtagelsen er provearten selv:
+ * Asbest og Sod er fund uden analyse, og de kommer ind med et niveau paa
+ * forhaand — se `visueltFund` i types.ts. De er ikke labprover, saa de taelles
+ * aldrig som afventende, og deres linje hedder «3» og ikke «P3».
  *
  * `materialer` og `bygningsdele` kommer fra databasen; de er panelets indhold.
  * Kender vi ikke et materiale — det kan vaere lukket eller omdobt siden proven
@@ -228,8 +238,8 @@ export function ressourceoversigt(
    * De faelles bortskaffelsestekster, nar kontoret har slaaet dem til.
    *
    * Null er det, appen altid har gjort: hver linje henter saetningen fra sit
-   * eget materiale. Er de sat, staar de tre tekster i stedet EN gang under
-   * linjerne, og linjen baerer kun sit maerke — for de tre saetninger er de
+   * eget materiale. Er de sat, staar de fire tekster i stedet EN gang under
+   * linjerne, og linjen baerer kun sit maerke — for de fire saetninger er de
    * samme uanset materiale, og gentaget paa tredive linjer er de stoej frem for
    * en anvisning.
    *
@@ -270,29 +280,21 @@ export function ressourceoversigt(
       // Niveauet er med i noglen og ikke handteringen: gult og rodt ma ikke
       // laegges sammen til en linje — maerket ved siden af skal betyde noget.
       //
-      // Teksten er med af samme grund, og den er ikke afledt af niveauet: to
-      // rode prover af samme materiale far hver sin saetning, hvis asbest kun er
-      // pavist i den ene. Uden den i noglen ville de to smelte sammen til en
-      // linje, og den ene af saetningerne ville forsvinde ud af rapporten.
-      //
-      // Med en faelles tekst er den grund vaek — der ER kun en saetning pr.
-      // maerke — og saa ville teksten i noglen dele to linjer op, som ville
-      // staa med praecis det samme paa arket. Derfor deler maerket dem naar
-      // teksten er faelles, og teksten naar den ikke er.
-      const tekst = bortskaffelsestekst(
-        p.resource_handling,
-        p.level,
-        p.asbestPaavist,
-      );
+      // Maerket er med af samme grund: to rode prover af samme materiale far
+      // hver sit maerke, hvis asbest kun er pavist i den ene, og uden det i
+      // noglen ville de to smelte sammen til en linje, og den ene af
+      // saetningerne ville forsvinde ud af rapporten. Teksten er afledt af
+      // maerket og staar derfor ikke i noglen for sig — to linjer med samme
+      // maerke har samme tekst, hvad enten den er faelles eller materialets.
       const maerke = affaldsmaerke(p.level, p.asbestPaavist);
       laegTil(
         urene,
-        noegle(del.id, materiale, p.level ?? "", maerke, faelles ? "" : tekst),
+        noegle(del.id, materiale, p.level ?? "", maerke),
         del,
         materiale,
         p,
         "bortskaffelse",
-        tekst,
+        bortskaffelsestekst(p.level, p.asbestPaavist),
         maerke,
       );
     } else {
@@ -323,23 +325,24 @@ export function ressourceoversigt(
 }
 
 /**
- * Rangfolgen paa teksterne under linjerne, og paa maerkerne i hver af dem.
+ * Rangfolgen paa teksterne under linjerne, og paa maerkerne.
  *
  * Farligt forst, saa forurenet, saa asbest — som paa graensevaerdisiden og i
  * skemaets forklaring, saa kunden moder de samme tre i den samme orden hele
- * rapporten igennem. Det neutrale maerke staar hos det farlige, fordi de deler
- * tekst.
+ * rapporten igennem. Det neutrale maerke staar sidst: det er det eneste, der
+ * ikke er et fund fra laboratoriet.
  */
 export const MAERKE_ORDEN: Affaldsmaerke[] = [
   "farligt",
-  "bortskaffelse",
   "forurenet",
   "asbest",
+  "bortskaffelse",
 ];
 export const TEKST_ORDEN: Bortskaffelsestekst[] = [
-  "bortskaffelse",
+  "farligt",
   "forurenet",
   "asbest",
+  "bortskaffelse",
 ];
 
 /** Maerkerne, der henter netop denne tekst. Bruges ogsa af indstillingssiden. */

@@ -142,8 +142,13 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
   poserne i bilen er mærket.
 - **Efter 1990 udelukker PCB og asbest.** Reglen ligger i `src/lib/types.ts` og
  bruges både i prøvetagningen og i eksportkontrollen.
-- En prøve kræver **lokalitet**. Materiale og prøveart er frivillige — en tom
- prøve er tilladt og kommer ikke med til laboratoriet.
+- En prøve kræver **lokalitet og mængde** — ton, over nul. Materiale og
+ prøveart er frivillige — en prøve uden dem er tilladt og kommer ikke med til
+ laboratoriet. Mængden er ikke frivillig, fordi rapporten bygger på den: en
+ linje uden er «mængde ikke opgjort», og det er en oplysning om ingenting. Nul
+ tæller ikke — nul ton er det samme som ikke at have målt. Kravet håndhæves som
+ lokalitet og billede: på «Næste», ikke i databasen, så gamle rækker og
+ offline-køen ikke kan komme til at fejle på det.
 - **Et billede kræves kun, når der er valgt en analyse.** Billedet dokumenterer
  hvor prøven i posen blev taget, og det er ufravigeligt for enhver række der
  skal til laboratoriet. En ressource er noget andet: «beton, bærende, 40 ton»
@@ -280,15 +285,16 @@ Tre stykker data bærer det:
 - **`building_parts`** er rapportens fede overskrifter, og samtidig de knapper
  screeneren vælger imellem på prøven. `sort_order` **er** afsnittenes rækkefølge
  i rapporten. Var en enum; en enum kan ikke rettes uden en udrulning.
-- **`materials`** har `report_name` og fem sætninger: én for genbrug, én for
-  genanvendelse og **tre for bortskaffelse**. Se afsnittet nedenfor.
+- **`materials`** har `report_name` og seks sætninger: én for genbrug, én for
+  genanvendelse og **fire for bortskaffelse**, én pr. affaldsmærke. Se
+  afsnittet nedenfor.
 - **prøven** binder dem sammen: materiale + bygningsdel + håndtering.
 
 Rapporten slår altså navnet op på materialet og sætningen på håndteringen, og
 overskriften kommer fra bygningsdelen. `src/lib/rapport/ressourcer.ts` samler
 linjerne og lægger mængderne sammen — den bestemmer intet om ordene.
 
-**De tre bortskaffelsestekster kan dog være fælles.** Er kontakten på
+**De fire bortskaffelsestekster kan dog være fælles.** Er kontakten på
 `/indstillinger` slået til — og det er den som standard — henter rapporten dem
 fra `screening.app_settings` i stedet for fra materialet og skriver dem ét sted
 under linjerne. Se «Én fælles tekst, eller én pr. materiale» nedenfor. Genbrug
@@ -325,12 +331,16 @@ Det er den vigtigste regel i hele afsnittet, og den er kundens egen:
 | Labsvar | Afsnit | Tekst |
 | --- | --- | --- |
 | Rent affald | Ressourcescreening, under sin bygningsdel | håndteringens sætning |
+| Rent, men screeneren valgte bortskaffelse | Forureninger | materialets **bortskaffelse** |
 | Forurenet affald | Forureninger | materialets **forurenet** |
-| Farligt affald | Forureninger | materialets **bortskaffelse** |
+| Farligt affald | Forureninger | materialets **farligt** |
 | Asbest påvist | Forureninger | materialets **asbest** |
 | Afventer svar | ingen af dem, men tælles | — |
 
-Er den fælles tekst slået til på `/indstillinger`, står de tre sætninger ét sted
+Svaret kan også komme fra prøvearten og ikke fra laboratoriet — Asbest og Sod
+er fund uden analyse, se «Prøveart som fund» nedenfor. Reglen er den samme.
+
+Er den fælles tekst slået til på `/indstillinger`, står de fire sætninger ét sted
 under linjerne i stedet for på hver af dem — se «Én fælles tekst» nedenfor. Hvad
 der lander hvor, ændrer sig ikke af det.
 
@@ -358,29 +368,36 @@ skal bortskaffes er ikke en ressource, uanset hvad analysen siger. Ellers ville
 en bortskaffelsessætning stå under en overskrift om materialer, der kan
 genbruges.
 
-**Bortskaffelsen har tre sætninger, ikke én.** De tre tilfælde kræver hver sit
-af entreprenøren: forurenet affald skal udsorteres, farligt affald skal til et
-godkendt modtageanlæg, og asbest skal befugtes, emballeres støvtæt og holdes
-adskilt fra alt andet. Én fælles sætning måtte enten love for lidt om asbesten
-eller for meget om det forurenede. Rangfølgen ligger i `bortskaffelsestekst` i
-`src/lib/types.ts`, ved siden af `faktiskHandtering`:
+**Bortskaffelsen har fire sætninger, ikke én.** De fire tilfælde kræver hver
+sit af entreprenøren: forurenet affald skal udsorteres, farligt affald skal til
+et godkendt modtageanlæg, asbest skal befugtes, emballeres støvtæt og holdes
+adskilt fra alt andet — og det rene, screeneren selv vil af med, skal bare
+bortskaffes efter reglerne. Én fælles sætning måtte enten love for lidt om
+asbesten eller for meget om det forurenede. Rangfølgen ligger i
+`bortskaffelsestekst` i `src/lib/types.ts`, ved siden af `faktiskHandtering`:
 
 | Situation | Felt |
 | --- | --- |
 | Asbest påvist | `sentence_asbest` |
-| Screeneren valgte bortskaffelse | `sentence_bortskaffelse` |
-| Farligt affald | `sentence_bortskaffelse` |
+| Farligt affald | `sentence_farligt` |
 | Forurenet affald | `sentence_forurenet` |
+| Screeneren valgte bortskaffelse, svaret er rent eller der er ingen analyse | `sentence_bortskaffelse` |
 
-Rækkefølgen **er** reglen, og de to øverste linjer er dem der overrasker.
-**Asbest overruler alt**, også screenerens eget valg og alt andet der er fundet
-i prøven — påvist asbest gør prøven rød, men en rød prøve er ikke nødvendigvis
-asbest, og de to skal ikke sige det samme. Og **screenerens `bortskaffelse`
-slår Eurofins**: hun stod ved materialet, og farligt affald og bortskaffelse er
-den samme besked, så de deler felt.
+Rækkefølgen **er** reglen. **Asbest overruler alt** — påvist asbest gør prøven
+rød, men en rød prøve er ikke nødvendigvis asbest, og de to skal ikke sige det
+samme. Og **teksten følger mærket én-til-én**: `MAERKE_TEKST` er en ren
+afbildning, og `bortskaffelsestekst` er bare `affaldsmaerke` slået op i den.
 
-`sentence_bortskaffelse` er den oprindelige og skiftede ikke betydning, da de to
-andre kom til. Derfor ændrede ingen eksisterende rapport ordlyd.
+**Screenerens `bortskaffelse` slår ikke Eurofins.** Det gjorde det engang —
+valgte hun bortskaffelse, gjaldt det uanset svaret — og det var harmløst, så
+længe farligt affald og bortskaffelse delte tekst. Nu de har hver sin, er det
+laboratoriet der bestemmer: Eurofins har et konkret bevis på standen, hvor
+screeneren antager. Valgte hun bortskaffelse, og svaret er gult, får linjen
+forureningsteksten. Rør ikke den retning heller.
+
+`sentence_farligt` er den nyeste. Den blev fyldt fra `sentence_bortskaffelse`
+i sin migration, så ingen eksisterende rapport skiftede ordlyd — kontoret deler
+dem ad i panelet, ét materiale ad gangen.
 
 Kontoret havde selv fundet en vej udenom, før felterne fandtes: asbestteksten
 lagt på de materialer, der *hedder* noget med asbest. Det virker kun, hvis
@@ -388,9 +405,10 @@ screeneren ramte det rigtige navn i marken — svarer Eurofins «Påvist» på n
 registreret som «Eternit, asbestfri», skal asbestteksten frem alligevel. Det er
 analysen der ved det, ikke navnet.
 
-**Teksten er med i grupperingsnøglen.** To røde prøver af samme materiale, hvor
+**Mærket er med i grupperingsnøglen.** To røde prøver af samme materiale, hvor
 asbest kun er påvist i den ene, må ikke lægges sammen til én linje — så ville
-den ene af de to sætninger forsvinde ud af rapporten.
+den ene af de to sætninger forsvinde ud af rapporten. Teksten er afledt af
+mærket og står derfor ikke i nøglen for sig.
 
 ### Mærket på linjen
 
@@ -415,11 +433,11 @@ rød** — påvist asbest *er* farligt affald, og den regel står uændret.
 
 **Mærket følger laboratoriet, ikke screenerens valg.** Svarede Eurofins gult,
 står der «Forurenet affald» — også når screeneren selv havde skrevet
-bortskaffelse på prøven, og også selvom linjen så får bortskaffelsesteksten.
-Ellers ville rapporten kalde en prøve rød, som analyseskemaet farver gul, og
-læseren ville ikke vide hvem der havde ret. De to siger derfor hver sit om hver
-sin ting: mærket er hvad laboratoriet fandt, sætningen er hvad entreprenøren
-skal gøre.
+bortskaffelse på prøven. Ellers ville rapporten kalde en prøve rød, som
+analyseskemaet farver gul, og læseren ville ikke vide hvem der havde ret. Og
+sætningen følger mærket, så de to kan ikke længere pege hver sin vej: mærket
+er hvad laboratoriet fandt, sætningen er hvad entreprenøren skal gøre ved
+netop det.
 
 **Det neutrale mærke er nyt og er der af nød.** En prøve, screeneren selv satte
 til bortskaffelse, og som er ren eller slet ikke analyseret, stod før uden
@@ -429,7 +447,7 @@ uden mærke ville stå helt uden tekst.
 
 ### Én fælles tekst, eller én pr. materiale
 
-De tre bortskaffelsestekster er i praksis **de samme for alle materialer** —
+De fire bortskaffelsestekster er i praksis **de samme for alle materialer** —
 «farligt affald skal til et godkendt modtageanlæg» ændrer sig ikke af, om det er
 beton eller tagpap. De blev alligevel skrevet pr. materiale, fordi de bor sammen
 med genbrugs- og genanvendelsessætningen, og de to *er* forskellige fra
@@ -437,7 +455,7 @@ materiale til materiale.
 
 Derfor en kontakt på `/indstillinger` og ikke en udskiftning:
 
-- **Slået til** (standard) skriver rapporten de tre tekster **én gang** under
+- **Slået til** (standard) skriver rapporten de fire tekster **én gang** under
   forureningslinjerne, under overskriften «Standardtekst for affaldstyper», og
   mærket på linjen peger på den, der gælder. Linjen selv bærer ingen sætning.
 - **Slået fra** henter hver linje sætningen fra sit eget materiale og skriver den
@@ -446,25 +464,25 @@ Derfor en kontakt på `/indstillinger` og ikke en udskiftning:
 **Materialernes egne sætninger røres aldrig af kontakten.** De står uberørt i
 `screening.materials`, så den kan gå begge veje. Påpeger en kommune en dag, at
 en tekst skal være unik for det enkelte materiale, er svaret et flueben og ikke
-en udrulning. Materialepanelet viser derfor de fælles tekster i stedet for de tre
-felter, når kontakten er slået til — og det **skjulte felt pr. sætning er ikke
-pynt**: `gemMateriale` læser alle fem sætninger ud af formularen, og et felt der
-ikke står der, bliver gemt som tomt.
+en udrulning. Materialepanelet viser derfor de fælles tekster i stedet for de
+fire felter, når kontakten er slået til — og det **skjulte felt pr. sætning er
+ikke pynt**: `gemMateriale` læser alle seks sætninger ud af formularen, og et
+felt der ikke står der, bliver gemt som tomt.
 
 **Kun de affaldstyper sagen faktisk har, bliver skrevet.** En standardtekst om
 asbest i en rapport uden asbest er en oplysning om ingenting — præcis det,
-Word-skabelonen gjorde. «Farligt affald» og «Bortskaffelse» deler tekst og står
-derfor ved den samme, frem for at få hver sin der siger det samme.
+Word-skabelonen gjorde. Hvert mærke har sin egen tekst; «Farligt affald» og
+«Bortskaffelse» delte engang, og det må de ikke igen — rødt er et bevis,
+bortskaffelse er en vurdering.
 
 **Er kontakten slået til, men teksterne ikke skrevet, falder rapporten tilbage
 på materialerne** frem for at skrive et forureningsafsnit uden et ord om
 affaldet.
 
-**Sammenlægningen skifter med kontakten**, og det skal den: to gule prøver af
-samme materiale, hvor screeneren valgte hver sit, får hver sin sætning uden
-fælles tekst og skal stå hver for sig. Med fælles tekst er der kun én tekst pr.
-mærke, og to linjer ville stå med præcis det samme på arket. Rødt med og uden
-asbest lægges **aldrig** sammen — de peger på hver sin tekst.
+**Sammenlægningen følger mærket**, uanset kontakten: to gule prøver af samme
+materiale, hvor screeneren valgte hver sit, får samme mærke og samme tekst —
+Eurofins overruler begge — og bliver én linje. Rødt med og uden asbest lægges
+**aldrig** sammen — de peger på hver sin tekst.
 
 Standardteksterne står nederst på afsnittets sidste side, og `ressourceSider`
 får deres højde at vide. Er der ikke plads, får de et ark for sig:
@@ -514,6 +532,50 @@ skema** bagefter og se, om tallene stadig står på én linje.
 Afsnittet deles i sider af `ressourceSider` af samme grund som metodeteksten er
 delt i `RAPPORT_SIDER`: `.print-side` har `break-inside: avoid`, og hver side
 skal bære mærket i hovedet.
+
+## Prøveart som fund
+
+Prøvearten er ellers bare tekst — «Hvid maling», «Fuger» — og styrer ingenting.
+**To af dem er et fund i sig selv**, og reglen er `visueltFund` i
+`src/lib/types.ts`, ved siden af analysereglerne:
+
+| Prøveart | Niveau | I analyseskemaet | I Forureninger |
+| --- | --- | --- | --- |
+| **Asbest** | Farligt affald | Asbest-kolonnen viser **Påvist**, rød | lilla «Asbest affald», asbestteksten |
+| **Sod** | Forurenet affald | **Prøveart-cellen selv** er gul — der er ingen kolonne for sod | gul «Forurenet affald», forureningsteksten |
+
+Screeneren ved, hvad hun står med, og der bestilles ingen analyse. Derfor
+**låser begge analyserne**: de fire knapper er slået fra, og vælges Asbest eller
+Sod på en prøve der allerede havde analyser, nulstilles de — samme greb som
+perioden. Det er hele pointen: et labsvar der sagde «ikke påvist» på en prøve,
+screeneren har registreret som asbest, ville modsige rapporten, og den konflikt
+**forebygges** frem for at afgøres. Uden analyser er prøven ikke en labprøve,
+får intet P og kommer aldrig med i Eurofins-filen. Linjen i Forureninger hedder
+derfor `3 – 200 kg …` og ikke `P3`, og prøven tælles aldrig som afventende.
+
+**«Mulig asbest» er ikke med.** Den er den prøveart, der *skal* til
+laboratoriet. Byt dem aldrig om.
+
+**Der står «Påvist», ikke «Påvist (set)».** Det er påvist, og en forklaring i
+skemaet ville gøre det tvetydigt for den byggesagkyndige, der læser det. I.a. i
+alle nabocellerne siger allerede, at der ikke er analyseret.
+
+**Alle der viser et niveau, skal spørge med prøvearten.** `levelOfSample` og
+`asbestPaavist` i `ResultatSkema.tsx` tager den som andet argument, og skemaet,
+badge'et på prøvesiden, tællerne på resultatsiden og `ressourceoversigt` giver
+den alle med. Udelades den, står skemaet rødt på en linje, rapporten ikke har
+flyttet. Kun «Svar modtaget» spørger uden — et svar er et svar fra laboratoriet.
+
+**Har laboratoriet alligevel analyseret for asbest, vinder de.** Låsen
+forhindrer det på nye prøver, men en række fra før låsen kan bære begge, og så
+er Eurofins' celle et bevis, hvor screenerens er en antagelse — `gaeldendeFund`
+lader fundet falde, når asbestcellen ikke står som I.a. Sod har ingen kolonne
+at tabe til og gælder altid. Eksportkontrollen advarer om sådan en række, hvis
+den stadig er på vej til laboratoriet.
+
+**Navnene er nøgler, ordret.** `verify:ressourcer` holder dem op mod
+seed-migrationen, så et omdøbt navn i `sample_types` ikke stille gør reglen
+virkningsløs.
 
 ## Bygningsoversigten
 

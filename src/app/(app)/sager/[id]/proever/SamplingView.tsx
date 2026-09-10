@@ -17,6 +17,7 @@ import {
   type PendingSample,
 } from "@/lib/offline/store";
 import { formatDecimal, parseDecimal } from "@/lib/format";
+import { LEVEL_LABEL } from "@/lib/lab/parametre";
 import {
   ANALYSIS_FIELDS,
   MATERIAL_CONDITIONS,
@@ -24,7 +25,9 @@ import {
   RESOURCE_HANDLINGS,
   RESOURCE_HANDLING_LABEL,
   analysesForPeriod,
+  analysesForSampleType,
   analysisApplies,
+  visueltFund,
   type BuildingPart,
   type BuildingPeriod,
   type CaseBuilding,
@@ -127,8 +130,10 @@ function toDraft(s: Sample, userId: string, kendteBygninger: Set<string>): Draft
     created_by: s.created_by ?? userId,
     // Raekker gemt for perioden begraensede analyserne kan baere et valg der
     // ikke laengere kan traeffes. Draften viser det perioden tillader, sa
-    // knappen og det gemte ikke siger hver sit.
+    // knappen og det gemte ikke siger hver sit. Samme for provearten: en
+    // raekke fra for Asbest og Sod laaste analyserne, vises uden dem.
     ...analysesForPeriod(s.period),
+    ...analysesForSampleType(s.sample_type),
   };
 }
 
@@ -274,6 +279,12 @@ export function SamplingView({
   const atPhotoLimit = thumbs.length >= MAX_PHOTOS;
   const photoLimitNotice = `Der er plads til ${MAX_PHOTOS} billeder pr. prøve. Slet et for at tage et nyt.`;
   const isLabSample = ANALYSIS_FIELDS.some((a) => draft[a.key]);
+  /**
+   * Provearten som fund. Asbest og Sod laaser analyserne: screeneren ved,
+   * hvad hun staar med, og et labsvar der sagde noget andet ville modsige
+   * rapporten. Se `visueltFund` i types.ts.
+   */
+  const fund = visueltFund(draft.sample_type);
   const erSelektiv = reportType === "selektiv";
   const valgtStand = MATERIAL_CONDITIONS.find(
     (c) => c.grade === draft.material_condition,
@@ -602,10 +613,15 @@ export function SamplingView({
   /**
    * Gemmer den aktuelle raekke.
    *
-   * En prove skal have en lokalitet. Materiale, proveart, maengde og analyser
-   * er frivillige — screeneren skal kunne registrere at hun har staet et sted
-   * og fotograferet det, uden at kunne sige hvad det er. En sadan raekke far
-   * ingen P og sendes ikke til laboratoriet.
+   * En prove skal have en lokalitet og en maengde. Materiale, proveart og
+   * analyser er frivillige — screeneren skal kunne registrere at hun har staet
+   * et sted og fotograferet det, uden at kunne sige hvad det er. En sadan
+   * raekke far ingen P og sendes ikke til laboratoriet.
+   *
+   * Maengden er ikke frivillig, fordi rapporten bygger paa den: en linje uden
+   * er «maengde ikke opgjort», og det er en oplysning om ingenting i et
+   * dokument til en kommune. Nul taeller ikke som et tal — nul ton er det
+   * samme som ikke at have maalt.
    *
    * Billedet kraeves kun, nar der er bestilt en analyse. Et billede er
    * dokumentation af hvor proven i posen blev taget, og det er derfor det er
@@ -621,16 +637,30 @@ export function SamplingView({
    * det der star, uden at spaerre vejen tilbage.
    */
   async function commit(require: boolean): Promise<boolean> {
+    // Maengden laeses ud af feltet her og ikke kun ved blur. Et tryk paa
+    // «Naeste» lige efter indtastningen skal ikke kunne gemme raekken uden det
+    // tal, der staar i feltet, fordi blur-handleren ikke naaede foran.
+    const ton = parseDecimal(tonsText);
+    const raekke =
+      draft.estimated_tons === ton ? draft : { ...draft, estimated_tons: ton };
+    if (raekke !== draft) {
+      setRows((prev) => prev.map((r) => (r.id === raekke.id ? raekke : r)));
+    }
+
     if (require) {
-      if (buildings.length > 0 && draft.building_ids.length === 0) {
+      if (buildings.length > 0 && raekke.building_ids.length === 0) {
         setNotice("Vælg en lokalitet, før du går videre.");
+        return false;
+      }
+      if (ton == null || ton <= 0) {
+        setNotice("Angiv den estimerede mængde i ton, før du går videre.");
         return false;
       }
       if (isLabSample && thumbs.length === 0) {
         setNotice("Tag mindst ét billede af prøven, før du går videre.");
         return false;
       }
-    } else if (!started(draft)) {
+    } else if (!started(raekke)) {
       // Den blanke raekke i enden er ikke en prove endnu. Den ligger bare
       // klar, og skal ikke gemmes som en tom registrering.
       return true;
@@ -639,7 +669,7 @@ export function SamplingView({
     setNotice(null);
     setBusy(true);
     try {
-      await persist(draft);
+      await persist(raekke);
       const res = await sync();
       if (res.failed > 0) {
         setNotice(
@@ -874,12 +904,15 @@ export function SamplingView({
           onChange={(v) => update({ material: v })}
         />
 
+        {/* Vaelges Asbest eller Sod efter at analyserne er sat, nulstilles
+            de i samme greb som perioden goer det. Proven skal ikke til
+            laboratoriet, og den ma ikke kunne komme det ved et uheld. */}
         <PickerField
           label="Prøveart"
           value={draft.sample_type}
           items={sampleTypes}
           recent={recentTypes}
-          onChange={(v) => update({ sample_type: v })}
+          onChange={(v) => update({ sample_type: v, ...analysesForSampleType(v) })}
         />
 
         {/* Bygningerne er fa og har korte navne, sa de ligger fremme som
@@ -984,7 +1017,7 @@ export function SamplingView({
               setTonsText(formatDecimal(n));
               update({ estimated_tons: n });
             }}
-            placeholder="0,2"
+            placeholder="Angiv mængde…"
             className="tap tabular w-full rounded-xl bg-surface px-3.5 py-2.5 shadow-card outline-none placeholder:text-muted"
           />
         </label>
@@ -1067,7 +1100,7 @@ export function SamplingView({
           <span className="label-xs">Analyser</span>
           <div className="grid grid-cols-2 gap-2">
             {ANALYSIS_FIELDS.map((a) => {
-              const applies = analysisApplies(a.key, draft.period);
+              const applies = analysisApplies(a.key, draft.period) && !fund;
               return (
                 <button
                   key={a.key}
@@ -1087,10 +1120,15 @@ export function SamplingView({
             })}
           </div>
           <p className="text-xs leading-relaxed text-muted">
-            {isLabSample
-              ? `Sendes til laboratoriet som ${label}.`
-              : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet."}
-            {draft.period === "efter_1990" &&
+            {fund
+              ? `${draft.sample_type} registreres som ${
+                  fund.asbest ? "påvist asbest" : LEVEL_LABEL[fund.level].toLowerCase()
+                } uden analyse — prøven sendes ikke til laboratoriet.`
+              : isLabSample
+                ? `Sendes til laboratoriet som ${label}.`
+                : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet."}
+            {!fund &&
+              draft.period === "efter_1990" &&
               ` ${EXCLUDED_LABELS} bestilles ikke på en bygning fra efter 1990.`}
           </p>
         </div>

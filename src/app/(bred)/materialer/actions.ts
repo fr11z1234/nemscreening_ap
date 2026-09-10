@@ -16,7 +16,7 @@ const tekst = (fd: FormData, felt: string) =>
 // Materialer
 // ---------------------------------------------------------------------------
 
-/** Gemmer et materiale: navnet, rapportnavnet og de tre saetninger. */
+/** Gemmer et materiale: navnet, rapportnavnet og de seks saetninger. */
 export async function gemMateriale(
   _prev: PanelState,
   formData: FormData,
@@ -37,11 +37,12 @@ export async function gemMateriale(
       report_name: tekst(formData, "report_name"),
       sentence_genbrug: tekst(formData, "sentence_genbrug"),
       sentence_genanvendelse: tekst(formData, "sentence_genanvendelse"),
-      // Tre bortskaffelsestekster, ikke en. Hvilken der bruges, afgores af
-      // `bortskaffelsestekst` i types.ts — asbest overruler de to andre.
-      sentence_bortskaffelse: tekst(formData, "sentence_bortskaffelse"),
+      // Fire bortskaffelsestekster, en pr. affaldsmaerke. Hvilken der bruges,
+      // afgores af `bortskaffelsestekst` i types.ts — asbest overruler de andre.
+      sentence_farligt: tekst(formData, "sentence_farligt"),
       sentence_forurenet: tekst(formData, "sentence_forurenet"),
       sentence_asbest: tekst(formData, "sentence_asbest"),
+      sentence_bortskaffelse: tekst(formData, "sentence_bortskaffelse"),
     })
     .eq("id", id)
     .select("id");

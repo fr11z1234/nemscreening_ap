@@ -290,6 +290,34 @@ check(
   "valideringen advarede om metaller, som perioden ikke slar fra",
 );
 
+// 13. Provearten: Asbest og Sod laaser analyserne i marken. En raekke fra for
+// laasen kan stadig baere dem, og saa er den paa vej til laboratoriet med et
+// fund, screeneren allerede har gjort.
+for (const type of ["Asbest", "Sod"]) {
+  check(
+    validateForExport("Testvej 1", [
+      sample(1, "Eternit", type, { analysis_asbestos: true }),
+    ]).some(
+      (i) => i.level === "warning" && i.message.includes("ikke sendes til laboratoriet"),
+    ),
+    `valideringen advarede ikke om analyser paa en prove med provearten ${type}`,
+  );
+}
+check(
+  validateForExport("Testvej 1", [
+    sample(1, "Eternit", "Mulig asbest", { analysis_asbestos: true }),
+  ]).every((i) => !i.message.includes("ikke sendes til laboratoriet")),
+  "valideringen advarede om «Mulig asbest», som netop skal til laboratoriet",
+);
+// Uden analyser er proven ikke med i filen, og saa er der intet at advare om.
+check(
+  validateForExport("Testvej 1", [
+    sample(1, "Eternit", "Asbest", {}),
+    sample(2, "Træ", "Maling", { analysis_metals: true }),
+  ]).every((i) => !i.message.includes("ikke sendes til laboratoriet")),
+  "valideringen advarede om en asbestprove, der ikke er paa vej til laboratoriet",
+);
+
 const out = new URL("../.eurofins-test.xlsx", import.meta.url);
 writeFileSync(out, file);
 

@@ -92,7 +92,7 @@ export const MAERKE_CLASS: Record<Affaldsmaerke, string> = {
  *
  * Den binder teksten nederst sammen med maerket paa linjen laengere oppe. Uden
  * den skal laeseren holde et ord op mod et andet ord paa et ark uden anden
- * farve — og saa er de tre tekster lige saa gode som en.
+ * farve — og saa er de fire tekster lige saa gode som en.
  */
 export const MAERKE_FLADE: Record<Affaldsmaerke, string> = {
   farligt: "flade-farligt",
@@ -138,9 +138,9 @@ export function Standardtekster({ raekker }: { raekker: Standardtekst[] }) {
         {raekker.map((r) => (
           <div
             key={r.maerker.join("-")}
-            // Fladen faar farve af det FORSTE maerke. Har raekken to, er det
-            // «Farligt affald» — den er den staerkeste af de to, og de deler
-            // tekst netop fordi beskeden er den samme.
+            // Fladen faar farve af det forste maerke. Der er et pr. tekst, nu
+            // hvor hvert maerke har sin egen — listen staar, fordi to engang
+            // delte.
             className={`mt-2 flex flex-wrap gap-x-4 gap-y-2 rounded-lg px-4 py-3 first:mt-0 sm:flex-nowrap ${MAERKE_FLADE[r.maerker[0]!]}`}
           >
             {/* Maerkerne i en spalte for sig, sa teksterne begynder samme sted

@@ -17,7 +17,7 @@ import type { PanelState } from "@/lib/panel";
 /**
  * Bortskaffelsesteksterne, faelles for alle materialer.
  *
- * De tre saetninger er de samme uanset materiale — «farligt affald skal til et
+ * De fire saetninger er de samme uanset materiale — «farligt affald skal til et
  * godkendt modtageanlaeg» aendrer sig ikke af, om det er beton eller tagpap. De
  * blev alligevel skrevet pr. materiale, fordi de bor sammen med genbrugs- og
  * genanvendelsessaetningen, og de to ER forskellige fra materiale til materiale.
@@ -78,7 +78,7 @@ export function IndstillingerPanel({
           </span>
           <span className="text-sm leading-relaxed text-muted">
             {faelles
-              ? "Rapporten skriver de tre tekster én gang under forureningslinjerne, og mærket på linjen peger på den, der gælder."
+              ? "Rapporten skriver de fire tekster én gang under forureningslinjerne, og mærket på linjen peger på den, der gælder."
               : "Rapporten henter sætningen fra hvert materiale og skriver den efter mængden. Felterne nedenfor bruges ikke."}
           </span>
         </span>
@@ -108,12 +108,10 @@ export function IndstillingerPanel({
 }
 
 /**
- * Et af de tre felter, med de maerker der henter netop den tekst.
+ * Et af de fire felter, med det maerke der henter netop den tekst.
  *
- * Maerkerne og ikke feltets navn: det er dem, laeseren ser i rapporten, og det
- * er dem, teksten kommer til at staa ved siden af. «Farligt affald» og
- * «Bortskaffelse» staar begge ved den forste, fordi de deler tekst — farligt
- * affald og screenerens eget valg om bortskaffelse er den samme besked.
+ * Maerket og ikke feltets navn: det er det, laeseren ser i rapporten, og det
+ * er det, teksten kommer til at staa ved siden af.
  */
 function Tekstfelt({
   tekst,

@@ -17,14 +17,15 @@ import type { Bortskaffelsestekst, Bortskaffelsestekster } from "@/lib/types";
 /** Noeglerne i tabellen. De hedder det samme som kolonnerne paa `materials`. */
 export const INDSTILLING_NOEGLER = {
   faelles: "shared_disposal_text",
-  bortskaffelse: "sentence_bortskaffelse",
+  farligt: "sentence_farligt",
   forurenet: "sentence_forurenet",
   asbest: "sentence_asbest",
+  bortskaffelse: "sentence_bortskaffelse",
 } as const;
 
 export type Indstillinger = {
   /**
-   * Om de tre bortskaffelsestekster er faelles for alle materialer.
+   * Om de fire bortskaffelsestekster er faelles for alle materialer.
    *
    * Slaaet til skriver rapporten dem EN gang, under linjerne, og maerket paa
    * linjen peger paa den tekst der gaelder. Slaaet fra henter hver linje
@@ -42,14 +43,14 @@ export type Indstillingsraekke = { key: string; value: unknown };
 /**
  * Hvad appen goer, nar tabellen ikke svarer.
  *
- * Faelles tekst SLAAET FRA og tre tomme felter: sa henter rapporten
+ * Faelles tekst SLAAET FRA og fire tomme felter: sa henter rapporten
  * materialernes egne saetninger, praecis som for indstillingen fandtes. En
  * manglende raekke maa aldrig kunne tomme et forureningsafsnit — det er den ene
  * fejl, der ikke ses paa en rapport, for teksten mangler jo bare.
  */
 export const STANDARD_INDSTILLINGER: Indstillinger = {
   faellesBortskaffelse: false,
-  tekster: { bortskaffelse: null, forurenet: null, asbest: null },
+  tekster: { farligt: null, forurenet: null, asbest: null, bortskaffelse: null },
 };
 
 const tekst = (v: unknown): string | null =>
@@ -61,9 +62,10 @@ export function laesIndstillinger(
   const vaerdi = new Map((raekker ?? []).map((r) => [r.key, r.value]));
 
   const felter: [Bortskaffelsestekst, string][] = [
-    ["bortskaffelse", INDSTILLING_NOEGLER.bortskaffelse],
+    ["farligt", INDSTILLING_NOEGLER.farligt],
     ["forurenet", INDSTILLING_NOEGLER.forurenet],
     ["asbest", INDSTILLING_NOEGLER.asbest],
+    ["bortskaffelse", INDSTILLING_NOEGLER.bortskaffelse],
   ];
 
   return {
@@ -89,6 +91,6 @@ export function faellesTekster(
 ): Bortskaffelsestekster | null {
   if (!indstillinger.faellesBortskaffelse) return null;
   const t = indstillinger.tekster;
-  if (!t.bortskaffelse && !t.forurenet && !t.asbest) return null;
+  if (!t.farligt && !t.forurenet && !t.asbest && !t.bortskaffelse) return null;
   return t;
 }

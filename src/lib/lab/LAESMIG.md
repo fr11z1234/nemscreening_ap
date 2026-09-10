@@ -71,6 +71,13 @@ Kolonnen `lab_results.asbestos_dusty` findes stadig i databasen, men bliver
 hverken læst eller skrevet. Skal skelnen ind igen, skal den sættes **før**
 prøven kan få en farve, ikke bagefter.
 
+**Prøvearten «Asbest» er også påvist asbest.** Screeneren kan se, at pladen er
+asbest, og så bestilles der ingen analyse — prøvearten låser den. Skemaet
+skriver «Påvist» i asbestkolonnen og farver prøven rød, præcis som et labsvar
+ville. Reglen er `visueltFund` i `src/lib/types.ts` og `gaeldendeFund` i
+`ResultatSkema.tsx`; se «Prøveart som fund» i `AGENTS.md`. Har laboratoriet
+alligevel svaret på asbest for den prøve, vinder deres svar.
+
 ## Grænseværdisiden i rapporten
 
 Rapporten har en side med hele grænseværditabellen farvelagt — den side der

@@ -882,10 +882,83 @@ og det kræver et login, der er medlem.
 | 5.3 | Røgtest med ny kode | En **gammel** sag ende til ende (som 3.6). En **ny selektiv** sag ende til ende. `/materialer`, `/indstillinger`, `/brugere` som admin. En rigtig screener-konto afvises rigtigt. Rapport-print med fuldt skema. | Set i en browser på produktionen. |
 | 5.4 | Besked til screenerne | Genindlæs appen. Uden Skew Protection får åbne faner «server action not found», indtil de genindlæser — det er Next.js, og det er derfor vinduet er en aften. | Sendt. |
 
-- [ ] 5.1
-- [ ] 5.2
-- [ ] 5.3
-- [ ] 5.4
+- [x] 5.1 — **intet ændret, og det er efterprøvet frem for antaget.** `/brugere` svarede 200 med 7 brugere på produktionen og klagede ikke over en manglende nøgle, **før** fast-forwarden — `main`s kode kørte der i forvejen, så `SUPABASE_SECRET_KEY` er sat. Bevis holdt.
+- [x] 5.2 — `git merge --ff-only fase-2` → `Updating 065e548..b132a07`, `git push` → `f6a4870..b132a07 main -> main`. Vercel: **● Ready**, Production, 25 s. `main` og `fase-2` står på samme commit. Bevis holdt.
+- [~] 5.3 — **holdt, på nær screener-halvdelen.** Se nedenfor.
+- [ ] 5.4 — mennesket sender beskeden.
+
+### 5.3, det tungeste bevis i hele forløbet
+
+**Eurofins-filen for produktionens egen sag er byte-identisk før og efter.**
+Samme sag (`Mosevej 2, 8370 Hadsten`), samme 35.817 bytes:
+
+| Kode | md5 |
+| --- | --- |
+| Gammel (4.6, otte minutter før fast-forwarden) | `d73488e3ff6b895f8444570316fb6c50` |
+| Ny (5.3, efter) | `d73488e3ff6b895f8444570316fb6c50` |
+
+`cmp` siger identisk. 9A punkt 8 er dermed bevist **på produktionens egne data**,
+ikke kun på branchens kopi.
+
+**Og billederne er der.** Rapporten har 38 sider og PDF'en er **17,9 MB** mod
+733 KB på branchen — forskellen er de rigtige fotos. Det er 9A punkt 6, set.
+
+| 9A | Hvad | Svar |
+| --- | --- | --- |
+| 1 | Sagslisten | 61 sager, samme tal som `count(*)`. |
+| 2, 3, 4 | Sag, prøve, «Fortsæt» | Åbner, alle felter som gemt. |
+| 6 | Billeder | 17,9 MB PDF med de rigtige fotos. |
+| 8 | Eurofins | Byte-identisk, se ovenfor. |
+| 9 | Resultatsiden | Åbner. |
+| 11 | Rapporten | 38 sider, ingen selektive afsnit på en miljøscreening. |
+| 13 | Panelerne som admin | Navigationen viser Sager, Materialer, Indstillinger, **Brugere** og navnet «Mads». Alle fire svarer 200. |
+
+0 svar ≥ 400, 0 konsolfejl, 0 skemarelaterede fejl.
+
+**En ny selektiv sag ende til ende på produktionen** (`d63847b9-…`, slettes i
+6.5): rapporttype, DAWA-adresse, BBR-bygning hentet og gemt, en prøve med
+bygningsdel, stand og håndtering. Rapporten fik «Projektets omfang» med BBR's
+egen anvendelsestekst og «Ressourcescreening». **Alle 61 gamle sager er stadig
+`miljoescreening`** — kun den nye er `selektiv`.
+
+**Og kontorets ord fra 4.7 når frem i en rapport.** Ressourcelinjen står som
+kunden skal læse den:
+
+> **Bærende konstruktioner**
+> Beton – 40.000 kg i god stand, Beton udsorteres som en ren fraktion og kan
+> efter nedknusning genanvendes som sekundært materiale.
+
+Fem ting på én linje, og hver af dem er en regel: bygningsdelen som overskrift,
+**`report_name` «Beton»** uden affaldsfraktionens parentes, **40.000 kg** fordi
+screeneren tastede 40 ton, **«i god stand»** fordi standen var 2, og kontorets
+egen sætning. Analyseskemaet skriver derimod
+`Beton (undtagen, gasbeton, letbeton)` — materialet som **registreret** — og det
+er meningen: skemaet bindes til den enkelte prøve, så entreprenøren kan slå
+rækken op. De to er ikke i modstrid.
+
+### 5.3, det ene der mangler: screeneren
+
+«En rigtig screener-konto afvises rigtigt» er **ikke** prøvet på produktionen.
+Jeg har ikke et screener-kodeord, og produktionens to aktive screenere er ikke
+mine konti.
+
+**Serversiden er derimod bevist på produktionen, uden noget login.** Alle fire
+skrivepolitikker kræver `screening.is_office()` — `using` **og** `with_check`:
+
+| Tabel | Politik | Kræver |
+| --- | --- | --- |
+| `materials` | `materials_write` | `screening.is_office()` |
+| `app_settings` | `app_settings_write` | `screening.is_office()` |
+| `building_parts` | `building_parts_write` | `screening.is_office()` |
+| `lab_results` | `lab_results_write` | `screening.is_office()` |
+
+og `is_office()` kræver en **aktiv** række i `screening.app_users` med rollen
+`office` eller `admin`. En screener kan altså **fysisk ikke** skrive der, uanset
+hvad brugerfladen viser. Læsning kræver `is_member()`.
+
+Det, der mangler, er kun brugerfladen: skjuler navigationen de tre paneler, og
+svarer siderne 404. Det er prøvet på branchen med en rigtig screener-konto mod
+**præcis denne commit** — 404 på alle tre, og kun «Sager» i menuen.
 
 ### Fase 6 — Efter
 
@@ -897,11 +970,86 @@ og det kræver et login, der er medlem.
 | 6.4 | Filerne med produktionsdata | `prod-data.sql` fra 2.1 slettes. Backuppen fra 4.2 gemmes et sted, der ikke er udviklerens skrivebord, i mindst 30 dage. |
 | 6.5 | Sporene efter 5.3 i produktionen | Den selektive testsag slettes gennem appens egen sletning (lag for lag, så storage følger med). Var loginet en testbruger oprettet til formålet, lukkes den på `/brugere`. Bevis: `count(*)` i `cases` = tallet fra 4.1. |
 
-- [ ] 6.1
-- [ ] 6.2
-- [ ] 6.3
-- [ ] 6.4
-- [ ] 6.5
+- [x] 6.1 — **ingen nye fejl.** Se nedenfor. Fortsat overvågning i 24–48 timer er menneskets.
+- [x] 6.2 — **branchen beholdes** (svar 6 i afsnit 10). Den står nu med fase 2-skemaet, de to testlogins og ingen sager — bygget af filerne med filernes egne versionsnumre. `seed.sql` kan fylde den op, når den skal bruges.
+- [x] 6.3 — denne fil er runbooken. Hvert trin bærer sit svar ordret, og hver rettelse står med sin grund.
+- [x] 6.4 — `prod-data.sql` (1,04 MB), `auth-stubbe.sql`, `branch-indhold.json` og de to Eurofins-testfiler er slettet. **Backuppen beholdes:** `prod-backup-20260912-142809.sql` (1,07 MB) og `prod-historik-20260912-142809.sql` — de skal flyttes et sted, der ikke er skrivebordet, i mindst 30 dage.
+- [x] 6.5 — **`cases` = 61**, præcis tallet fra 4.1. Bevis holdt.
+
+### 6.1: hvad loggene siger
+
+Det, der kunne have været skræmmende, var 41 gange
+`Warp server error: Thread killed by timeout manager` fra PostgREST. Det er
+**ikke** fase 2. Samme besked, samme eneste variant, i vinduet **før**
+migrationen:
+
+| Vindue | `Warp server error` |
+| --- | --- |
+| Før migrationen (3 timer) | **155** |
+| Efter migrationen (50 min) | **36** |
+
+Samme takt. Det er PostgREST's tomgangsstøj, når idle-tråde lukkes.
+
+**Ingen `PGRST…`, ingen «column does not exist», ingen «permission denied».**
+De øvrige fund er gjort rede for: to `invalid_credentials` og én `bad_json` er
+mine egne fejlslagne loginforsøg, og `session_not_found` på `GET /user` har
+`referer: https://nemscreening.dk` — det er **websitets** brugere med udløbne
+sessioner, ikke vores.
+
+Og én linje er et godt tegn:
+`Received a schema cache reload message on the "pgrst" channel` — det er
+`notify pgrst, 'reload schema'` fra migrationen, der gør sit arbejde.
+
+**Sikkerhedsrådgiverne viser intet nyt fra fase 2.** `building_parts` står
+**ikke** under «RLS Enabled No Policy», så Supabases egen linter bekræfter, at
+den har sine to politikker. De øvrige fund er websitets `public.`-funktioner og
+screenings `is_member()`/`is_office()`/`fjern_slettet_bygning()`, som stammer fra
+grundmigrationerne og er med vilje.
+
+### 6.5: hvad testsagen kostede
+
+Slettet gennem **appens egen** sletning, ikke med SQL — netop fordi den læser
+storage-stierne ud, før rækkerne forsvinder. Dialogen krævede tre fluebén (sagen,
+1 bygning, 1 prøve), og «Slet» åbnede sig først, da alle tre var sat.
+
+| Tabel | Efter | Som i 4.1 |
+| --- | --- | --- |
+| `cases` | **61** | ✓ |
+| `case_buildings` | 87 | ✓ |
+| `samples` | 776 | ✓ |
+| `sample_photos` | 1541 | ✓ |
+| `lab_results` | 331 | ✓ |
+| `case_files` | 359 | ✓ |
+| `exports` | **89** | 87 + 2 |
+
+Ingen forældreløse storage-filer efter sagen.
+
+**De to ekstra `exports`-rækker er mine**, én fra røgtesten i 4.6 og én fra 5.3.
+`exports` er en log over hentede Eurofins-filer, og at hente en er præcis det,
+kontoret gør hver uge. Ingen sag, prøve, billede eller labsvar er rørt.
+
+---
+
+## 13. Hvad produktionen står med nu
+
+| Hvad | Før | Nu |
+| --- | --- | --- |
+| Skema | `982a253bed9339988695b362769c67d3`, 251 linjer | **`0eae9171f6330081f8eeeef71032e849`, 289 linjer** |
+| Sager | 61 | 61, alle `miljoescreening` |
+| Prøver · billeder · labsvar | 776 · 1541 · 331 | uændret, md5 for md5 |
+| `building_parts` | fandtes ikke | 8 rækker, RLS, to politikker |
+| `materials` | 55 navne, ingen tekst | 55 navne, **53 med kontorets ord**, 2 lukket, 2 omdøbt |
+| `app_settings` | 1 nøgle | 6: eurofins + `shared_disposal_text` + de fire tekster |
+| Kode (`main`) | `f6a4870` | **`b132a07`** |
+| Migrationshistorik | 11 screening + 24 website + 2 website | + **de ni**, med filernes egne numre og md5 |
+
+**Restore-punktet** er `prod-backup-20260912-142809.sql`. Rollback af koden er
+Vercels «Instant Rollback» til deployment `nemscreening-84gavw52p`, og den rører
+**ikke** databasen — det er hele pointen med expand-only.
+
+`fase2-rollback.sql` ligger i skuffen, øvet i begge retninger i 3.7. Den skal
+**ikke** køres uden at nogen har forstået hvorfor: tomme nye kolonner skader
+ingen, og den tager kontorets tekster med sig.
 
 ---
 

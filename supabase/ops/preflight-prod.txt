@@ -1,0 +1,17 @@
+1  |  foerste .. sidste  |  20260725173107 .. 20260908200657
+1  |  nogen EFTER 20260804111609?  |  20260908200516, 20260908200657
+1  |  screening-migrationer i alt  |  13
+3  |  af de tolv MANGLER  |  ingen
+3  |  af de tolv navne findes  |  12
+3b  |  materialer i alt  |  55
+3b  |  materialer lukket (active = false)  |  0
+3b  |  proevearter i alt  |  21
+4  |  Asbest / Sod / Mulig asbest findes  |  Asbest, Mulig asbest, Sod
+5  |  enum-typerne findes  |  0
+5  |  noegler i app_settings  |  eurofins_analyses_details
+5  |  nye kolonner der allerede findes  |  0
+5  |  tabellen building_parts findes  |  0
+7  |  proever med proeveart Asbest  |  15 i alt, 13 med analyser, 9 med labsvar
+7  |  proever med proeveart Sod  |  17 i alt, 0 med analyser, 0 med labsvar
+7  |  proever uden maengde (spaerrer «Naeste»)  |  102
+8  |  pgrst.db_schemas  |  IKKE SAT

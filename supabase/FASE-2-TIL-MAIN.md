@@ -643,14 +643,113 @@ en fast-forward til den commit, der har været igennem det hele.
 | 3.7 | **Rollback øves** | `psql "$PGURL_BRANCH" -f fase2-rollback.sql` → skemalisten skal give `982a253bed9339988695b362769c67d3` (basis) → `fase2-prod.sql` igen → `0eae9171f6330081f8eeeef71032e849` (fase 2). Rækketal uændrede hele vejen. | Begge md5'er matcher. Begge scripts er nu bevist. |
 | 3.8 | Filerne er ikke drevet | `npx supabase db reset` (alle 20 + seed) på den lokale stak. Gjort én gang allerede den 12. september — alle 20 byggede rent — men gøres igen efter fletningen, for det er *den* commit, der går live. | Bygger grønt. Skemalisten = `0eae9171f6330081f8eeeef71032e849`. |
 
-- [ ] 3.1
-- [ ] 3.2
-- [ ] 3.3
-- [ ] 3.4
-- [ ] 3.5
-- [ ] 3.6
-- [ ] 3.7
-- [ ] 3.8
+- [x] 3.1 — **én konflikt, som forventet:** `CONFLICT (modify/delete): src/components/AppHeader.tsx deleted in HEAD and modified in origin/main`. `src/lib/types.ts` flettede sig selv rent. Bevis holdt.
+- [x] 3.2 — **ingen reference til `AppHeader` tilbage i `src/`**, og filen er væk. Bevis holdt.
+- [x] 3.3 — commit `22b40dd` med to forældre (`bd936cf` + `f6a4870`). `git status` ren bortset fra `.claude/`. `AGENTS.md` siger ikke længere «flet ikke». Bevis holdt.
+- [x] 3.4 — **hele kæden grøn.** Bevis holdt.
+- [x] 3.5 — `bd936cf..22b40dd fase-2 -> fase-2`. Vercel: **● Ready** på 24 s. Bevis holdt.
+- [x] 3.6 — **lokalt: holdt, alle punkter.** Previewet klikkede mennesket selv igennem (12. sep. 2026) efter listen nedenfor: «det hele virker». Bevis holdt.
+- [x] 3.7 — **rollback → `982a253bed9339988695b362769c67d3`, genanvendelse → `0eae9171f6330081f8eeeef71032e849`.** Begge byte-identiske med de committede lister. Alle elleve md5'er af gamle kolonner identiske hele vejen ned og op. Bevis holdt.
+- [x] 3.8 — `npx supabase db reset`: alle 20 migrationer og `seed.sql` byggede rent, skemalisten **`0eae9171f6330081f8eeeef71032e849`**, og seed-sagens prøver hedder `P1, P2, 3, P4, P5`. Bevis holdt.
+
+### 3.2, hvad der blev porteret
+
+`main`s sidehoved havde to hensigter, og de er nu rammens:
+
+| Hensigt | Hvor den ligger nu |
+| --- | --- |
+| «Brugere» i navigationen, kun for `admin` | `Skal.tsx`, efter Materialer og Indstillinger — smallere grænse, sidste plads |
+| Navnet fører til `/kodeord` | `SkalRamme.tsx`, navnet nederst er nu et link med `aria-current` som de andre punkter |
+
+`<AppHeader />` og «← Sager» er fjernet fra `brugere/page.tsx` og
+`kodeord/page.tsx` — layoutet leverer begge dele nu.
+
+**`supabase/ops/` er undtaget ESLint.** Planens generator i 12.4 er ordret
+CommonJS, og repoets `no-require-imports` er rigtig i `src/` og forkert for et
+script, `node` skal kunne køre direkte. Samme begrundelse som `supabase/.temp/**`
+allerede havde: ellers holder kontrolkæden op med at sige noget om vores eget
+arbejde.
+
+**`supabase/ops/` har sin egen `.gitattributes` med `eol=lf`.** Uden den ville
+`core.autocrlf` give `.txt` og `.md5` CRLF i arbejdskopien, og så ville hver
+linje i en skemaliste afvige — eller værre: en md5 ville bære et `\r` og
+`sammenlign-verify.js` fejle på noget, der ikke er en fejl.
+
+**Skærmbillederne committes ikke** (`ops/.gitignore`). Generalprøven kørte mod en
+kopi af produktionens data, så de viser rigtige adresser, rigtige kunder og
+rigtige labsvar — 61 sagsnavne på ét af dem. Tallene (`foer-*.txt`,
+`efter-*.txt`, `skema-*.txt`, `*.md5`) er derimod med: de er dokumentationen af,
+at intet blev rørt.
+
+### 3.6, hvad der blev set lokalt
+
+Mod branchen, som har produktionens 61 sager og fase 2-skemaet. Begge testlogins.
+
+| 9A | Hvad | Svar |
+| --- | --- | --- |
+| 1 | Sagslisten | 61 sager. |
+| 7 | **Offline-køen** | Køen, den **gamle** app skrev, blev synket af den **nye**: 1 → 0 i IndexedDB, og prøve 32 gik fra 1 til **3,21 ton** i databasen. De tre fase 2-felter står stadig `null` på rækken — den nye kode opdigtede ikke værdier. |
+| 8 | **Eurofins-filen** | **`a8da4e8d72d74fbc93307fead8bf30e6`** — samme md5 som den gamle kode, og `cmp` siger byte-identisk. |
+| 11 | Rapporten | 37 sider, ingen selektive afsnit på en miljøscreening. |
+| 13 | **Rollerne** | admin ser Sager, Materialer, Indstillinger, **Brugere**; alle fire svarer 200. Screeneren ser **kun** Sager og får **404** på alle tre paneler — men 200 på `/kodeord`, for sit eget kodeord må enhver skifte. |
+
+**Ny selektiv sag ende til ende.** Oprettet med rapporttypen «Selektiv
+nedrivning», adresse fra DAWA, BBR-bygninger hentet og gemt, og en prøve med alle
+tre selektive felter — bygningsdel «Bærende konstruktioner», stand 2, håndtering
+«Genanvendelse». Prøvesiden viser `Bygningsdel`, `Materiale stand` og
+`Miljø & ressourcehåndtering`, som kun står på en selektiv sag. Rapporten fik
+**«Projektets omfang»** med BBR's egen anvendelsestekst og
+**«Ressourcescreening»**. 0 svar ≥ 400, 0 konsolfejl.
+
+**Og alle 61 gamle sager er stadig `miljoescreening`** — kun den nye er
+`selektiv`. Det er 9B's «Alle eksisterende sager bliver `miljoescreening`»,
+efterprøvet.
+
+### 3.6, previewet: klikket igennem af mennesket
+
+Agenten kunne ikke nå det, og mennesket gjorde det i stedet efter en nummereret
+liste — det ene sted i planen, hvor det er meningen. Svaret var «det hele
+virker», og den ene ting, der blev spurgt om, var **de manglende billeder**:
+appen skriver «2 foto», og der er ingen.
+
+**Det er ventet, og 2.3 siger det.** Rækkerne om billederne fulgte med dumpet,
+filerne gjorde ikke: `pg_dump` kopierer tabelrækker og ikke Storage, og branchens
+egne buckets blev tømt i 0.2. På branchen står der 1541 rækker i `sample_photos`
+og **0** filer i `screening-photos`, 359 rækker i `case_files` og **0** filer i
+`screening-rapport`. Migrationen rører ikke Storage, så det kan ikke ske i
+produktionen; at eksisterende billeder vises, er 9A punkt 6 og prøves i 4.6/5.3,
+hvor filerne er der.
+
+Eurofins-filen fra previewet blev ikke hentet ind til sammenligning, og den
+behøvedes ikke: 9A punkt 8 er «samme sag, gammel kode mod ny», og den er ført
+lokalt mod den samme branch-database — `a8da4e8d72d74fbc93307fead8bf30e6` begge
+veje, `cmp` byte-identisk. Previewet kører den samme commit mod den samme
+database.
+
+### Hvorfor previewet ikke kunne nås
+
+`https://nemscreening-app-git-fase-2-nemscreening.vercel.app` og
+deployment-URL'en svarer **begge** `HTTP 302 → vercel.com/sso-api`. Det er
+Vercels *Deployment Protection*, og den gælder previews, ikke produktionen —
+`https://nemscreening-app.vercel.app/login` svarer `200`, så **5.3 kan køres**.
+
+Selve buildet er grønt (● Ready, 24 s), så det, previewet mangler at vise, er om
+den *byggede* artefakt taler rigtigt med branchens database. Planen forudsatte,
+at previewet kunne nås; det kan det ikke uden en af to ting, og begge er
+menneskets valg, ikke agentens: et *Protection Bypass for Automation*-token på
+projektet, eller at mennesket selv klikker det igennem.
+
+### 3.7, hvad rollbacken gjorde
+
+| | Skemaliste | `app_settings` | Alt andet |
+| --- | --- | --- | --- |
+| Før | `0eae9171…` | 2 | cases 62, samples 777, case_buildings 88, case_files 359, exports 91, lab_results 331, materials 55, sample_photos 1541, sample_types 21, app_users 9 |
+| Efter rollback | **`982a253…`** | 1 | uændret |
+| Efter genanvendelse | **`0eae9171…`** | 2 | uændret |
+
+`DELETE 9` fjernede de ni historikrækker, og `app_settings` er den ene række
+migrationen selv ejer. **Ingen data gik tabt ved turen ned og op**, og alle
+elleve md5'er af gamle kolonner var identiske hele vejen.
 
 ### Fase 4 — PRODUKTION: databasen
 
@@ -674,14 +773,105 @@ under et sekund.
 | 4.6 | **Den gamle, kørende app** | Log ind på produktionen med det givne login og røgtest det, der stadig kører på Vercel, mod det nye skema: sagsliste, sag, rapport, eksport. | Alt virker. Nu ved vi, at Fase 5 kan tage den tid, det tager. |
 | 4.7 | Kontorets indhold | Kun hvis spørgsmål 1 er ja: `fase2-indhold.sql`. | Tællingen i scriptet stemmer. |
 
-- [ ] 4.0
-- [ ] 4.1
-- [ ] 4.2
-- [ ] 4.3
-- [ ] 4.4
-- [ ] 4.5
-- [ ] 4.6
-- [ ] 4.7
+- [x] 4.0 — `DELETE 62` sager, `DELETE 7` brugere. Alle børnetabeller 0 via CASCADE, `app_users` = 2, `auth.users` = 2, alle fire buckets tomme. Bevis holdt.
+- [x] 4.1 — **alle tjek grønne.** Se nedenfor: to af planens tjek var forkert *formuleret*, produktionen var ikke afveget. Bevis holdt.
+- [x] 4.2 — `prod-backup-20260912-142809.sql` (1,07 MB) og `prod-historik-20260912-142809.sql` (68 KB). Backuppen har hele skemaet (11 tabeller, 21 politikker, 5 funktioner, 13 indeks, 3 typer, RLS på alle 11) og rækketal **præcis** = 4.1. Kun `screening`. Bevis holdt.
+- [x] 4.3 — `foer-prod.txt` skrevet.
+- [x] 4.4 — **`COMMIT`.** 2,14 s inkl. containerstart. Bevis holdt.
+- [x] 4.5 — **`BEVIS: HOLDER — ingen gammel celle er roert`.** Skemalisten `0eae9171f6330081f8eeeef71032e849`. Bevis holdt.
+- [ ] 4.6 — **stoppet:** loginet virker ikke, se nedenfor.
+- [ ] 4.7 — venter på 4.6.
+
+### 4.1: produktionen var ikke afveget — to af planens tjek var
+
+**Historikken er fælles med websitet, og websitet har lagt to migrationer på.**
+8. september 2026: `20260908200516 framework_agreements` og
+`20260908200657 agreement_function_search_path`. Planen forventede «11 rækker,
+ingen senere» og filtrerede på `version >= '20260725173107'` — og et datofilter
+fanger websitets migrationer. Det så ud som om produktionen var rettet i hånden.
+
+Den var ikke, og det er bevist tre gange:
+
+1. **Skemalisten på produktionen gav `982a253bed9339988695b362769c67d3`, 251
+   linjer** — byte for byte det samme som `skema-basis.txt`, branchen og den
+   lokale stak. Websitets to migrationer har ikke ændret én kolonne, én politik
+   eller én funktion i `screening`.
+2. **Deres SQL er læst.** Den første opretter `public.framework_agreements`,
+   `framework_agreement_lines`, `framework_agreement_events` og to nullable
+   kolonner på `public.bookings`; den anden sætter `search_path` på fire
+   `public.`-funktioner. Ordet «screening» står kun i firmanavnet NemScreening,
+   i en kommentar.
+3. **De stod i historik-backuppen fra 4.2**, altså før migrationen i 4.4.
+
+`preflight-prod.sql` tæller nu screenings elleve **ved navn**. Reglen for dette
+projekt: **filtrér aldrig migrationer på dato.** Den samme fælde ramte
+`fase2-verify-efter.sql` i 4.5 og er rettet der også.
+
+**Og `pgrst.db_schemas` står «ikke sat» på produktionen — det er normalt.**
+Rolleindstillingen er *branchens* greb, fordi en branch uden GitHub-integration
+ikke får `config.toml` anvendt. Produktionen har skemaet slået til i dashboardet.
+Det rigtige tjek er adfærden, og den svarer
+`42501 permission denied for schema screening` — altså at Postgres kender skemaet
+og nægter adgang uden login, præcis som det skal være. Ikke `PGRST106`.
+
+### 4.1's tal til afsnit 9B (rapporteres, afgør intet)
+
+| Hvad | Antal |
+| --- | --- |
+| Prøver med prøvearten **Asbest** | 15 — heraf 13 med analyser, 9 med labsvar |
+| Prøver med prøvearten **Sod** | 17 — ingen med analyser, ingen med labsvar |
+| Prøver **uden mængde** (spærrer «Næste») | 102 |
+
+De 12 materialenavne findes ordret, ingen mangler. 55 materialer, 0 lukkede,
+21 prøvearter — samme liste som branchen, så 4.7 rammer alle rækker. `Asbest`,
+`Sod` og `Mulig asbest` findes alle tre. **Intet af fase 2 fandtes i forvejen:**
+0 nye kolonner, ingen `building_parts`, ingen enum-typer, kun
+`eurofins_analyses_details` i `app_settings`.
+
+### 4.4 og 4.5: ringen er lukket
+
+**Produktionen kørte linje for linje det samme som generalprøven.** `psql`-svaret
+fra 2.5 (branchen) og 4.4 (produktionen) er identiske: 51 linjer, `BEGIN` til
+`COMMIT`, med `UPDATE 0` hvor bilaget lover nul rækker, `UPDATE 12` på spærren og
+`INSERT 0 0` på den `app_settings`-kopi, der ikke skal ramme noget.
+
+**Tre miljøer, tre veje, samme skema.** Skemalisten efter migrationen er
+**byte-identisk** med `skema-fase2.txt` på produktionen, på branchen og på den
+lokale stak.
+
+**Ni af elleve md5'er var ens på branchen og produktionen allerede før
+migrationen** — kun `app_users` (branchen havde to testlogins mere) og `cases`
+(branchens navne bar `[TEST]`) afveg. Generalprøven kørte altså mod en trofast
+kopi, bit for bit.
+
+Og efter migrationen: alle elleve md5'er uændrede, rækketal uændrede undtagen
+`app_settings` 1 → 2 og `building_parts` som ny med 8. **Migrationen skrev ikke i
+én eneste eksisterende celle i 61 sager, 776 prøver, 1541 billeder og 331
+labsvar.**
+
+### 4.6: stoppet — loginet er ikke medlem af appen
+
+Loginet, mennesket gav, kan ikke bruges:
+
+```
+https://nemscreening-app.vercel.app/login?error=Forkert+e-mail+eller+kodeord.
+```
+
+To ting er galt, og den anden er den vigtige:
+
+- **Kodeordet passer ikke.** GoTrue svarer `{"code":400,
+  "error_code":"invalid_credentials","msg":"Invalid login credentials"}`.
+- **Kontoen er ikke medlem af screening-appen.**
+  `Madsrahbekfriis@hotmail.com` har en `auth.users`-konto (bekræftet, sidst
+  logget ind 24. august 2026) men **ingen række i `screening.app_users`**. Det er
+  et website-login: `auth` er fælles, og en kunde på nemscreening.dk er allerede
+  `authenticated` her. Adgang til appen kræver medlemskab, og det er netop derfor
+  `is_member()` findes.
+
+Produktionens `office`/`admin`-medlemmer er andre konti (3 aktive admins).
+**Databasen er migreret og verificeret** — 4.4 committede, 4.5 er grøn — så der
+er intet halvt gjort. Det, der mangler, er at klikke den *kørende* app igennem,
+og det kræver et login, der er medlem.
 
 ### Fase 5 — PRODUKTION: koden
 

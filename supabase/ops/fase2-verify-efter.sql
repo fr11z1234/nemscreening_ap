@@ -103,9 +103,25 @@ order by 2;
 -- Historikken (12.4) — de ni versioner med filernes numre
 -- ---------------------------------------------------------------------------
 -- md5'erne holdes op mod fase2-prod.md5, linje for linje. Forventet: ni raekker.
+--
+-- RETTET: her stod `where version >= '20260824161500'`. Det virkede paa branchen
+-- og gav ELLEVE paa produktionen, fordi historikken er FAELLES med websitet, og
+-- websitet lagde to migrationer paa 8. september 2026 — `framework_agreements`
+-- og `agreement_function_search_path`. De er nyere end vores foerste og blev
+-- fanget af datofilteret.
+--
+-- Det saa ud som et fejlet bevis og var det ikke: de to stod i historik-backuppen
+-- fra 4.2, altsaa FOER migrationen, og deres SQL roerer kun `public.` og
+-- `auth.` — intet i `screening`. Men et tjek, der melder fejl paa noget rigtigt,
+-- er et daarligt tjek. Derfor staar de ni nu ved navn.
+--
+-- Laer af det: paa dette projekt maa INTET filtreres paa migrationsdato.
 select 'historik' as afsnit, version as navn, md5(statements[1]) as vaerdi
 from supabase_migrations.schema_migrations
-where version >= '20260824161500' order by version;
+where version in (
+  '20260824161500', '20260824193000', '20260825120000', '20260825120500', '20260825124500',
+  '20260828104500', '20260904120000', '20260909120000', '20260910120000')
+order by version;
 
 -- ---------------------------------------------------------------------------
 -- De nye paastande (afsnit 7)

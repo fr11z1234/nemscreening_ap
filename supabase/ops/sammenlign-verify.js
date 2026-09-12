@@ -5,6 +5,26 @@
 // Det er 9A punkt 14, gjort mekanisk: raekketallene skal vaere ens paa naer de
 // to, migrationen selv laver, og alle elleve md5'er af de GAMLE kolonner skal
 // vaere identiske. Én afvigelse er et fejlet bevis.
+//
+// ---------------------------------------------------------------------------
+// DEN GAELDER KUN MELLEM 4.3 OG 4.5. Brug den ikke bagefter.
+// ---------------------------------------------------------------------------
+// Scriptet maaler ÉN ting: aendrede MIGRATIONEN noget, den ikke maatte. Alt
+// efter 4.5 flytter med rette de samme tal, og saa raaber det ulv:
+//
+//   4.7 (kontorets indhold) aendrer `materials.name` (to omdoebninger) og
+//   `materials.active` (to lukninger) — altsaa GAMLE kolonner, med vilje, og
+//   det er svaret paa spoergsmaal 1 i afsnit 10. Den laegger ogsaa fire
+//   `sentence_*`-noegler i `app_settings`, saa baade raekketal og md5 dér
+//   flytter sig. Og saetningstaellerne gaar fra migrationens 5/7/0/0/0/0 til
+//   kontorets 47/47/49/49/43/49.
+//
+//   Enhver hentet Eurofins-fil laegger en raekke i `exports`. Det er en log
+//   over det, kontoret goer hver uge.
+//
+// Koert efter 4.7 melder scriptet derfor 13 «fejl», som alle er rigtige
+// aendringer. Skal tilstanden efterproeves senere, sammenlign da mod tal, der er
+// taget EFTER 4.7 — ikke mod foer-prod.txt.
 const fs = require("fs");
 const path = require("path");
 

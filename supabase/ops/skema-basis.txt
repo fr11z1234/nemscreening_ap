@@ -1,0 +1,251 @@
+constraint app_settings.app_settings_pkey PRIMARY KEY (key)
+constraint app_users.app_users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint app_users.app_users_pkey PRIMARY KEY (id)
+constraint case_buildings.case_buildings_case_id_fkey FOREIGN KEY (case_id) REFERENCES screening.cases(id) ON DELETE CASCADE
+constraint case_buildings.case_buildings_pkey PRIMARY KEY (id)
+constraint case_files.case_files_case_id_fkey FOREIGN KEY (case_id) REFERENCES screening.cases(id) ON DELETE CASCADE
+constraint case_files.case_files_kind_check CHECK ((kind = ANY (ARRAY['plantegning'::text, 'forsidebillede'::text, 'eurofins_pdf'::text, 'eurofins_side'::text])))
+constraint case_files.case_files_pkey PRIMARY KEY (id)
+constraint cases.cases_created_by_fkey FOREIGN KEY (created_by) REFERENCES screening.app_users(id) ON DELETE SET NULL
+constraint cases.cases_pkey PRIMARY KEY (id)
+constraint exports.exports_case_id_fkey FOREIGN KEY (case_id) REFERENCES screening.cases(id) ON DELETE CASCADE
+constraint exports.exports_generated_by_fkey FOREIGN KEY (generated_by) REFERENCES screening.app_users(id) ON DELETE SET NULL
+constraint exports.exports_pkey PRIMARY KEY (id)
+constraint lab_results.lab_results_pkey PRIMARY KEY (sample_id)
+constraint lab_results.lab_results_sample_id_fkey FOREIGN KEY (sample_id) REFERENCES screening.samples(id) ON DELETE CASCADE
+constraint materials.materials_name_key UNIQUE (name)
+constraint materials.materials_pkey PRIMARY KEY (id)
+constraint sample_photos.sample_photos_created_by_fkey FOREIGN KEY (created_by) REFERENCES screening.app_users(id) ON DELETE SET NULL
+constraint sample_photos.sample_photos_pkey PRIMARY KEY (id)
+constraint sample_photos.sample_photos_sample_id_fkey FOREIGN KEY (sample_id) REFERENCES screening.samples(id) ON DELETE CASCADE
+constraint sample_photos.sample_photos_storage_path_key UNIQUE (storage_path)
+constraint sample_types.sample_types_name_key UNIQUE (name)
+constraint sample_types.sample_types_pkey PRIMARY KEY (id)
+constraint samples.samples_building_id_fkey FOREIGN KEY (building_id) REFERENCES screening.case_buildings(id) ON DELETE SET NULL
+constraint samples.samples_case_id_fkey FOREIGN KEY (case_id) REFERENCES screening.cases(id) ON DELETE CASCADE
+constraint samples.samples_case_seq_unique UNIQUE (case_id, seq)
+constraint samples.samples_created_by_fkey FOREIGN KEY (created_by) REFERENCES screening.app_users(id) ON DELETE SET NULL
+constraint samples.samples_pkey PRIMARY KEY (id)
+enum building_period foer_1990,efter_1990
+enum case_status oprettet,under_screening,proever_taget,sendt_til_lab,afsluttet
+enum user_role screener,office,admin
+funktion fjern_slettet_bygning d6c4b04585d563cdf9c7ad56d7c3f3f7
+funktion is_admin ba6109d6e5d8a847373402f717ce52c2
+funktion is_member 8848d5b3e24c08f7f22e3903c61086c0
+funktion is_office e117aefb43c78e2b46316f83d5f569bf
+funktion set_updated_at c34e74962cac3d266475c705c67c10e9
+grant app_settings authenticated DELETE,INSERT,SELECT,UPDATE
+grant app_settings service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant app_users authenticated DELETE,INSERT,SELECT,UPDATE
+grant app_users service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant case_buildings authenticated DELETE,INSERT,SELECT,UPDATE
+grant case_buildings service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant case_files authenticated DELETE,INSERT,SELECT,UPDATE
+grant case_files service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant cases authenticated DELETE,INSERT,SELECT,UPDATE
+grant cases service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant exports authenticated DELETE,INSERT,SELECT,UPDATE
+grant exports service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant lab_results authenticated DELETE,INSERT,SELECT,UPDATE
+grant lab_results service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant materials authenticated DELETE,INSERT,SELECT,UPDATE
+grant materials service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant sample_photos authenticated DELETE,INSERT,SELECT,UPDATE
+grant sample_photos service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant sample_types authenticated DELETE,INSERT,SELECT,UPDATE
+grant sample_types service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+grant samples authenticated DELETE,INSERT,SELECT,UPDATE
+grant samples service_role DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+indeks CREATE INDEX case_buildings_case_idx ON screening.case_buildings USING btree (case_id, sort_order)
+indeks CREATE INDEX case_files_raekkefolge ON screening.case_files USING btree (case_id, doc_order, sort_order)
+indeks CREATE INDEX case_files_sag ON screening.case_files USING btree (case_id)
+indeks CREATE INDEX cases_created_by_idx ON screening.cases USING btree (created_by)
+indeks CREATE INDEX cases_status_created_idx ON screening.cases USING btree (status, created_at DESC)
+indeks CREATE INDEX exports_case_idx ON screening.exports USING btree (case_id, generated_at DESC)
+indeks CREATE INDEX sample_photos_sample_idx ON screening.sample_photos USING btree (sample_id, sort_order)
+indeks CREATE INDEX samples_case_lab_idx ON screening.samples USING btree (case_id) WHERE is_lab_sample
+indeks CREATE INDEX samples_case_seq_idx ON screening.samples USING btree (case_id, seq)
+indeks CREATE UNIQUE INDEX app_settings_pkey ON screening.app_settings USING btree (key)
+indeks CREATE UNIQUE INDEX app_users_pkey ON screening.app_users USING btree (id)
+indeks CREATE UNIQUE INDEX case_buildings_pkey ON screening.case_buildings USING btree (id)
+indeks CREATE UNIQUE INDEX case_files_en_plantegning ON screening.case_files USING btree (case_id) WHERE (kind = 'plantegning'::text)
+indeks CREATE UNIQUE INDEX case_files_en_side_pr_doc ON screening.case_files USING btree (case_id, doc_id, sort_order) WHERE (kind = 'eurofins_side'::text)
+indeks CREATE UNIQUE INDEX case_files_et_bilag_pr_doc ON screening.case_files USING btree (case_id, doc_id) WHERE (kind = 'eurofins_pdf'::text)
+indeks CREATE UNIQUE INDEX case_files_et_forsidebillede ON screening.case_files USING btree (case_id) WHERE (kind = 'forsidebillede'::text)
+indeks CREATE UNIQUE INDEX case_files_pkey ON screening.case_files USING btree (id)
+indeks CREATE UNIQUE INDEX cases_pkey ON screening.cases USING btree (id)
+indeks CREATE UNIQUE INDEX exports_pkey ON screening.exports USING btree (id)
+indeks CREATE UNIQUE INDEX lab_results_pkey ON screening.lab_results USING btree (sample_id)
+indeks CREATE UNIQUE INDEX materials_name_key ON screening.materials USING btree (name)
+indeks CREATE UNIQUE INDEX materials_pkey ON screening.materials USING btree (id)
+indeks CREATE UNIQUE INDEX sample_photos_pkey ON screening.sample_photos USING btree (id)
+indeks CREATE UNIQUE INDEX sample_photos_storage_path_key ON screening.sample_photos USING btree (storage_path)
+indeks CREATE UNIQUE INDEX sample_types_name_key ON screening.sample_types USING btree (name)
+indeks CREATE UNIQUE INDEX sample_types_pkey ON screening.sample_types USING btree (id)
+indeks CREATE UNIQUE INDEX samples_case_seq_unique ON screening.samples USING btree (case_id, seq)
+indeks CREATE UNIQUE INDEX samples_pkey ON screening.samples USING btree (id)
+kolonne app_settings.key text not null
+kolonne app_settings.updated_at timestamp with time zone not null default now()
+kolonne app_settings.value jsonb not null
+kolonne app_users.active boolean not null default true
+kolonne app_users.created_at timestamp with time zone not null default now()
+kolonne app_users.email text
+kolonne app_users.full_name text
+kolonne app_users.id uuid not null
+kolonne app_users.role USER-DEFINED (user_role) not null default 'screener'::screening.user_role
+kolonne app_users.updated_at timestamp with time zone not null default now()
+kolonne case_buildings.area_built numeric
+kolonne case_buildings.area_residential numeric
+kolonne case_buildings.area_total numeric
+kolonne case_buildings.bbr_building_id text
+kolonne case_buildings.building_no text
+kolonne case_buildings.built_year integer
+kolonne case_buildings.case_id uuid not null
+kolonne case_buildings.created_at timestamp with time zone not null default now()
+kolonne case_buildings.id uuid not null default gen_random_uuid()
+kolonne case_buildings.is_manual boolean not null default false
+kolonne case_buildings.label text not null
+kolonne case_buildings.raw_bbr jsonb
+kolonne case_buildings.rebuilt_year integer
+kolonne case_buildings.sort_order integer not null default 0
+kolonne case_buildings.usage_code text
+kolonne case_buildings.usage_text text
+kolonne case_files.bytes bigint
+kolonne case_files.case_id uuid not null
+kolonne case_files.created_at timestamp with time zone not null default now()
+kolonne case_files.created_by uuid
+kolonne case_files.doc_id uuid
+kolonne case_files.doc_order integer not null default 0
+kolonne case_files.filename text
+kolonne case_files.height integer
+kolonne case_files.id uuid not null default gen_random_uuid()
+kolonne case_files.kind text not null
+kolonne case_files.mime text
+kolonne case_files.sort_order integer not null default 0
+kolonne case_files.storage_path text not null
+kolonne case_files.width integer
+kolonne cases.address_text text
+kolonne cases.area_m2 numeric
+kolonne cases.built_year integer
+kolonne cases.case_name text not null
+kolonne cases.city text
+kolonne cases.created_at timestamp with time zone not null default now()
+kolonne cases.created_by uuid
+kolonne cases.customer_contact text
+kolonne cases.customer_email text
+kolonne cases.customer_name text
+kolonne cases.customer_phone text
+kolonne cases.dawa_adgangsadresse_id text
+kolonne cases.id uuid not null default gen_random_uuid()
+kolonne cases.note text
+kolonne cases.postnr text
+kolonne cases.rebuilt_year integer
+kolonne cases.source_booking_id uuid
+kolonne cases.status USER-DEFINED (case_status) not null default 'oprettet'::screening.case_status
+kolonne cases.updated_at timestamp with time zone not null default now()
+kolonne exports.case_id uuid not null
+kolonne exports.filename text
+kolonne exports.generated_at timestamp with time zone not null default now()
+kolonne exports.generated_by uuid
+kolonne exports.id uuid not null default gen_random_uuid()
+kolonne exports.kind text not null default 'eurofins_csv'::text
+kolonne exports.row_count integer
+kolonne exports.sample_ids ARRAY not null default '{}'::uuid[]
+kolonne lab_results.asbestos text
+kolonne lab_results.asbestos_dusty boolean
+kolonne lab_results.cd text
+kolonne lab_results.chlor_paraffins text
+kolonne lab_results.cr text
+kolonne lab_results.created_at timestamp with time zone not null default now()
+kolonne lab_results.cu text
+kolonne lab_results.hg text
+kolonne lab_results.ni text
+kolonne lab_results.pah_total text
+kolonne lab_results.pb text
+kolonne lab_results.pcb_total text
+kolonne lab_results.raw jsonb
+kolonne lab_results.received_at timestamp with time zone
+kolonne lab_results.sample_id uuid not null
+kolonne lab_results.zn text
+kolonne materials.active boolean not null default true
+kolonne materials.id uuid not null default gen_random_uuid()
+kolonne materials.name text not null
+kolonne materials.sort_order integer not null default 0
+kolonne sample_photos.bytes bigint
+kolonne sample_photos.created_at timestamp with time zone not null default now()
+kolonne sample_photos.created_by uuid
+kolonne sample_photos.height integer
+kolonne sample_photos.id uuid not null default gen_random_uuid()
+kolonne sample_photos.sample_id uuid not null
+kolonne sample_photos.sort_order integer not null default 0
+kolonne sample_photos.storage_path text not null
+kolonne sample_photos.taken_at timestamp with time zone
+kolonne sample_photos.width integer
+kolonne sample_types.active boolean not null default true
+kolonne sample_types.id uuid not null default gen_random_uuid()
+kolonne sample_types.name text not null
+kolonne sample_types.sort_order integer not null default 0
+kolonne samples.analysis_asbestos boolean not null default false
+kolonne samples.analysis_metals boolean not null default false
+kolonne samples.analysis_pah boolean not null default false
+kolonne samples.analysis_pcb boolean not null default false
+kolonne samples.building_id uuid
+kolonne samples.building_ids ARRAY not null default '{}'::uuid[]
+kolonne samples.case_id uuid not null
+kolonne samples.comment text
+kolonne samples.created_at timestamp with time zone not null default now()
+kolonne samples.created_by uuid
+kolonne samples.estimated_tons numeric
+kolonne samples.id uuid not null default gen_random_uuid()
+kolonne samples.is_lab_sample boolean
+kolonne samples.label text
+kolonne samples.location_note text
+kolonne samples.material text
+kolonne samples.period USER-DEFINED (building_period)
+kolonne samples.sample_type text
+kolonne samples.seq integer not null
+kolonne samples.updated_at timestamp with time zone not null default now()
+politik app_settings.app_settings_select SELECT roles=authenticated using=screening.is_member() check=
+politik app_settings.app_settings_write ALL roles=authenticated using=screening.is_office() check=screening.is_office()
+politik app_users.app_users_select SELECT roles=authenticated using=screening.is_member() check=
+politik app_users.app_users_write ALL roles=authenticated using=screening.is_admin() check=screening.is_admin()
+politik case_buildings.case_buildings_all ALL roles=authenticated using=screening.is_member() check=screening.is_member()
+politik case_files.case_files_select SELECT roles=public using=screening.is_member() check=
+politik case_files.case_files_write ALL roles=public using=
+CASE
+    WHEN (kind = ANY (ARRAY['eurofins_pdf'::text, 'eurofins_side'::text])) THEN screening.is_office()
+    ELSE screening.is_member()
+END check=
+CASE
+    WHEN (kind = ANY (ARRAY['eurofins_pdf'::text, 'eurofins_side'::text])) THEN screening.is_office()
+    ELSE screening.is_member()
+END
+politik cases.cases_delete DELETE roles=authenticated using=screening.is_office() check=
+politik cases.cases_insert INSERT roles=authenticated using= check=screening.is_member()
+politik cases.cases_select SELECT roles=authenticated using=screening.is_member() check=
+politik cases.cases_update UPDATE roles=authenticated using=screening.is_member() check=screening.is_member()
+politik exports.exports_insert INSERT roles=authenticated using= check=screening.is_member()
+politik exports.exports_select SELECT roles=authenticated using=screening.is_member() check=
+politik lab_results.lab_results_select SELECT roles=authenticated using=screening.is_member() check=
+politik lab_results.lab_results_write ALL roles=authenticated using=screening.is_office() check=screening.is_office()
+politik materials.materials_select SELECT roles=authenticated using=screening.is_member() check=
+politik materials.materials_write ALL roles=authenticated using=screening.is_office() check=screening.is_office()
+politik sample_photos.sample_photos_all ALL roles=authenticated using=screening.is_member() check=screening.is_member()
+politik sample_types.sample_types_select SELECT roles=authenticated using=screening.is_member() check=
+politik sample_types.sample_types_write ALL roles=authenticated using=screening.is_office() check=
+politik samples.samples_all ALL roles=authenticated using=screening.is_member() check=screening.is_member()
+rls app_settings enabled=true forced=false
+rls app_users enabled=true forced=false
+rls case_buildings enabled=true forced=false
+rls case_files enabled=true forced=false
+rls cases enabled=true forced=false
+rls exports enabled=true forced=false
+rls lab_results enabled=true forced=false
+rls materials enabled=true forced=false
+rls sample_photos enabled=true forced=false
+rls sample_types enabled=true forced=false
+rls samples enabled=true forced=false
+trigger CREATE TRIGGER app_users_updated_at BEFORE UPDATE ON screening.app_users FOR EACH ROW EXECUTE FUNCTION screening.set_updated_at()
+trigger CREATE TRIGGER case_buildings_fjern_fra_proever AFTER DELETE ON screening.case_buildings FOR EACH ROW EXECUTE FUNCTION screening.fjern_slettet_bygning()
+trigger CREATE TRIGGER cases_updated_at BEFORE UPDATE ON screening.cases FOR EACH ROW EXECUTE FUNCTION screening.set_updated_at()
+trigger CREATE TRIGGER samples_updated_at BEFORE UPDATE ON screening.samples FOR EACH ROW EXECUTE FUNCTION screening.set_updated_at()

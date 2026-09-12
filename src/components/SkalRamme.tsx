@@ -72,11 +72,27 @@ export function SkalRamme({
     </ul>
   );
 
+  /*
+   * Navnet forer til kodeordsskiftet.
+   *
+   * En ny bruger har faet sit kodeord laest hojt af den, der oprettede hende,
+   * og det skal kunne skiftes uden at nogen forklarer hvor. Navnet er stedet:
+   * det er der, man leder efter sig selv.
+   */
   const bund = (
     <div className="mt-auto border-t border-border pt-3">
-      <p className="truncate px-3 text-sm text-muted" title={navn}>
+      <Link
+        href="/kodeord"
+        title="Skift kodeord"
+        onClick={() => setAaben(false)}
+        className={`tap flex items-center truncate rounded-xl px-3 text-sm transition-colors ${
+          erAktiv("/kodeord")
+            ? "bg-primary-soft font-medium text-primary inset-ring inset-ring-primary-line"
+            : "text-muted hover:bg-surface-2 hover:text-fg"
+        }`}
+      >
         {navn}
-      </p>
+      </Link>
       <form action={logout}>
         <button className="tap mt-1 flex w-full items-center rounded-xl px-3 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg">
           Log ud

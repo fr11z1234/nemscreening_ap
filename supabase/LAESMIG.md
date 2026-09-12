@@ -41,15 +41,66 @@ dem mangler, så der er ikke rettet noget i SQL-editoren, som aldrig blev
 registreret.
 
 Det er en navnekontrol, ikke en fuld skemasammenligning — den ville ikke fange
-en ændret datatype eller en droppet constraint. Det endelige bevis er at køre
-migrationerne op på en tom database og sammenligne. Det sker første gang, der
-oprettes en Supabase-branch.
+en ændret datatype eller en droppet constraint.
+
+**Det endelige bevis er nu ført.** 12. september 2026, som forberedelse til fase
+2: en normaliseret skemaliste — kolonner med type, nullable og default,
+constraints, indeks, politikker med deres betingelser, funktionernes kroppe,
+triggere, enum-værdier, RLS-flaget pr. tabel og grants pr. rolle — blev hentet
+fra tre steder og gav **samme md5**:
+
+| Bygget af | md5 | Linjer |
+| --- | --- | --- |
+| Den lokale stak, af de elleve filer | `982a253bed9339988695b362769c67d3` | 251 |
+| Branchen, nulstillet til `20260804111609` | `982a253bed9339988695b362769c67d3` | 251 |
+
+To miljøer bygget af de samme filer beskriver altså **samme** skema, ned til
+politikkernes betingelser og funktionernes kroppe. Produktionen holdes op mod
+det samme tal i pre-flight, før fase 2 lægges på — afviger den, er der rettet
+noget i dashboardet, som aldrig blev registreret, og så skal det forstås først.
+Forespørgslen ligger som
+`ops/skemaliste.sql`, og listerne som `ops/skema-basis.txt` (elleve filer) og
+`ops/skema-fase2.txt` (alle tyve).
+
+**Branchen er nu bygget af filerne med filernes egne versionsnumre.** Det var den
+ikke før: fase 2's ni migrationer blev lagt på med MCP-værktøjet, som gav dem
+*sine egne* numre — filen `20260824161500_…` blev registreret som
+`20260824171828`. Branchens historik var altså ikke sandheden, filerne var. Efter
+nulstillingen i fase 2's Fase 0 og migrationen med `ops/fase2-prod.sql` står de
+ni versioner med **filernes** numre, og `md5(statements[1])` matcher filen på
+disken linje for linje.
 
 ## Kør dem ikke mod produktion
 
 Produktionen **har** dem allerede; dens migrationstabel nævner alle elleve. Filerne
 her er til at bygge et *nyt* miljø op: en preview-branch, et lokalt stak, eller
 produktionen igen hvis den en dag skal genskabes.
+
+## Sådan lægges en migration på produktionen
+
+**`supabase db push` kan ikke bruges her.** Produktionens historik indeholder
+websitets **24** migrationer foran screening-appens, og `db push` vil derfor
+kræve en «repair» af websitets historik — altså at vi retter i et andet repos
+regnskab. Det gør vi ikke.
+
+I stedet, og det er sådan fase 2's ni migrationer blev lagt på 12. september
+2026:
+
+1. Et script bygges **mekanisk** af filerne — hver fils indhold byte for byte,
+   efterfulgt af en `insert into supabase_migrations.schema_migrations` med
+   **filens eget** versionsnummer og hele filen som `statements[1]`.
+2. Alle ni i **én transaktion** med `lock_timeout` og `statement_timeout`.
+   Alt eller intet.
+3. Verifikation med tal, ikke med øjne: rækketal og md5 af hver tabels gamle
+   kolonner før og efter, og en normaliseret skemaliste, hvis md5 skal ramme det
+   samme som en lokal stak bygget af de samme filer.
+
+Fremgangsmåden, scriptene og hvert bevis står i `FASE-2-TIL-MAIN.md`.
+Generatoren er `ops/byg-fase2-prod.js`, og skemalisten er `ops/skemaliste.sql`.
+
+**Brug aldrig MCP-værktøjets `apply_migration` mod produktionen.** Den stempler
+sit *eget* versionsnummer, og så holder historikken op med at svare til
+filerne. Det er præcis det, der skete på branchen — se nedenfor.
 
 ## Hvad en Supabase-branch faktisk er
 
@@ -64,11 +115,26 @@ sted, noget findes.
 
 ## Miljøerne som de står nu
 
-| | Projekt-ref | Hvad der er i den |
-| --- | --- | --- |
-| Produktion | `mwityvqavrqxqaunvtdg` | Live. Deles med hjemmesiden. **Rør den ikke.** |
-| Branchen `fase-2` | `ezylaouiajlpxhrplqln` | Test-database bag Vercels preview. |
-| Lokal stak | — | `npx supabase start`, nulstilles med `db reset`. |
+| | Projekt-ref | Vært (Session pooler) | Hvad der er i den |
+| --- | --- | --- | --- |
+| Produktion | `mwityvqavrqxqaunvtdg` | `aws-1-eu-north-1.pooler.supabase.com:5432` | Live. Deles med hjemmesiden. **Rør den ikke.** |
+| Branchen `fase-2` | `ezylaouiajlpxhrplqln` | `aws-0-eu-north-1.pooler.supabase.com:5432` | Test-database bag Vercels preview. Sagsnavne begynder med `[TEST]`. |
+| Lokal stak | — | `host.docker.internal:54322` | `npx supabase start`, nulstilles med `db reset`. |
+
+**Værtsnavnet er pr. projekt, ikke pr. region.** Begge ligger i `eu-north-1`, og
+alligevel er den ene på `aws-0` og den anden på `aws-1`. Den forkerte vært svarer
+`FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found` — altså før kodeordet
+prøves, så det er sådan man ser, hvilken der er den rigtige. Hent strengen fra
+dashboardet → *Connect* → **Session pooler**; ikke *Direct* (IPv6-only), ikke
+*Transaction pooler* (kan ikke `set local`).
+
+**Databasekodeordet findes kun i dashboardet, og det vises aldrig.** Connect
+skriver `[YOUR-PASSWORD]`. Kender man det ikke, er *Reset database password*
+under Project Settings → Database den eneste vej — og på en branch er punktet
+**skjult i menuen**; siden findes alligevel på branchens eget ref
+(`…/dashboard/project/ezylaouiajlpxhrplqln/database/settings`). Kodeordet kan
+**ikke** sættes med SQL: `postgres` er ikke superbruger på Supabase og svarer
+`42501: permission denied to alter role`.
 
 Branchens API ligger på `https://ezylaouiajlpxhrplqln.supabase.co`. Dens
 publicerbare nøgle er ikke en hemmelighed — den ligger i browserens bundt i

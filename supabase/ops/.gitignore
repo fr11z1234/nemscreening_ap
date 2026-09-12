@@ -1,0 +1,15 @@
+# Skaermbilleder og hentede filer fra roegtesterne.
+#
+# De er bilag til rapporten og bliver paa udviklerens maskine. De maa IKKE
+# committes: generalproeven koerte mod en KOPI AF PRODUKTIONENS DATA paa
+# branchen, saa billederne viser rigtige adresser, rigtige kundenavne og
+# rigtige labsvar — 61 sagsnavne paa ét af dem. Og en Eurofins-fil er en
+# rigtig sags proever.
+#
+# Samme grund som `prod-data.sql` ikke ligger her: en kopi af produktionens
+# data hoerer ikke i et repo, og et repo glemmer ikke.
+#
+# Scriptene og TALLENE (foer-*.txt, efter-*.txt, skema-*.txt, *.md5) skal
+# derimod med. De indeholder raekketal og md5'er, ikke data, og de er hele
+# dokumentationen af, at intet blev roert.
+skaerm/

@@ -1,0 +1,17 @@
+# Alt her sammenlignes BYTE FOR BYTE med noget, psql har skrevet — og psql
+# skriver LF.
+#
+# `skema-basis.txt` og `skema-fase2.txt` holdes op mod en frisk skemaliste med
+# `diff`, og md5'en af listen er selve beviset. `foer-*.txt` og `efter-*.txt`
+# laeses af `sammenlign-verify.js`, som splitter paa linjeskift og sammenligner
+# md5'er som tekst. `fase2-prod.md5` holdes op mod md5'en af filerne i
+# `../migrations/`.
+#
+# Med core.autocrlf=true ville Windows give dem CRLF i arbejdskopien, og saa
+# ville hver eneste linje afvige — eller vaerre: en md5 ville baere et '\r' og
+# sammenligningen fejle paa noget, der ikke er en fejl. Det er samme grund som
+# `*.sql` i ../.gitattributes, og det er ikke Postgres der er kraevende, det er
+# verifikationen.
+*.txt text eol=lf
+*.md5 text eol=lf
+*.js  text eol=lf

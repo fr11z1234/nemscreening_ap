@@ -10,16 +10,10 @@ Læs `README.md` først — den forklarer kæden fra sag til rapport, hvor tinge
 ligger, og hvordan databasen er skruet sammen. Herunder står kun det, der er
 let at bryde.
 
-## LÆS DETTE FØRST: fase 2 er i gang
+## LÆS DETTE FØRST: databasen er delt
 
-Der bygges en version 2 med brydende ændringer. Den skal kunne kasseres i sin
-helhed, og den må ikke kunne røre det, der er live. Derfor gælder følgende, og
-det vejer tungere end alt andet i denne fil.
-
-**Arbejd på grenen `fase-2`. Flet den ikke til `main`.** Vercel bygger `main`
-som produktion; ethvert push dertil går live med det samme. Afsnittet
-«Udrulning» nedenfor beskriver den normale rutine — den er sat ud af kraft,
-indtil fase 2 er færdig og nogen udtrykkeligt beder om at flette.
+Det her vejer tungere end alt andet i denne fil, fordi det, der går galt, går
+galt for en anden app end den, du sidder i.
 
 **Databasen deles med hjemmesiden.** Samme Supabase-projekt huser
 nemscreening.dk: `public` indeholder websitets leads, bookinger og indlæg —
@@ -817,16 +811,22 @@ sidetallet alene hverken sorterer eller duer som React-nøgle.
 
 ## Om data
 
-Sagerne i Supabase er **testdata** pr. juli 2026 og slettes inden go-live.
-Uoverensstemmelser i dem er ikke fejl der skal migreres væk.
+**Sagerne i produktionen er rigtige.** Rigtige adresser, rigtige kunder,
+rigtige labsvar, og rapporter der er sendt til kommuner. De var testdata indtil
+fase 2 gik live 12. september 2026; det er de ikke længere. Uoverensstemmelser i
+gamle rækker er ikke fejl, der skal migreres væk — men de skal heller ikke
+rettes på et gæt.
 
 ## Udrulning
 
-> **Sat ud af kraft, mens fase 2 bygges.** Flet ikke til `main` uden at nogen
-> udtrykkeligt beder om det — se afsnittet øverst i filen. Resten her beskriver
-> den normale rutine, som gælder igen bagefter.
-
 Arbejd på en gren, flet til `main`, push. Vercel bygger `main` som produktion.
+
+**Skemaændringer kan ikke pushes med `supabase db push`** — se
+`supabase/LAESMIG.md`. Produktionens migrationshistorik har websitets 24
+migrationer foran screening-appens, så `db push` vil kræve en «repair» af
+websitets historik. Migrationer lægges på med SQL og registreres i hånden med
+filernes egne versionsnumre. Fremgangsmåden, med scripts og verifikation, står
+i `supabase/FASE-2-TIL-MAIN.md`, og den blev brugt til fase 2.
 
 ### Preview mod en test-database
 
@@ -849,5 +849,9 @@ værdien er gemt. De skal tilføjes med `--no-sensitive`. Det er der ingen skade
 i: en `NEXT_PUBLIC_`-variabel ligger i browserens bundt i forvejen.
 
 Sådan afgøres det, hvilken database en preview faktisk bruger: log ind og se
-på sagslisten. Test-databasen har **én** sag, Nørrebrogade 12, med prøverne
-P1, P2, 3, P4, P5. Produktionen har snesevis. De kan ikke forveksles.
+på sagslisten. **Test-databasens sagsnavne begynder alle med `[TEST]`.** Mærket
+blev sat i hånden, da branchen fik en kopi af produktionens data til
+generalprøven for fase 2, og det er den eneste grund til, at de to ikke kan
+forveksles i en browser. Bygges branchen op forfra fra `seed.sql`, har den i
+stedet **én** sag, Nørrebrogade 12, med prøverne P1, P2, 3, P4, P5. Ser du
+hverken `[TEST]` eller Nørrebrogade, taler du med produktionen.

@@ -23,6 +23,12 @@ export async function Skal({ children }: { children: React.ReactNode }) {
     nav.push({ href: "/materialer", label: "Materialer" });
     nav.push({ href: "/indstillinger", label: "Indstillinger" });
   }
+  // Brugere er smallere end de to ovenfor: `app_users_write` kraever
+  // is_admin(), og `brugere/page.tsx` svarer 404 til alle andre. Punktet star
+  // derfor sidst og kun for admin.
+  if (rolle === "admin") {
+    nav.push({ href: "/brugere", label: "Brugere" });
+  }
 
   return (
     <MemberGate>

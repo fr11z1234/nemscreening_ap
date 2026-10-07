@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type {
   AddressPick,
   AddressSuggestion,
-} from "@/app/api/dawa/autocomplete/route";
+} from "@/app/api/adresse/autocomplete/route";
 
 /**
- * Adressesogning med forslag fra DAWA.
+ * Adressesogning med forslag fra Klimadatastyrelsens Adressevaelger.
  *
  * Skriver ikke direkte i et formularfelt, men melder det valgte tilbage til
  * foraelderen, sa den kan udfylde bade sagsnavn, postnummer og by pa en gang.
  *
- * Soegningen er trinvis, fordi DAWA's er det: forst et vejnavn, sa et
+ * Soegningen er trinvis, fordi Adressevaelgerens er det: forst en vej, sa et
  * husnummer. Kun det sidste er et valg — se autocomplete-ruten.
  */
 export function AddressSearch({
@@ -43,7 +44,7 @@ export function AddressSearch({
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/dawa/autocomplete?q=${encodeURIComponent(q)}`,
+          `/api/adresse/autocomplete?q=${encodeURIComponent(q)}`,
         );
         if (!res.ok) throw new Error();
         const data = (await res.json()) as AddressSuggestion[];
@@ -62,12 +63,18 @@ export function AddressSearch({
   }, [query]);
 
   function choose(s: AddressSuggestion) {
-    if (s.slags === "vejnavn") {
-      // Et vejnavn er en indsnaevring og ikke et valg. Teksten slutter med et
-      // mellemrum, sa den naeste soegning rammer husnumrene — listen bliver
-      // staaende og fyldes med adresser i stedet.
-      setQuery(s.tekst);
-      inputRef.current?.focus();
+    if (s.slags === "indsnaevring") {
+      // En indsnaevring er ikke et valg. Teksten skrives i feltet, sa den
+      // naeste soegning rammer husnumrene — listen bliver staaende og fyldes
+      // med adresser i stedet.
+      //
+      // Markoeren star ikke altid til sidst: pa "Nørrebrogade , 2200
+      // København N" skal husnummeret ind foran kommaet. Derfor skal teksten
+      // vaere i feltet, foer markoeren kan saettes.
+      flushSync(() => setQuery(s.soeg));
+      const input = inputRef.current;
+      input?.focus();
+      input?.setSelectionRange(s.markoer, s.markoer);
       return;
     }
     setQuery(s.tekst);
@@ -98,19 +105,19 @@ export function AddressSearch({
       {open && visible.length > 0 && (
         <ul className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-xl bg-surface shadow-raised inset-ring inset-ring-border">
           {visible.map((s) => (
-            // Vejnavne har intet id — de skelnes pa teksten, som er unik
-            // inden for det ene svar.
-            <li key={s.slags === "adresse" ? s.id : `vej:${s.tekst}`}>
+            // Indsnaevringer har ikke altid et id — de skelnes pa teksten, som
+            // er unik inden for det ene svar.
+            <li key={s.slags === "adresse" ? s.id : `ind:${s.soeg}`}>
               <button
                 type="button"
                 onClick={() => choose(s)}
                 className="tap flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2"
               >
                 <span className="min-w-0 flex-1 truncate">{s.tekst}</span>
-                {/* Uden det her ligner et vejnavn et valg der ikke virker. */}
-                {s.slags === "vejnavn" && (
+                {/* Uden det her ligner en indsnaevring et valg der ikke virker. */}
+                {s.slags === "indsnaevring" && (
                   <span className="shrink-0 text-xs text-muted">
-                    vælg husnummer
+                    vælg {s.mangler}
                   </span>
                 )}
               </button>

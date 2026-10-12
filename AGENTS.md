@@ -149,7 +149,25 @@ læg aldrig noget i flowet der kræver netværk for at komme videre.
  er en opmåling, og der er tyve af dem i en bygning. Krævede hver af dem et
  billede, ville ressourcescreeningen tage længere tid end prøvetagningen — og
  billederne blive taget for at komme videre frem for for at dokumentere noget.
-- **Højst to billeder pr. prøve.**
+ Derfor advarer sagssiden og «Gennemgå billeder» kun om **prøver til
+ laboratoriet** uden billede. En registrering uden analyse er ofte netop noget,
+ der ikke kan ses — isoleringen i hulmuren — og får en stille plads, ikke en
+ gul advarsel.
+- **Højst to billeder pr. prøve**, taget med kameraet eller uploadet. Under
+ søgeren står et felt pr. billede; de tomme er stiplede med et plus og åbner
+ filvælgeren — til det, kameraet ikke fik med, eller det kunden sender
+ bagefter. Et uploadet billede går i **den samme offline-kø** som et taget, og
+ rapporten viser det med `object-contain`, så intet beskæres.
+- **Billeder slettes og skiftes også i «Gennemgå billeder»** med samme greb:
+ krydset sletter, plusset kommer frem i stedet. At skifte er at slette og
+ lægge et nyt op — der er ingen erstat-knap. Begge steder bruger
+ `src/lib/offline/billeder.ts`, så reglerne for upload og sletning kun står ét
+ sted.
+- **Et billede slettes kun, når sletningen er landet.** Ligger det stadig i
+ køen, er det aldrig nået op, og så er sletningen færdig uden dækning. Er det
+ oppe, skal rækken væk i Supabase først — ellers kommer det igen ved næste
+ åbning og kan skubbe det nye ud af rapporten, som kun viser de første to.
+ Dialogen siger det, frem for at billedet forsvinder på skrømt.
 - **Prøvetagningen åbner der hvor man slap.** Uden `?seq=` i adressen er man
   kommet fra "Fortsæt prøvetagning", og så skal man tilbage til den senest
   rørte prøve — ikke til en ny, blank. En ny er et tryk væk; den halvfærdige
@@ -213,13 +231,15 @@ søgeren følger med. Bliver en søger liggende igen, fejler den også.
 
 Filvælgeren er undtagelsen. Har telefonen ikke `getUserMedia`, tages billedet i
 systemets eget kamera, og der er ingen søger af vores at rette sig efter —
-filen kommer med i sin helhed.
+filen kommer med i sin helhed. Det samme gælder et uploadet billede.
 
 ### En systemdialog sætter søgeren på pause
 
 **Strømmen kan leve, uden at der kommer billeder.** `window.confirm` foran en
 sletning og filvælgeren suspenderer begge siden, og browseren sætter `<video>`
-på pause. Sporet er stadig `live`, så kontrollen «lever sporet?» sagde ja og
+på pause. Billedsletningen bruger i dag `SletDialog` i siden og ikke
+`window.confirm`, men filvælgeren — systemets kamera og uploadet — er stadig en
+systemdialog. Sporet er stadig `live`, så kontrollen «lever sporet?» sagde ja og
 gjorde intet — søgeren frøs på det sidste billede, indtil screeneren gik ud af
 prøven og ind igen, for så blev komponenten monteret forfra.
 
@@ -653,6 +673,10 @@ liste over hvad der forsvinder, og "Slet" åbner sig først når de alle er sat.
 Et enkelt "er du sikker?" bliver trykket væk uden at blive læst, og det der
 forsvinder er altid mere end det man trykkede på. Tomme lag springes over — et
 flueben ved "0 billeder" lærer kun folk at sætte flueben uden at læse.
+
+Et enkelt billede slettes med `SletDialog` **uden lag**: det der forsvinder er
+præcis det, man trykkede på, og billedet står i dialogen i stedet for et
+flueben ved en beskrivelse af det.
 
 **Databasen rydder selv op.** Fremmednøglerne fra `cases` til
 `case_buildings`, `samples`, `case_files` og `exports` står på CASCADE, og

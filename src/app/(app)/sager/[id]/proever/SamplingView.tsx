@@ -5,17 +5,23 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCamera } from "@/lib/camera/useCamera";
-import { compressImageFile } from "@/lib/camera/compress";
 import { PickerField } from "@/components/PickerField";
 import { SletDialog, type SletLag } from "@/components/SletDialog";
+import { SletBilledeDialog } from "@/components/SletBilledeDialog";
 import { flush, PHOTO_BUCKET } from "@/lib/offline/sync";
 import {
   dropSampleEverywhere,
-  enqueuePhoto,
   pendingCounts,
   savePendingSample,
   type PendingSample,
 } from "@/lib/offline/store";
+import {
+  MAX_PHOTOS,
+  koeBilleder,
+  laesFiler,
+  sletBillede,
+  type NytBillede,
+} from "@/lib/offline/billeder";
 import { formatDecimal, parseDecimal } from "@/lib/format";
 import { LEVEL_LABEL } from "@/lib/lab/parametre";
 import {
@@ -40,15 +46,6 @@ type Thumb = { id: string; url: string; local: boolean };
 export type InitialPhoto = { id: string; sample_id: string; url: string };
 
 const uuid = () => crypto.randomUUID();
-
-/**
- * Billeder pr. prove.
- *
- * To raekker: et oversigtsbillede af hvor proven er taget, og et naerbillede
- * af materialet. Flere goer hverken dokumentationen staerkere eller
- * gennemgangen inden afgang hurtigere — den bliver bare laengere at scrolle.
- */
-const MAX_PHOTOS = 2;
 
 const labelFor = (d: Draft) =>
   ANALYSIS_FIELDS.some((a) => d[a.key]) ? `P${d.seq}` : String(d.seq);
@@ -262,6 +259,7 @@ export function SamplingView({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [sletter, setSletter] = useState(false);
+  const [billedTilSletning, setBilledTilSletning] = useState<Thumb | null>(null);
 
   const {
     videoRef,
@@ -274,6 +272,7 @@ export function SamplingView({
     toggleTorch,
   } = useCamera();
   const fileInput = useRef<HTMLInputElement>(null);
+  const uploadInput = useRef<HTMLInputElement>(null);
 
   const thumbs = photos[draft.id] ?? [];
   const atPhotoLimit = thumbs.length >= MAX_PHOTOS;
@@ -388,29 +387,29 @@ export function SamplingView({
     };
   }, []);
 
-  async function addPhoto(shot: { blob: Blob; width: number; height: number }) {
-    // Sidste laas. De tre veje ind stopper hver for sig med en besked, men
-    // graensen skal ogsa holde hvis en af dem far en vej udenom.
-    if (atPhotoLimit) return;
+  /**
+   * Laegger billeder pa den aktuelle prove — fra kameraet eller fra en fil.
+   *
+   * Alle veje ind ender her, ogsa uploadet. Koen er den samme som i
+   * gennemgangen af billederne; se lib/offline/billeder.ts.
+   */
+  async function addPhotos(nye: NytBillede[]) {
+    // Sidste laas. Vejene ind stopper hver for sig med en besked, men graensen
+    // skal ogsa holde hvis en af dem far en vej udenom.
+    const plads = nye.slice(0, Math.max(0, MAX_PHOTOS - thumbs.length));
+    if (plads.length === 0) return;
 
-    const id = uuid();
-    await enqueuePhoto({
-      id,
-      sample_id: draft.id,
-      case_id: caseId,
-      blob: shot.blob,
-      width: shot.width,
-      height: shot.height,
-      taken_at: new Date().toISOString(),
-      sort_order: thumbs.length,
+    const ids = await koeBilleder(caseId, draft.id, plads, thumbs.length);
+    const tilfoejet: Thumb[] = plads.map((billede, i) => {
+      const url = URL.createObjectURL(billede.blob);
+      localUrls.current.add(url);
+      return { id: ids[i], url, local: true };
     });
     // Provens raekke skal findes for fotoet kan gemmes.
     await persist(draft);
-    const url = URL.createObjectURL(shot.blob);
-    localUrls.current.add(url);
     setPhotos((p) => ({
       ...p,
-      [draft.id]: [...(p[draft.id] ?? []), { id, url, local: true }],
+      [draft.id]: [...(p[draft.id] ?? []), ...tilfoejet],
     }));
     void sync();
   }
@@ -430,49 +429,54 @@ export function SamplingView({
       return;
     }
     const shot = await capture();
-    if (shot) await addPhoto(shot);
+    if (shot) await addPhotos([{ ...shot, takenAt: new Date().toISOString() }]);
     else openFilePicker();
   }
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  /**
+   * Billeder fra en fil: systemets kamera, eller et billede der findes i
+   * forvejen — det marken ikke fik med, eller det kunden sender bagefter.
+   */
+  async function onVaelgFiler(e: React.ChangeEvent<HTMLInputElement>) {
+    const filer = Array.from(e.target.files ?? []);
     e.target.value = "";
     // Filvaelgeren er ogsa en systemdialog og stopper sogeren pa samme maade.
     void resumeCamera();
-    if (!file) return;
-    if (atPhotoLimit) {
+    if (filer.length === 0) return;
+
+    const ledige = MAX_PHOTOS - thumbs.length;
+    if (ledige <= 0) {
       setNotice(photoLimitNotice);
       return;
     }
-    await addPhoto(await compressImageFile(file));
+
+    setBusy(true);
+    try {
+      const { nye, besked } = await laesFiler(filer, ledige);
+      await addPhotos(nye);
+      setNotice(besked);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function removePhoto(id: string) {
-    // Et billede kan ikke tages om, nar screeneren er kort hjem fra adressen.
-    // Derfor en bekraeftelse frem for et tryk der bare sletter.
-    const svar = window.confirm("Slet billedet?");
+  /** Sletter billedet, screeneren har bekraeftet i dialogen. */
+  async function sletBilledet(thumb: Thumb): Promise<string | null> {
+    const sampleId = draft.id;
+    const fejl = await sletBillede(supabase, caseId, sampleId, thumb.id);
+    if (fejl) return fejl;
 
-    // Dialogen satte sogeren paa pause. Stroemmen lever videre, sa ingenting
-    // opdager det af sig selv — den frøs paa det sidste billede, indtil
-    // screeneren gik ud af proven og ind igen. Ogsa naar der svares nej: det
-    // er dialogen der stopper videoen, ikke sletningen.
-    void resumeCamera();
-    if (!svar) return;
-
-    const thumb = thumbs.find((t) => t.id === id);
-    if (thumb?.local) {
+    if (thumb.local) {
       URL.revokeObjectURL(thumb.url);
       localUrls.current.delete(thumb.url);
     }
     setPhotos((p) => ({
       ...p,
-      [draft.id]: (p[draft.id] ?? []).filter((t) => t.id !== id),
+      [sampleId]: (p[sampleId] ?? []).filter((t) => t.id !== thumb.id),
     }));
-    await supabase.from("sample_photos").delete().eq("id", id);
-    await supabase.storage
-      .from(PHOTO_BUCKET)
-      .remove([`${caseId}/${draft.id}/${id}.jpg`]);
+    setBilledTilSletning(null);
     void refreshPending();
+    return null;
   }
 
   /**
@@ -657,7 +661,7 @@ export function SamplingView({
         return false;
       }
       if (isLabSample && thumbs.length === 0) {
-        setNotice("Tag mindst ét billede af prøven, før du går videre.");
+        setNotice("Tag eller upload mindst ét billede af prøven, før du går videre.");
         return false;
       }
     } else if (!started(raekke)) {
@@ -714,10 +718,15 @@ export function SamplingView({
 
   async function onFinish() {
     if (!(await commit(false))) return;
+    // Kun fremad. Aabner kontoret en sag, der er sendt til laboratoriet, for at
+    // laegge kundens billeder op, maa «Afslut» ikke sende den tilbage til
+    // «Prover taget» — sa skifter sagssiden tilbage til provetagning, og
+    // svarene ligger et tryk laengere vaek.
     await supabase
       .from("cases")
       .update({ status: "proever_taget" })
-      .eq("id", caseId);
+      .eq("id", caseId)
+      .in("status", ["oprettet", "under_screening"]);
     router.push(`/sager/${caseId}`);
     router.refresh();
   }
@@ -861,37 +870,68 @@ export function SamplingView({
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={onPickFile}
+        onChange={onVaelgFiler}
+        className="hidden"
+      />
+      {/* Uden capture: telefonen tilbyder billedbiblioteket og filerne ved
+          siden af kameraet, og pc'en en almindelig filvaelger. Flere ad gangen,
+          sa kundens to billeder kan laegges op i et greb. */}
+      <input
+        ref={uploadInput}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={onVaelgFiler}
         className="hidden"
       />
 
-      <div className="flex items-center gap-2 overflow-x-auto px-4 py-3">
-        {thumbs.length === 0 ? (
-          <p className="text-[13px] text-muted">
-            {isLabSample
-              ? "Tryk på billedet ovenfor — en prøve til laboratoriet skal have mindst ét billede"
-              : "Tryk på billedet ovenfor for at tage et billede"}
-          </p>
-        ) : (
-          thumbs.map((t) => (
+      {/* Et felt pr. billede proven kan have. De tomme er stiplede med et plus
+          og lader en uploade det, kameraet ikke fik med; et billede taget med
+          kameraet fylder det naeste tomme, som det altid har gjort. Sa kan man
+          se, hvor mange der er plads til, uden at laese det nogen steder. */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex shrink-0 gap-2">
+          {thumbs.map((t, i) => (
             // Selve billedet er ikke en knap. Sletning ligger pa det lille
             // kryds, sa et tilfaeldigt tryk ikke koster et foto.
             <div
               key={t.id}
-              className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2"
+              className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-surface-2"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={t.url} alt="" className="h-full w-full object-cover" />
               <button
                 type="button"
-                onClick={() => removePhoto(t.id)}
-                aria-label="Slet billedet"
+                onClick={() => setBilledTilSletning(t)}
+                aria-label={`Slet billede ${i + 1}`}
                 className="absolute right-0.5 top-0.5 flex size-6 items-center justify-center rounded-full bg-black/65 text-sm leading-none text-white"
               >
                 ×
               </button>
             </div>
-          ))
+          ))}
+          {Array.from(
+            { length: Math.max(0, MAX_PHOTOS - thumbs.length) },
+            (_, i) => (
+              <button
+                key={`tom-${i}`}
+                type="button"
+                onClick={() => uploadInput.current?.click()}
+                disabled={busy}
+                aria-label="Upload billede"
+                className="flex size-16 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-grid text-3xl leading-none text-muted transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary active:border-primary active:bg-primary-soft active:text-primary disabled:opacity-50"
+              >
+                +
+              </button>
+            ),
+          )}
+        </div>
+        {/* Kun kravet staar skrevet. At kameraet og plusset tager billeder,
+            giver sig selv. */}
+        {isLabSample && thumbs.length === 0 && (
+          <p className="text-[13px] leading-snug text-muted">
+            Prøven skal have mindst ét billede
+          </p>
         )}
       </div>
 
@@ -1126,7 +1166,7 @@ export function SamplingView({
                 } uden analyse — prøven sendes ikke til laboratoriet.`
               : isLabSample
                 ? `Sendes til laboratoriet som ${label}.`
-                : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet."}
+                : "Uden analyse registreres materialet kun — det sendes ikke til laboratoriet og kræver intet billede."}
             {!fund &&
               draft.period === "efter_1990" &&
               ` ${EXCLUDED_LABELS} bestilles ikke på en bygning fra efter 1990.`}
@@ -1232,6 +1272,14 @@ export function SamplingView({
           sletTekst="Slet prøven"
           onSlet={sletProeve}
           onLuk={() => setSletter(false)}
+        />
+      )}
+
+      {billedTilSletning && (
+        <SletBilledeDialog
+          url={billedTilSletning.url}
+          onSlet={() => sletBilledet(billedTilSletning)}
+          onLuk={() => setBilledTilSletning(null)}
         />
       )}
     </div>

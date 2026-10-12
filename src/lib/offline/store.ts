@@ -1,4 +1,4 @@
-import { createStore, del, entries, set } from "idb-keyval";
+import { createStore, del, entries, get, set } from "idb-keyval";
 import type { BuildingPeriod, ResourceHandling } from "@/lib/types";
 
 /**
@@ -94,6 +94,24 @@ export async function enqueuePhoto(p: PendingPhoto) {
 
 export async function dropPhoto(id: string) {
   await del(id, photoStore);
+}
+
+/** Om fotoet stadig venter pa at komme op. */
+export async function photoIsPending(id: string): Promise<boolean> {
+  return (await get(id, photoStore)) !== undefined;
+}
+
+/**
+ * Fjerner et foto fra koen, nar screeneren sletter det.
+ *
+ * Svarer om det laa der. Gjorde det, er det aldrig naaet op, og sletningen er
+ * faerdig uden forbindelse. Blev det liggende, ville naeste synk sende det op,
+ * og billedet dukke op igen pa en prove, hvor det var slettet.
+ */
+export async function takePhotoFromQueue(id: string): Promise<boolean> {
+  const fandtes = await photoIsPending(id);
+  if (fandtes) await del(id, photoStore);
+  return fandtes;
 }
 
 /**

@@ -19,6 +19,11 @@ export type SletLag = {
  *
  * Lag der er tomme kommer ikke med. Et flueben ved "0 billeder" laerer kun
  * folk at saette flueben uden at laese.
+ *
+ * Og forsvinder der intet andet end det, man trykkede pa — et enkelt billede —
+ * er der ingen lag, og "Slet" er aaben med det samme. Saa er det `children`,
+ * der viser hvad det gaelder: et billede man kan se, frem for en beskrivelse
+ * af det.
  */
 export function SletDialog({
   titel,
@@ -27,11 +32,13 @@ export function SletDialog({
   sletTekst = "Slet",
   onSlet,
   onLuk,
+  children,
 }: {
   titel: string;
   indledning: string;
   lag: SletLag[];
   sletTekst?: string;
+  children?: React.ReactNode;
   /** Fejlbeskeden, eller null nar det lykkedes. */
   onSlet: () => Promise<string | null>;
   onLuk: () => void;
@@ -94,24 +101,28 @@ export function SletDialog({
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">{indledning}</p>
 
-        <ul className="mt-4 flex flex-col gap-1.5">
-          {lag.map((l) => (
-            <li key={l.id}>
-              {/* Hele linjen er kontakten. Et flueben pa 20 px er ikke et mal
-                  man rammer med en tommelfinger i arbejdshandske. */}
-              <label className="tap flex items-start gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm leading-relaxed">
-                <input
-                  type="checkbox"
-                  checked={afkrydset.includes(l.id)}
-                  onChange={() => skift(l.id)}
-                  disabled={travl}
-                  className="mt-0.5 size-5 shrink-0 accent-danger"
-                />
-                <span>{l.tekst}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        {children}
+
+        {lag.length > 0 && (
+          <ul className="mt-4 flex flex-col gap-1.5">
+            {lag.map((l) => (
+              <li key={l.id}>
+                {/* Hele linjen er kontakten. Et flueben pa 20 px er ikke et mal
+                    man rammer med en tommelfinger i arbejdshandske. */}
+                <label className="tap flex items-start gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm leading-relaxed">
+                  <input
+                    type="checkbox"
+                    checked={afkrydset.includes(l.id)}
+                    onChange={() => skift(l.id)}
+                    disabled={travl}
+                    className="mt-0.5 size-5 shrink-0 accent-danger"
+                  />
+                  <span>{l.tekst}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {fejl && (
           <p className="mt-4 rounded-xl bg-danger-soft p-3 text-sm text-danger">

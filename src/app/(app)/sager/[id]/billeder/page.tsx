@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/offline/sync";
 import type { Case, Sample } from "@/lib/types";
+import { Koesynk } from "./Koesynk";
+import { ProeveBilleder, type GennemgaaetBillede } from "./ProeveBilleder";
 
 export const metadata = { title: "Billeder · Nemscreening" };
 
@@ -15,6 +17,14 @@ type PhotoRow = { id: string; sample_id: string; storage_path: string };
  * billede, skal det opdages her og ikke pa kontoret dagen efter. Derfor star
  * prover uden billeder overst i bevidstheden — de far deres egen optaelling og
  * en tydelig tom plads i stedet for bare at glide med i listen.
+ *
+ * Men kun prover til laboratoriet kan mangle et. Billedet kraeves kun, nar der
+ * er valgt en analyse; en registrering uden er ofte netop noget, der ikke kan
+ * ses — isoleringen i hulmuren, betonen under gulvet. Den far en stille plads,
+ * hvor et billede kan laegges til, og ikke en advarsel.
+ *
+ * Og det der findes her, skal ogsa kunne rettes her. Et forkert billede kan
+ * slettes, og et nyt laegges op i dets sted, uden at aabne proven.
  */
 export default async function PhotosPage({
   params,
@@ -42,7 +52,7 @@ export default async function PhotosPage({
   // Bucket'en er privat, sa der signeres midlertidige URL'er. En time er
   // rigeligt til en gennemgang og kort nok til at et delt skaermbillede af
   // adresselinjen ikke bliver en permanent adgang.
-  const bySample = new Map<string, string[]>();
+  const bySample = new Map<string, GennemgaaetBillede[]>();
   if (samples.length > 0) {
     const { data: rows } = await supabase
       .from("sample_photos")
@@ -66,18 +76,22 @@ export default async function PhotosPage({
       for (const row of rows) {
         const url = urlByPath.get(row.storage_path);
         if (!url) continue;
+        const billede = { id: row.id, url };
         const list = bySample.get(row.sample_id);
-        if (list) list.push(url);
-        else bySample.set(row.sample_id, [url]);
+        if (list) list.push(billede);
+        else bySample.set(row.sample_id, [billede]);
       }
     }
   }
 
-  const total = [...bySample.values()].reduce((n, urls) => n + urls.length, 0);
-  const missing = samples.filter((s) => !bySample.get(s.id)?.length);
+  const total = [...bySample.values()].reduce((n, b) => n + b.length, 0);
+  const missing = samples.filter(
+    (s) => s.is_lab_sample && !bySample.get(s.id)?.length,
+  );
 
   return (
     <>
+      <Koesynk />
       <main className="flex flex-1 flex-col px-4 pb-12">
         <div className="pt-4">
           <Link
@@ -102,8 +116,8 @@ export default async function PhotosPage({
             {missing.length > 0 && (
               <div className="mt-4 rounded-xl bg-warning-soft p-3">
                 <p className="text-sm font-medium text-warning">
-                  {missing.length} prøve{missing.length === 1 ? "" : "r"} uden
-                  billeder
+                  {missing.length} prøve{missing.length === 1 ? "" : "r"} til
+                  laboratoriet uden billeder
                 </p>
                 <p className="tabular mt-1 text-sm text-warning">
                   {missing.map((s) => s.label).join(", ")}
@@ -113,10 +127,16 @@ export default async function PhotosPage({
 
             <div className="mt-6 flex flex-col gap-7">
               {samples.map((s) => {
-                const urls = bySample.get(s.id) ?? [];
+                const billeder = bySample.get(s.id) ?? [];
                 return (
                   <section key={s.id}>
-                    <div className="flex items-baseline gap-2.5">
+                    {/* Hovedet aabner proven. Plusset nedenfor tager kun en fil
+                        eller systemets kamera; vil man have sogeren, der
+                        skaerer til rapportens ramme, er den her. */}
+                    <Link
+                      href={`/sager/${id}/proever?seq=${s.seq}`}
+                      className="group -mx-1 flex items-baseline gap-2.5 rounded-lg px-1 py-0.5"
+                    >
                       <span
                         className={`tabular shrink-0 rounded-md px-1.5 py-0.5 text-[13px] font-semibold ${
                           s.is_lab_sample
@@ -126,44 +146,32 @@ export default async function PhotosPage({
                       >
                         {s.label}
                       </span>
-                      <span className="truncate font-medium">
+                      <span className="truncate font-medium group-hover:underline">
                         {s.material ?? "Uden materiale"}
                       </span>
-                      <span className="tabular ml-auto shrink-0 text-xs text-muted">
-                        {urls.length || "ingen"}
-                      </span>
-                    </div>
-
-                    {urls.length === 0 ? (
-                      <Link
-                        href={`/sager/${id}/proever?seq=${s.seq}`}
-                        className="tap mt-2 flex items-center justify-center rounded-xl bg-warning-soft text-sm font-medium text-warning hover:opacity-85"
+                      <span
+                        className={`tabular ml-auto shrink-0 text-xs ${
+                          s.is_lab_sample && billeder.length === 0
+                            ? "font-medium text-warning"
+                            : "text-muted"
+                        }`}
                       >
-                        Mangler billeder — tag dem nu
-                      </Link>
-                    ) : (
-                      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {urls.map((url, i) => (
-                          // Fuld storrelse abnes i en ny fane. Signeret URL,
-                          // sa den virker uden endnu et login.
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block aspect-square overflow-hidden rounded-xl bg-surface-2"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={url}
-                              alt={`${s.label}, billede ${i + 1}`}
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          </a>
-                        ))}
-                      </div>
-                    )}
+                        {billeder.length ||
+                          (s.is_lab_sample ? "mangler" : "ingen")}
+                      </span>
+                    </Link>
+
+                    {/* Noeglen skifter med billederne fra serveren, sa en
+                        genopfriskning efter en aendring andetsteds ikke
+                        efterlader en gammel liste. */}
+                    <ProeveBilleder
+                      key={billeder.map((b) => b.id).join()}
+                      caseId={id}
+                      sampleId={s.id}
+                      label={s.label}
+                      kraevet={s.is_lab_sample}
+                      billeder={billeder}
+                    />
                   </section>
                 );
               })}

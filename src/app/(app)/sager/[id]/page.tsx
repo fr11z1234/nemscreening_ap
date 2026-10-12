@@ -64,7 +64,12 @@ export default async function CasePage({
     s.building_ids.map((b) => buildingLabel.get(b)).filter(Boolean).join(", ") ||
     null;
   const photosOf = (s: SampleRow) => s.sample_photos?.[0]?.count ?? 0;
-  const withoutPhotos = samples.filter((s) => photosOf(s) === 0).length;
+  // Kun prover til laboratoriet kan mangle et billede. En registrering uden
+  // analyse — isoleringen i hulmuren — er ofte netop noget, der ikke kan ses,
+  // og talte den med, ville advarslen staa gult pa enhver selektiv sag.
+  const withoutPhotos = samples.filter(
+    (s) => s.is_lab_sample && photosOf(s) === 0,
+  ).length;
 
   // Efter afsendelse handler sagen om svar, ikke om prover.
   const afventerSvar =
@@ -217,8 +222,9 @@ export default async function CasePage({
             </ul>
           )}
 
-          {/* Den sidste kontrol for screeneren korer: er der billeder pa alle
-              prover? Knappen sidder under listen, hvor spørgsmalet opstar. */}
+          {/* Den sidste kontrol for screeneren korer: har alle prover til
+              laboratoriet et billede? Knappen sidder under listen, hvor
+              spoergsmalet opstar. */}
           {samples.length > 0 && (
             <Link
               href={`/sager/${id}/billeder`}
